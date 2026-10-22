@@ -37,6 +37,9 @@ test('the login page offers the configured provider, and only that', async ({ pa
   await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
   await expect(page.getByRole('button')).toHaveCount(1);
+  // A fresh install is called "Meetings"; mtxt appears nowhere.
+  await expect(page.getByRole('heading', { level: 1, name: 'Meetings' })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText('mtxt');
 });
 
 test('the first user to sign in on a fresh install becomes admin', async ({ page }) => {
@@ -45,6 +48,37 @@ test('the first user to sign in on a fresh install becomes admin', async ({ page
   const response = await page.goto('/settings');
   expect(response?.status()).toBe(200);
   await expect(page.getByLabel('Admin email addresses')).toHaveValue(ADMIN.email);
+});
+
+test('a second subject with an admin address is refused, and nothing changes', async ({ page }) => {
+  const response = await page.request.post('/api/test/sign-in', {
+    data: { email: ADMIN.email, name: 'Impostor', subject: 'another-subject' },
+  });
+  expect(response.status()).toBe(409);
+  // The real sign-in path lands on the login page with this message.
+  await page.goto('/login?error=AccountConflict');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'belongs to another account' }),
+  ).toHaveText(
+    'This address belongs to another account in this install. Nothing was changed. Contact your admin.',
+  );
+  await signIn(page, { email: ADMIN.email, name: ADMIN.name });
+  await page.goto('/settings');
+  await expect(page.locator('#adminEmails')).toHaveValue(ADMIN.email);
+});
+
+test('callbackUrl only ever returns to this site', async ({ page }) => {
+  await signIn(page, MEMBER);
+  for (const [value, expected] of [
+    ['/\t/evil.example.com', /\/meetings$/],
+    ['//evil.example.com', /\/meetings$/],
+    ['https://evil.example.com', /\/meetings$/],
+    ['/meetings?x=1', /\/meetings\?x=1$/],
+  ] as const) {
+    await page.goto(`/login?callbackUrl=${encodeURIComponent(value)}`);
+    await expect(page, value).toHaveURL(expected);
+    expect(page.url(), value).toMatch(/^http:\/\/localhost:\d+\//);
+  }
 });
 
 test('a non-admin gets the 403 "Admins only" page on /settings', async ({ page }) => {
@@ -260,6 +294,44 @@ test('the data-flow panel names the chosen provider and the retention typed', as
   await page.locator('#retentionAudioDays').fill('14');
   await expect(panel).toContainText('Audio is deleted after 14 days.');
   await expect(panel).toContainText('Processing is not guaranteed to stay in the EU.');
+});
+
+test('a sign-in request cannot replace the client id', async ({ page }) => {
+  // Google, because its discovery document is public; the e2e Entra tenant is a placeholder.
+  await signIn(page, ADMIN);
+  await page.goto('/settings');
+  await page.locator('#identityProvider').selectOption('google');
+  await page.locator('#oidcTenantId').fill('example.com');
+  await page.locator('#oidcClientId').fill('e2e-google-client.apps.example');
+  await page.locator('#oidcClientSecret').fill('e2e-google-secret-not-a-credential');
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+
+  const { csrfToken } = await (await page.request.get('/api/auth/csrf')).json();
+  const response = await page.request.post('/api/auth/signin/google?client_id=attacker', {
+    form: {
+      csrfToken,
+      callbackUrl: '/meetings',
+      client_id: 'attacker',
+      redirect_uri: 'https://evil.example.com',
+      hd: 'evil.example.com',
+    },
+    maxRedirects: 0,
+  });
+  const location = new URL(response.headers()['location'] ?? '');
+  expect(location.host).toBe('accounts.google.com');
+  expect(location.searchParams.get('client_id')).toBe('e2e-google-client.apps.example');
+  expect(location.searchParams.get('hd')).toBe('example.com');
+  expect(location.searchParams.get('redirect_uri')).toMatch(/\/api\/auth\/callback\/google$/);
+
+  // Back to Entra for the tests after this one.
+  await page.goto('/settings');
+  await page.locator('#identityProvider').selectOption('entra');
+  await page.locator('#oidcTenantId').fill('00000000-0000-4000-8000-000000000001');
+  await page.locator('#oidcClientId').fill('00000000-0000-4000-8000-000000000002');
+  await page.locator('#oidcClientSecret').fill('e2e-client-secret-not-a-credential');
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
 });
 
 test.describe('in Danish', () => {
