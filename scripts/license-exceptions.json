@@ -1,0 +1,30 @@
+{
+  "caniuse-lite": {
+    "license": "CC-BY-4.0",
+    "reason": "Browser support data, pulled in by next through browserslist at build time. Data, not code. Reported 2026-10-22."
+  },
+  "glob": {
+    "license": "BlueOak-1.0.0",
+    "reason": "Permissive, OSI-approved. Build tooling under @opennextjs/aws and next. Reported 2026-10-22."
+  },
+  "jackspeak": {
+    "license": "BlueOak-1.0.0",
+    "reason": "Permissive, OSI-approved. Dependency of glob. Reported 2026-10-22."
+  },
+  "lru-cache": {
+    "license": "BlueOak-1.0.0",
+    "reason": "Permissive, OSI-approved. Build tooling under next and @opennextjs/aws. Reported 2026-10-22."
+  },
+  "minimatch": {
+    "license": "BlueOak-1.0.0",
+    "reason": "Permissive, OSI-approved. Dependency of glob. Reported 2026-10-22."
+  },
+  "minipass": {
+    "license": "BlueOak-1.0.0",
+    "reason": "Permissive, OSI-approved. Dependency of glob. Reported 2026-10-22."
+  },
+  "path-scurry": {
+    "license": "BlueOak-1.0.0",
+    "reason": "Permissive, OSI-approved. Dependency of glob. Reported 2026-10-22."
+  }
+}
