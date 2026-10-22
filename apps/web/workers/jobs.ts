@@ -6,7 +6,13 @@ import { routeJobs } from '@mtxt/adapters';
  * `transcribing`. Recap jobs have no handler yet (packet 5).
  */
 export const handleJobs = routeJobs<CloudflareEnv>({
-  async transcribe(job, message) {
+  async transcribe(job, message, env) {
+    // One install per Worker: a job for another install is not ours to run.
+    if (job.install_id !== env.INSTALL_ID) {
+      console.error('Dropping a transcribe job for another install', job.install_id);
+      message.ack();
+      return;
+    }
     console.log('Transcription is not implemented yet; acking', job.recording_id);
     message.ack();
   },

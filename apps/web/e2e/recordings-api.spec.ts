@@ -209,4 +209,83 @@ test.describe('recordings API', () => {
     });
     expect(nobody.status()).toBe(401);
   });
+
+  test('a chunk must be application/octet-stream', async ({ request }) => {
+    const rec = await create(request, { sha256: sha256(file), size_bytes: file.length });
+    const response = await request.put(`/api/v1/recordings/${rec.id}/chunks/1`, {
+      headers: { ...owner, 'content-type': 'text/html' },
+      data: chunk(file, 1),
+    });
+    expect(response.status()).toBe(415);
+    expect((await response.json()).error.code).toBe('unsupported_media_type');
+  });
+
+  test('stops reading a chunk without Content-Length at one byte past 8 MiB', async ({
+    request,
+    baseURL,
+  }) => {
+    const rec = await create(request, { source: 'browser', duration_s: 0 });
+    // 16 MiB, sent chunked so the server cannot refuse it by its header.
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (sent >= 2 * CHUNK) return controller.close();
+          sent += 65_536;
+          controller.enqueue(new Uint8Array(65_536));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const response = await fetch(`${baseURL}/api/v1/recordings/${rec.id}/chunks/1`, {
+      method: 'PUT',
+      headers: { ...owner, 'content-type': 'application/octet-stream' },
+      body,
+      duplex: 'half',
+    } as RequestInit);
+    expect(response.status).toBe(413);
+    expect((await response.json()).error.code).toBe('too_large');
+    const after = await (
+      await request.get(`/api/v1/recordings/${rec.id}`, { headers: owner })
+    ).json();
+    expect(after.chunks_received).toEqual([]);
+  });
+
+  test('a declared Content-Length over 8 MiB is refused before reading', async ({
+    request,
+    baseURL,
+  }) => {
+    const rec = await create(request, { source: 'browser', duration_s: 0 });
+    const response = await fetch(`${baseURL}/api/v1/recordings/${rec.id}/chunks/1`, {
+      method: 'PUT',
+      headers: { ...owner, 'content-type': 'application/octet-stream' },
+      body: new Uint8Array(CHUNK + 1),
+    });
+    expect(response.status).toBe(413);
+  });
+
+  test('60 MiB out of order, eight PUTs at a time: busy with Retry-After, then confirmed', async ({
+    request,
+  }) => {
+    const big = new Uint8Array(randomBytes(60 * 1024 * 1024));
+    const rec = await create(request, { sha256: sha256(big), size_bytes: big.length });
+    const pending = new Set([8, 3, 1, 7, 2, 6, 4, 5]);
+    let busy = 0;
+    while (pending.size) {
+      const wave = [...pending];
+      const responses = await Promise.all(wave.map((n) => put(request, rec.id, n, chunk(big, n))));
+      responses.forEach((response, i) => {
+        if (response.status() === 200) return pending.delete(wave[i]!);
+        expect(response.status()).toBe(409);
+        expect(response.headers()['retry-after']).toBe('1');
+        busy++;
+      });
+    }
+    expect(busy).toBeGreaterThan(0);
+    const complete = await request.post(`/api/v1/recordings/${rec.id}/complete`, {
+      headers: owner,
+    });
+    expect(complete.status()).toBe(200);
+    expect(await complete.json()).toMatchObject({ status: 'confirmed', size_bytes: big.length });
+  });
 });

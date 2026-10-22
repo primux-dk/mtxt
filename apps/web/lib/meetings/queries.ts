@@ -63,7 +63,8 @@ function viewScope(installId: string, user: CurrentUser, params: LibraryParams):
       return sql`${base} and m.archived_at is null and m.owner_id = ${user.id}`;
     case 'shared':
       return sql`${base} and m.archived_at is null and m.visibility = 'shared' and m.owner_id != ${user.id}
-        and exists (select 1 from meeting_shares s where s.meeting_id = m.id and s.user_id = ${user.id})`;
+        and exists (select 1 from meeting_shares s
+          where s.install_id = ${installId} and s.meeting_id = m.id and s.user_id = ${user.id})`;
     case 'company':
       return sql`${base} and m.archived_at is null and m.visibility = 'company'`;
     case 'archived':
@@ -87,7 +88,7 @@ export async function listMeetings(
     where = sql`${where} and m.title_folded like ${likeContains(foldTitle(params.q))} escape '\\'`;
   }
   const from = sql`from meetings m left join recordings r on r.id = (
-    select r2.id from recordings r2 where r2.meeting_id = m.id
+    select r2.id from recordings r2 where r2.install_id = ${installId} and r2.meeting_id = m.id
     order by r2.is_primary desc, r2.created_at desc limit 1)
     where ${where}`;
 
@@ -157,14 +158,18 @@ export interface MeetingDetail {
 /** The user's access to a meeting: resolveAccess with the share looked up. */
 export async function accessTo(
   db: Db,
-  meeting: Pick<Meeting, 'id' | 'ownerId' | 'visibility' | 'deletedAt'>,
+  installId: string,
+  meeting: Pick<Meeting, 'id' | 'installId' | 'ownerId' | 'visibility' | 'deletedAt'>,
   user: CurrentUser,
 ): Promise<Access> {
+  // A row from another install is nobody's here, whatever it points at.
+  if (meeting.installId !== installId) return null;
   let shared = false;
   if (meeting.ownerId !== user.id && meeting.visibility === 'shared') {
     shared = Boolean(
       await db.query.meetingShares.findFirst({
         where: and(
+          eq(schema.meetingShares.installId, installId),
           eq(schema.meetingShares.meetingId, meeting.id),
           eq(schema.meetingShares.userId, user.id),
         ),
@@ -185,14 +190,19 @@ export async function loadMeeting(
     where: and(eq(m.id, meetingId), eq(m.installId, installId)),
   });
   if (!meeting) return null;
-  const access = await accessTo(db, meeting, user);
+  const access = await accessTo(db, installId, meeting, user);
   if (!access) return null;
   const [recordings, recap] = await Promise.all([
     db.query.recordings.findMany({
-      where: eq(schema.recordings.meetingId, meeting.id),
+      where: and(
+        eq(schema.recordings.installId, installId),
+        eq(schema.recordings.meetingId, meeting.id),
+      ),
       orderBy: [desc(schema.recordings.isPrimary), desc(schema.recordings.createdAt)],
     }),
-    db.query.recaps.findFirst({ where: eq(schema.recaps.meetingId, meeting.id) }),
+    db.query.recaps.findFirst({
+      where: and(eq(schema.recaps.installId, installId), eq(schema.recaps.meetingId, meeting.id)),
+    }),
   ]);
   return { meeting, access, recordings, current: recordings[0] ?? null, hasRecap: Boolean(recap) };
 }

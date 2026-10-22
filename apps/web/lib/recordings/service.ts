@@ -184,7 +184,7 @@ async function ownedRecording(ctx: RecordingContext, user: CurrentUser, id: stri
   const row = await ctx.db
     .select({ recording: r, ownerId: m.ownerId, visibility: m.visibility, deletedAt: m.deletedAt })
     .from(r)
-    .innerJoin(m, eq(m.id, r.meetingId))
+    .innerJoin(m, and(eq(m.id, r.meetingId), eq(m.installId, ctx.installId)))
     .where(and(eq(r.id, id), eq(r.installId, ctx.installId)))
     .get();
   if (!row || row.deletedAt) throw new HttpError(404, 'not_found', 'No such recording.');
@@ -206,7 +206,7 @@ export async function createRecording(
       where: and(eq(m.id, req.meeting_id), eq(m.installId, ctx.installId)),
     });
     // Not readable looks the same as absent; readable but not owned is a 403.
-    const access = meeting ? await accessTo(ctx.db, meeting, user) : null;
+    const access = meeting ? await accessTo(ctx.db, ctx.installId, meeting, user) : null;
     if (!meeting || !access) throw new HttpError(404, 'not_found', 'No such meeting.');
     if (access !== 'owner')
       throw new HttpError(403, 'forbidden', 'Only the meeting owner uploads to it.');
@@ -267,17 +267,37 @@ export async function uploadChunk(
   user: CurrentUser,
   id: string,
   n: number,
-  body: ArrayBuffer,
+  request: Request,
 ) {
   if (!Number.isInteger(n) || n < 1) invalid('The chunk number is a whole number from 1.');
+  // Who, which recording and its state first: no byte is read for a refused chunk.
   const rec = await ownedRecording(ctx, user, id);
   if (rec.status !== 'uploading') {
     throw new HttpError(409, 'not_uploading', `The recording is ${rec.status}.`);
   }
-  const result = await ctx.uploads.get(id).putChunk(n, body);
+  const type = (request.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+  if (type !== 'application/octet-stream') {
+    throw new HttpError(
+      415,
+      'unsupported_media_type',
+      'Send the chunk as application/octet-stream.',
+    );
+  }
+  const declared = request.headers.get('content-length');
+  if (declared !== null && Number(declared) > CHUNK_SIZE_BYTES) {
+    throw new HttpError(413, 'too_large', `A chunk is at most ${CHUNK_SIZE_BYTES} bytes.`);
+  }
+  // The session reads the body, at most one chunk, and only once it accepts it.
+  const result = await ctx.uploads.get(id).putChunk(n, request.body);
   if (!result.ok) {
-    const status = { chunk_size: 400, too_large: 413, not_uploading: 409 }[result.code];
-    throw new HttpError(status, result.code, result.message);
+    const status = { chunk_size: 400, too_large: 413, not_uploading: 409, busy: 409 }[result.code];
+    throw new HttpError(
+      status,
+      result.code,
+      result.message,
+      {},
+      result.code === 'busy' ? { 'retry-after': '1' } : {},
+    );
   }
   return {
     n: result.n,
@@ -322,7 +342,7 @@ export async function completeRecording(
       await ctx.db
         .update(r)
         .set({ status: 'failed', failure: result.code })
-        .where(and(eq(r.id, id), eq(r.status, 'uploading')));
+        .where(and(eq(r.id, id), eq(r.installId, ctx.installId), eq(r.status, 'uploading')));
       throw new HttpError(422, result.code, result.message);
     }
     const [confirmed] = await ctx.db
@@ -334,7 +354,7 @@ export async function completeRecording(
         sizeBytes: result.sizeBytes,
         ...(final?.duration_s !== undefined ? { durationS: final.duration_s } : {}),
       })
-      .where(and(eq(r.id, id), eq(r.status, 'uploading')))
+      .where(and(eq(r.id, id), eq(r.installId, ctx.installId), eq(r.status, 'uploading')))
       .returning();
     rec = confirmed ?? (await ownedRecording(ctx, user, id));
   }
@@ -343,14 +363,15 @@ export async function completeRecording(
   if (rec.status === 'confirmed') {
     // The first confirmed recording becomes primary when the meeting has none.
     await ctx.db.run(
-      sql`update recordings set is_primary = 1 where id = ${id} and not exists (
-        select 1 from recordings p where p.meeting_id = ${rec.meetingId} and p.is_primary = 1)`,
+      sql`update recordings set is_primary = 1 where id = ${id} and install_id = ${ctx.installId}
+        and not exists (select 1 from recordings p
+          where p.install_id = ${ctx.installId} and p.meeting_id = ${rec.meetingId} and p.is_primary = 1)`,
     );
     await ctx.queue.send({ type: 'transcribe', recording_id: id, install_id: ctx.installId });
     await ctx.db
       .update(r)
       .set({ status: 'transcribing' })
-      .where(and(eq(r.id, id), eq(r.status, 'confirmed')));
+      .where(and(eq(r.id, id), eq(r.installId, ctx.installId), eq(r.status, 'confirmed')));
   }
   return atConfirmation;
 }
@@ -364,11 +385,11 @@ export async function getRecording(
   const row = await ctx.db
     .select({ recording: r, meeting: m })
     .from(r)
-    .innerJoin(m, eq(m.id, r.meetingId))
+    .innerJoin(m, and(eq(m.id, r.meetingId), eq(m.installId, ctx.installId)))
     .where(and(eq(r.id, id), eq(r.installId, ctx.installId)))
     .get();
   if (!row) throw new HttpError(404, 'not_found', 'No such recording.');
-  if (!(await accessTo(ctx.db, row.meeting, user))) {
+  if (!(await accessTo(ctx.db, ctx.installId, row.meeting, user))) {
     throw new HttpError(404, 'not_found', 'No such recording.');
   }
   const session =

@@ -18,10 +18,16 @@ async function serve(request: Request, id: string, head: boolean) {
     const row = await db
       .select({ recording: schema.recordings, meeting: schema.meetings })
       .from(schema.recordings)
-      .innerJoin(schema.meetings, eq(schema.meetings.id, schema.recordings.meetingId))
+      .innerJoin(
+        schema.meetings,
+        and(
+          eq(schema.meetings.id, schema.recordings.meetingId),
+          eq(schema.meetings.installId, installId),
+        ),
+      )
       .where(and(eq(schema.recordings.id, id), eq(schema.recordings.installId, installId)))
       .get();
-    if (!row || !(await accessTo(db, row.meeting, user)) || !row.recording.confirmedAt) {
+    if (!row || !(await accessTo(db, installId, row.meeting, user)) || !row.recording.confirmedAt) {
       throw new HttpError(404, 'not_found', 'No audio for this recording.');
     }
     const key = row.recording.storagePath;

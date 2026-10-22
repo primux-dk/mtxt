@@ -4,8 +4,8 @@ import { HttpError } from './http-error';
 import { getAdapters, getInstallSettings } from './install';
 import type { RecordingContext } from './recordings/service';
 
-export const json = (body: unknown, status = 200) =>
-  Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+export const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  Response.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
 
 /** The error shape of the contract: `{ error: { code, message } }`, plus `missing` for 409s. */
 export function errorResponse(error: unknown): Response {
@@ -13,6 +13,7 @@ export function errorResponse(error: unknown): Response {
     return json(
       { error: { code: error.code, message: error.message }, ...error.extra },
       error.status,
+      error.headers,
     );
   }
   console.error(error);
