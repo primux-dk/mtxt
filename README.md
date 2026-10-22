@@ -33,11 +33,14 @@ Prerequisites: Node 22 and pnpm 12 (`corepack enable` picks the version in `pack
 pnpm install
 pnpm db:migrate      # apply packages/adapters/migrations to the local D1
 pnpm db:seed         # write the default settings row (idempotent)
+cp apps/web/.dev.vars.example apps/web/.dev.vars   # then fill in the secrets
 pnpm dev             # next dev on http://localhost:3000, with the local bindings
 ```
 
+Every page needs a company login. `apps/web/.dev.vars` holds `AUTH_SECRET`, `SETTINGS_KEY` and the first OIDC values (an Entra ID or Google app registration); the comments in `.dev.vars.example` say what each is. Without them the login page names the ones missing. The first person to sign in becomes the install's first admin.
+
 - `pnpm preview` builds the Worker with OpenNext and serves it with `wrangler dev` on http://localhost:8787: the same code that deploys.
-- `pnpm test` runs the unit tests (Vitest). `pnpm test:e2e` builds the Worker, starts `wrangler dev` and runs the Playwright test; it needs Chromium for Playwright 1.63 (`pnpm --filter @mtxt/web exec playwright install chromium`).
+- `pnpm test` runs the unit tests (Vitest). `pnpm test:e2e` builds the e2e Worker (`build:e2e`, which adds a test-only sign-in), starts `wrangler dev` on a fresh local install with the placeholder secrets in `apps/web/e2e/e2e.vars` and runs the Playwright tests; it needs Chromium for Playwright 1.63 (`pnpm --filter @mtxt/web exec playwright install chromium`).
 - `pnpm typecheck`, `pnpm lint`, `pnpm check:licenses` and `pnpm check:generated` are what CI runs.
 - After a schema change in `packages/adapters/src/db/schema.ts`, run `pnpm generate` and commit the new migration. After editing `packages/contract/openapi.yaml`, the same command regenerates the contract types.
 - `/design` serves the design guidelines rendered with the install's own theme values.
