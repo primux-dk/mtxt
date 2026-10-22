@@ -1,59 +1,19 @@
 'use server';
 
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import { foldTitle, schema } from '@mtxt/adapters';
-import { getSessionUser } from '@/lib/auth/session';
+import { audit, foldTitle, schema, syncSearch } from '@mtxt/adapters';
 import { HttpError } from '@/lib/http-error';
-import { getAdapters } from '@/lib/install';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
-import { accessTo } from '@/lib/meetings/queries';
 import { resetForRetry } from '@/lib/transcription/store';
+import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
 
-/**
- * The owner's changes to a meeting. Each sets a value rather than toggling
- * one, so a retry never doubles a change (behaviour.md rule 2). Each answers
- * with the outcome; the screen rolls back on `ok: false`.
- */
-export type ActionResult =
-  { ok: true } | { ok: false; code: 'forbidden' | 'not_found' | 'invalid' | 'conflict' | 'server' };
+/** The owner's changes to a meeting. Each answers with the outcome; the screen rolls back on `ok: false`. */
+export type { ActionResult };
 
 const m = schema.meetings;
 const r = schema.recordings;
 const thisMeeting = (meetingId: string, installId: string) =>
   and(eq(m.id, meetingId), eq(m.installId, installId));
-
-async function asOwner<T>(
-  meetingId: string,
-  run: (ctx: Awaited<ReturnType<typeof getAdapters>>) => Promise<T>,
-) {
-  const user = await getSessionUser();
-  if (!user) throw new HttpError(401, 'unauthorized', 'Sign in first.');
-  const ctx = await getAdapters();
-  const meeting = await ctx.db.query.meetings.findFirst({
-    where: and(eq(m.id, meetingId), eq(m.installId, ctx.installId)),
-  });
-  const access = meeting ? await accessTo(ctx.db, ctx.installId, meeting, user) : null;
-  if (!access) throw new HttpError(404, 'not_found', 'No such meeting.');
-  if (access !== 'owner')
-    throw new HttpError(403, 'forbidden', 'Only the owner changes a meeting.');
-  return run(ctx);
-}
-
-async function outcome(run: () => Promise<unknown>): Promise<ActionResult> {
-  try {
-    await run();
-    return { ok: true };
-  } catch (error) {
-    if (error instanceof HttpError) {
-      if (error.status === 403 || error.status === 401) return { ok: false, code: 'forbidden' };
-      if (error.status === 404) return { ok: false, code: 'not_found' };
-      if (error.status === 400) return { ok: false, code: 'invalid' };
-      if (error.status === 409) return { ok: false, code: 'conflict' };
-    }
-    console.error(error);
-    return { ok: false, code: 'server' };
-  }
-}
 
 export async function renameMeeting(meetingId: string, title: string): Promise<ActionResult> {
   return outcome(() =>
@@ -65,6 +25,7 @@ export async function renameMeeting(meetingId: string, title: string): Promise<A
         .update(m)
         .set({ title: clean, titleFolded: foldTitle(clean) })
         .where(thisMeeting(meetingId, installId));
+      await syncSearch(db, installId, { meetingId, title: clean });
     }),
   );
 }
@@ -96,46 +57,60 @@ export async function setArchived(meetingId: string, archived: boolean): Promise
  * uploads are aborted, every recording's audio is deleted from storage, then
  * the rows, table by table and by install, in one transaction. Storage goes
  * first, so a failure leaves the meeting in place to delete again, never
- * orphaned audio.
+ * orphaned audio. The audit log keeps a `deleted` row with the title. The
+ * owner also removes a meeting retention has already emptied this way.
  */
 export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
   return outcome(() =>
-    asOwner(meetingId, async ({ db, storage, uploads, installId }) => {
-      await assertOwnRowsOnly(db, installId, meetingId);
-      const recordings = await db.query.recordings.findMany({
-        where: and(eq(r.meetingId, meetingId), eq(r.installId, installId)),
-      });
-      await Promise.all(
-        recordings
-          .filter((rec) => rec.status === 'uploading')
-          .map((rec) => uploads.get(rec.id).abort()),
-      );
-      const recap = await db.query.recaps.findFirst({
-        where: and(eq(schema.recaps.meetingId, meetingId), eq(schema.recaps.installId, installId)),
-      });
-      // The providers' raw results live in storage too (transcripts.raw_path).
-      const raws = recordings.length
-        ? await db
-            .select({ path: schema.transcripts.rawPath })
-            .from(schema.transcripts)
-            .where(
-              and(
-                inArray(
-                  schema.transcripts.recordingId,
-                  recordings.map((rec) => rec.id),
+    asOwner(
+      meetingId,
+      async ({ db, storage, uploads, installId, user, meeting }) => {
+        await assertOwnRowsOnly(db, installId, meetingId);
+        const recordings = await db.query.recordings.findMany({
+          where: and(eq(r.meetingId, meetingId), eq(r.installId, installId)),
+        });
+        await Promise.all(
+          recordings
+            .filter((rec) => rec.status === 'uploading')
+            .map((rec) => uploads.get(rec.id).abort()),
+        );
+        const recap = await db.query.recaps.findFirst({
+          where: and(
+            eq(schema.recaps.meetingId, meetingId),
+            eq(schema.recaps.installId, installId),
+          ),
+        });
+        // The providers' raw results live in storage too (transcripts.raw_path).
+        const raws = recordings.length
+          ? await db
+              .select({ path: schema.transcripts.rawPath })
+              .from(schema.transcripts)
+              .where(
+                and(
+                  inArray(
+                    schema.transcripts.recordingId,
+                    recordings.map((rec) => rec.id),
+                  ),
+                  eq(schema.transcripts.installId, installId),
                 ),
-                eq(schema.transcripts.installId, installId),
-              ),
-            )
-        : [];
-      const keys = [
-        ...recordings.map((rec) => rec.storagePath),
-        ...raws.flatMap((raw) => (raw.path ? [raw.path] : [])),
-        ...(recap?.docxPath ? [recap.docxPath] : []),
-      ];
-      if (keys.length) await storage.delete(keys);
-      await deleteMeetingRows(db, installId, meetingId);
-    }),
+              )
+          : [];
+        const keys = [
+          ...recordings.map((rec) => rec.storagePath).filter(Boolean),
+          ...raws.flatMap((raw) => (raw.path ? [raw.path] : [])),
+          ...(recap?.docxPath ? [recap.docxPath] : []),
+        ];
+        if (keys.length) await storage.delete(keys);
+        await deleteMeetingRows(db, installId, meetingId);
+        await audit(db, installId, {
+          userId: user.id,
+          meetingId: null,
+          meetingTitle: meeting.title,
+          action: 'deleted',
+        });
+      },
+      { deleted: true },
+    ),
   );
 }
 
