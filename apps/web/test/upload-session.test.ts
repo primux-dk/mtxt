@@ -386,13 +386,42 @@ describe('UploadSessionCore under concurrency and failure', () => {
     expect(store.state?.status).toBe('confirmed');
   });
 
-  it('stops reading at one byte past the chunk cap', async () => {
+  it('takes exactly 8 MiB + 1 bytes of a 16 MiB byte stream, then 413', async () => {
+    const session = new UploadSessionCore(storage, store);
+    await session.begin(init({ sha256: null, sizeBytes: null }));
+    const total = 2 * CHUNK_SIZE_BYTES;
+    let provided = 0;
+    // A byte stream, as workerd gives a request body: it fills the reader's own buffer.
+    const body = new ReadableStream<Uint8Array>({
+      type: 'bytes',
+      pull(controller) {
+        const request = (controller as ReadableByteStreamController).byobRequest!;
+        if (provided >= total) {
+          controller.close();
+          request.respond(0);
+          return;
+        }
+        const view = request.view!;
+        const n = Math.min(view.byteLength, 65_536, total - provided);
+        new Uint8Array(view.buffer, view.byteOffset, n).fill(1);
+        provided += n;
+        request.respond(n);
+      },
+    });
+    expect(await session.putChunk(1, body)).toMatchObject({ code: 'too_large' });
+    expect(provided).toBe(CHUNK_SIZE_BYTES + 1);
+    expect(session.lastReadBytes).toBe(CHUNK_SIZE_BYTES + 1);
+    expect((await session.status()).chunksReceived).toEqual([]);
+  });
+
+  it('keeps no more than 8 MiB + 1 of a stream that hands over whole pieces', async () => {
     const session = new UploadSessionCore(storage, store);
     await session.begin(init({ sha256: null, sizeBytes: null }));
     const body = streamOf(new Uint8Array(2 * CHUNK_SIZE_BYTES));
     expect(await session.putChunk(1, body.stream)).toMatchObject({ code: 'too_large' });
+    expect(session.lastReadBytes).toBe(CHUNK_SIZE_BYTES + 1);
+    // Such a stream cannot be asked for less than a piece: at most one piece more is pulled.
     expect(body.pulled.bytes).toBeLessThanOrEqual(CHUNK_SIZE_BYTES + 65_536);
-    expect((await session.status()).chunksReceived).toEqual([]);
   });
 
   it('holds at most one chunk while 60 MiB arrive out of order, eight PUTs at a time', async () => {

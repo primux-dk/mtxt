@@ -41,8 +41,15 @@ export class UploadSession extends DurableObject<CloudflareEnv> implements Uploa
     if (at && (await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(at);
   }
 
-  putChunk(n: number, body: ReadableStream<Uint8Array> | ArrayBuffer | null) {
-    return this.core.putChunk(n, body);
+  async putChunk(n: number, body: ReadableStream<Uint8Array> | ArrayBuffer | null) {
+    const result = await this.core.putChunk(n, body);
+    if (!result.ok && result.code === 'too_large') {
+      // The measured read bound (review item 5), in the Worker log.
+      console.log(
+        `upload session: refused chunk ${n} after ${this.core.lastReadBytes} bytes (byob ${this.core.lastReadByob})`,
+      );
+    }
+    return result;
   }
 
   async complete(final?: { sha256: string; sizeBytes: number }) {

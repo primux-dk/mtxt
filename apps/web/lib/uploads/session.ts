@@ -69,6 +69,15 @@ export function checkChunks(
   return missing.length ? { ok: false, missing } : { ok: true };
 }
 
+/** A BYOB reader when the stream is a byte stream, else null. */
+function byobReader(body: ReadableStream<Uint8Array>): ReadableStreamBYOBReader | null {
+  try {
+    return body.getReader({ mode: 'byob' });
+  } catch {
+    return null;
+  }
+}
+
 /** Why a body read stopped. */
 type ReadOutcome = { bytes: Uint8Array } | { tooLarge: true };
 
@@ -99,6 +108,10 @@ export class UploadSessionCore implements UploadSession {
   private completing: Promise<CompleteResult> | null = null;
   private bufferedBytes = 0;
   private peakBufferedBytes = 0;
+  /** Bytes the last chunk read took from its stream, overrun byte included. For tests and the log. */
+  lastReadBytes = 0;
+  /** Whether the last chunk read was a BYOB read of a byte stream. */
+  lastReadByob = false;
 
   constructor(
     private readonly storage: StorageAdapter,
@@ -249,27 +262,52 @@ export class UploadSessionCore implements UploadSession {
       this.hold(body.byteLength);
       return { bytes: new Uint8Array(body) };
     }
-    const buffer = new Uint8Array(limit);
+    // Room for one byte more than allowed: that byte is how an overrun shows.
+    const capacity = limit + 1;
+    let buffer = new Uint8Array(capacity);
     let filled = 0;
-    const reader = body.getReader();
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (filled + value.byteLength > limit) {
-          await reader.cancel().catch(() => {});
-          this.hold(-filled);
-          // A wrong-size chunk is a size error, not an overrun, unless it passes the chunk cap.
-          return limit < CHUNK_SIZE_BYTES
-            ? { bytes: new Uint8Array(limit + 1) }
-            : { tooLarge: true };
+    const byob = byobReader(body);
+    this.lastReadByob = byob !== null;
+    if (byob) {
+      // A byte stream (a request body in workerd): each read asks for at most
+      // the room left, so no more than limit + 1 bytes are ever taken.
+      try {
+        while (filled < capacity) {
+          const { done, value } = await byob.read(
+            new Uint8Array(buffer.buffer, filled, capacity - filled),
+          );
+          // The read moved the buffer into `value`; carry on in the moved one.
+          if (value) buffer = new Uint8Array(value.buffer, 0, capacity);
+          if (done || !value) break;
+          filled += value.byteLength;
+          this.hold(value.byteLength);
         }
-        buffer.set(value, filled);
-        filled += value.byteLength;
-        this.hold(value.byteLength);
+        if (filled > limit) await byob.cancel().catch(() => {});
+      } finally {
+        byob.releaseLock();
       }
-    } finally {
-      reader.releaseLock();
+    } else {
+      // Any other stream hands over whole pieces; only what fits is kept.
+      const reader = body.getReader();
+      try {
+        while (filled < capacity) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const take = Math.min(value.byteLength, capacity - filled);
+          buffer.set(value.subarray(0, take), filled);
+          filled += take;
+          this.hold(take);
+        }
+        if (filled > limit) await reader.cancel().catch(() => {});
+      } finally {
+        reader.releaseLock();
+      }
+    }
+    this.lastReadBytes = filled;
+    if (filled > limit) {
+      this.hold(-filled);
+      // A wrong-size chunk is a size error, not an overrun, unless it passes the chunk cap.
+      return limit < CHUNK_SIZE_BYTES ? { bytes: new Uint8Array(limit + 1) } : { tooLarge: true };
     }
     return { bytes: buffer.subarray(0, filled) };
   }
