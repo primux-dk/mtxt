@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import {
+  backfillTitleKeys,
   bootstrapIdentity,
   cloudflareAdapters,
   DEFAULT_SETTINGS,
@@ -66,12 +67,30 @@ function refoldOnce(db: Parameters<typeof refoldTemplateKeys>[0], installId: str
   return refolded;
 }
 
+/**
+ * Meetings from before the capture migration get their search key
+ * (meetings.title_folded) on the first request an isolate serves: SQLite
+ * cannot fold æ, ø and å, so the app does (backfillTitleKeys, idempotent).
+ */
+let titlesFolded: Promise<unknown> | null = null;
+function foldTitlesOnce(db: Parameters<typeof backfillTitleKeys>[0], installId: string) {
+  titlesFolded ??= backfillTitleKeys(db, installId)
+    .then((filled) => {
+      if (filled) console.log(`Folded ${filled} meeting titles for search.`);
+    })
+    .catch((error) => {
+      titlesFolded = null;
+      console.warn('Could not fold meeting titles yet:', (error as Error).message);
+    });
+  return titlesFolded;
+}
+
 /** The install's settings row, read once per request. */
 export const getInstallSettings = cache(async (): Promise<Settings> => {
   const { db, installId } = await getAdapters();
   try {
     const settings = await readSettings(db, installId);
-    await refoldOnce(db, installId);
+    await Promise.all([refoldOnce(db, installId), foldTitlesOnce(db, installId)]);
     return (await bootstrap(settings)) ? await readSettings(db, installId) : settings;
   } catch (error) {
     // Most likely a fresh checkout: the local database has no tables yet.

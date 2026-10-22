@@ -22,6 +22,23 @@ async function migratedDatabase() {
   return db;
 }
 
+/** Drizzle on node:sqlite, the async way D1 runs it. */
+function proxy(db: DatabaseSync) {
+  return drizzle(
+    async (query, params, method) => {
+      const statement = db.prepare(query);
+      if (method === 'run') {
+        statement.run(...(params as never[]));
+        return { rows: [] };
+      }
+      statement.setReturnArrays(true);
+      const rows = statement.all(...(params as never[])) as unknown as unknown[][];
+      return { rows: method === 'get' ? (rows[0] ?? []) : rows } as { rows: unknown[] };
+    },
+    { schema },
+  );
+}
+
 const tables: SQLiteTable[] = Object.values(schema).filter(
   (value): value is never => value instanceof SQLiteTable,
 );
@@ -76,19 +93,7 @@ describe('schema', () => {
   it('seeds the default settings row once and reads it back through Drizzle', async () => {
     db.exec(seedSql('test'));
     db.exec(seedSql('test'));
-    const orm = drizzle(
-      async (query, params, method) => {
-        const statement = db.prepare(query);
-        if (method === 'run') {
-          statement.run(...(params as never[]));
-          return { rows: [] };
-        }
-        statement.setReturnArrays(true);
-        const rows = statement.all(...(params as never[])) as unknown as unknown[][];
-        return { rows: method === 'get' ? (rows[0] ?? []) : rows } as { rows: unknown[] };
-      },
-      { schema },
-    );
+    const orm = proxy(db);
     const rows = await orm
       .select()
       .from(schema.settings)
@@ -156,23 +161,63 @@ describe('schema', () => {
     });
   });
 
-  it('keeps recordings from before 0001 when it rebuilds the table', async () => {
+  it('upgrades a populated packet-1 database without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
     old.exec(
       `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('u1', 't', 's', 'a@example.com', 'A');
-       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'Møde', 0);
-       INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path)
-       VALUES ('r1', 't', 'm1', 'u1', 'upload', 1, 1, 'h', 1, 'p');`,
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'MØDE ÆRØ ÅR', 1000);
+       INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path, status)
+       VALUES ('r1', 't', 'm1', 'u1', 'upload', 1, 1, 'h', 1, 'recordings/t/m1/r1.m4a', 'transcribed');
+       INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('t1', 't', 'r1', 'p', 'm', 'da', '{}');
+       INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('s1', 't', 'm1', 'Speaker 1');
+       INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text) VALUES
+         ('g1', 't', 't1', 's1', 0, 1, 'a'), ('g2', 't', 't1', 's1', 1, 2, 'b'), ('g3', 't', 't1', 's1', 2, 3, 'c');`,
     );
+    const counts = () =>
+      ['meetings', 'recordings', 'transcripts', 'speakers', 'segments'].map(
+        (table) => (old.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
+      );
+    const before = counts();
     old.exec(await readFile(new URL('0001_capture.sql', migrationsDir), 'utf8'));
-    expect(old.prepare(`SELECT id, content_type, status FROM recordings`).all()).toEqual([
-      { id: 'r1', content_type: 'application/octet-stream', status: 'uploading' },
-    ]);
-    expect(old.prepare(`SELECT title_folded FROM meetings`).get()).toEqual({
-      title_folded: 'møde',
+    expect(counts()).toEqual(before);
+    expect(before).toEqual([1, 1, 1, 1, 3]);
+    // Packet-1 recordings keep working: a media type from the extension, confirmed at their start.
+    expect(
+      old.prepare(`SELECT content_type, created_at, confirmed_at FROM recordings`).get(),
+    ).toEqual({
+      content_type: 'audio/mp4',
+      created_at: 1000,
+      confirmed_at: 1000,
     });
+    // The fold is left to the app.
+    expect(old.prepare(`SELECT title_folded FROM meetings`).get()).toEqual({ title_folded: null });
+    expect(old.prepare(`PRAGMA foreign_key_check`).all()).toEqual([]);
+  });
+
+  it('only adds to the packet-1 schema: 0001 drops and rebuilds nothing', async () => {
+    const sql = await readFile(new URL('0001_capture.sql', migrationsDir), 'utf8');
+    expect(sql).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
+  });
+
+  it('folds packet-1 titles with backfillTitleKeys, once', async () => {
+    const { backfillTitleKeys } = await import('../src/db/title-keys');
+    db.exec(
+      `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('u1', 't', 's', 'a@example.com', 'A');
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'MØDE ÆRØ ÅR', 0);
+       INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at) VALUES ('m2', 't', 'u1', 'Other', 'kept', 0);
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m3', 'other', 'u1', 'ÆBLE', 0);`,
+    );
+    const orm = proxy(db);
+    expect(await backfillTitleKeys(orm, 't')).toBe(1);
+    expect(await backfillTitleKeys(orm, 't')).toBe(0);
+    const rows = db.prepare(`SELECT id, title_folded FROM meetings ORDER BY id`).all();
+    expect(rows).toEqual([
+      { id: 'm1', title_folded: 'møde ærø år' },
+      { id: 'm2', title_folded: 'kept' },
+      { id: 'm3', title_folded: null },
+    ]);
   });
 
   it('refuses an install id that could break the seed SQL', () => {

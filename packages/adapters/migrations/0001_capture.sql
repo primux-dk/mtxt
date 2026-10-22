@@ -1,37 +1,20 @@
-PRAGMA foreign_keys=OFF;--> statement-breakpoint
-CREATE TABLE `__new_recordings` (
-	`id` text PRIMARY KEY NOT NULL,
-	`install_id` text NOT NULL,
-	`meeting_id` text NOT NULL,
-	`uploaded_by` text NOT NULL,
-	`source` text NOT NULL,
-	`is_primary` integer DEFAULT false NOT NULL,
-	`duration_s` integer NOT NULL,
-	`sha256` text,
-	`size_bytes` integer,
-	`content_type` text NOT NULL,
-	`storage_path` text NOT NULL,
-	`status` text DEFAULT 'uploading' NOT NULL,
-	`failure` text,
-	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
-	`confirmed_at` integer,
-	`delete_audio_at` integer,
-	FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`uploaded_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
-	CONSTRAINT "recordings_source_check" CHECK("source" IN ('desktop', 'browser', 'upload', 'teams', 'meet', 'device')),
-	CONSTRAINT "recordings_status_check" CHECK("status" IN ('uploading', 'confirmed', 'transcribing', 'transcribed', 'failed'))
-);
---> statement-breakpoint
--- Edited by hand: drizzle-kit selected the new columns from the old table. Rows
--- from before this migration get the generic content type; v0.1 had none.
-INSERT INTO `__new_recordings`("id", "install_id", "meeting_id", "uploaded_by", "source", "is_primary", "duration_s", "sha256", "size_bytes", "content_type", "storage_path", "status", "delete_audio_at") SELECT "id", "install_id", "meeting_id", "uploaded_by", "source", "is_primary", "duration_s", "sha256", "size_bytes", 'application/octet-stream', "storage_path", "status", "delete_audio_at" FROM `recordings`;--> statement-breakpoint
-DROP TABLE `recordings`;--> statement-breakpoint
-ALTER TABLE `__new_recordings` RENAME TO `recordings`;--> statement-breakpoint
-PRAGMA foreign_keys=ON;--> statement-breakpoint
-CREATE INDEX `recordings_meeting` ON `recordings` (`meeting_id`);--> statement-breakpoint
-CREATE INDEX `recordings_uploaded_by` ON `recordings` (`uploaded_by`);--> statement-breakpoint
-CREATE INDEX `recordings_install_delete_audio` ON `recordings` (`install_id`,`delete_audio_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `recordings_one_primary` ON `recordings` (`meeting_id`) WHERE "is_primary" = 1;--> statement-breakpoint
-ALTER TABLE `meetings` ADD `title_folded` text DEFAULT '' NOT NULL;--> statement-breakpoint
--- Best effort for rows from before this migration: SQLite folds ASCII only. The app writes the full fold.
-UPDATE `meetings` SET `title_folded` = lower(`title`);
+ALTER TABLE `meetings` ADD `title_folded` text;--> statement-breakpoint
+ALTER TABLE `recordings` ADD `content_type` text DEFAULT 'audio/webm' NOT NULL;--> statement-breakpoint
+ALTER TABLE `recordings` ADD `failure` text;--> statement-breakpoint
+ALTER TABLE `recordings` ADD `created_at` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE `recordings` ADD `confirmed_at` integer;--> statement-breakpoint
+-- Backfills, written by hand. Rows from packet 1 get their media type from the
+-- file extension, their creation time from the meeting's start, and, when they
+-- are past uploading, a confirmation at that same time (no new upload event).
+-- title_folded is left null: SQLite folds ASCII only, so the app fills it with
+-- backfillTitleKeys() at start-up.
+UPDATE `recordings` SET `content_type` = CASE lower(substr(`storage_path`, length(rtrim(`storage_path`, replace(`storage_path`, '.', ''))) + 1))
+	WHEN 'webm' THEN 'audio/webm'
+	WHEN 'mp4' THEN 'audio/mp4'
+	WHEN 'm4a' THEN 'audio/mp4'
+	WHEN 'mp3' THEN 'audio/mpeg'
+	WHEN 'wav' THEN 'audio/wav'
+	WHEN 'ogg' THEN 'audio/ogg'
+	ELSE 'audio/webm' END;--> statement-breakpoint
+UPDATE `recordings` SET `created_at` = coalesce((SELECT `started_at` FROM `meetings` WHERE `meetings`.`id` = `recordings`.`meeting_id`), 0) WHERE `created_at` = 0;--> statement-breakpoint
+UPDATE `recordings` SET `confirmed_at` = `created_at` WHERE `confirmed_at` IS NULL AND `status` IN ('confirmed', 'transcribing', 'transcribed', 'failed');
