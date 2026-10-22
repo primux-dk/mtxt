@@ -41,6 +41,7 @@ The whole admin surface. If a setting is not here, it does not exist.
 | Setting | Values |
 |---|---|
 | Product name | Free text, shown on the recorder, the login page and the tray |
+| Company name | Free text, shown under the product name in the sidebar and in the login footer ("An installation for Acme A/S") |
 | Theme | Accent colour and button colour, two hex values. Defaults are sage #566b45 and #111111. Tints, lines, focus ring and the dark mode are derived. Three pairs are checked in both themes, accent text on the background, button text on the button, accent on a card; a value that puts any pair under 4.5:1 is refused with the ratio shown. A preview row under the fields shows the derived states. The recorder reads the same two values at login |
 | Identity provider | Entra ID or Google: tenant id, client id, secret |
 | Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, local Whisper or Parakeet: key, region |
@@ -112,8 +113,9 @@ recap_versions   id, recap_id, author_id (null = AI), body_md, created_at   -- o
 decisions        id, recap_id, text, owner_user_id, done     -- lifted from the recap by the AI, editable
 templates        id, name, body_md, is_default                 -- admin edits
 keyterms         id, term, boost                               -- one list per install
-settings         product_name, theme_accent, theme_primary, identity_provider, stt_provider, language, interface_language, live_transcript_default,
-                 default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled
+settings         product_name, company_name, theme_accent, theme_primary, identity_provider, stt_provider, language, interface_language, live_transcript_default,
+                 default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
+                 recording_sources (JSON array of desktop|upload|browser|teams|meet)
 audit_events     id, user_id, meeting_id, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write), at
 ```
 
