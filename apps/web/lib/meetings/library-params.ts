@@ -1,7 +1,8 @@
 /** The library's state, all of it in the URL (behaviour.md rule 5). */
 export const VIEWS = ['mine', 'shared', 'company', 'archived'] as const;
 export const STATUS_FILTERS = ['ready', 'transcribing', 'failed'] as const;
-export const SORTS = ['date', 'title'] as const;
+/** `relevance` is the default, and only possible, order of a search (packet 6). */
+export const SORTS = ['date', 'title', 'relevance'] as const;
 export const PAGE_SIZE = 25;
 
 export type View = (typeof VIEWS)[number];
@@ -32,16 +33,20 @@ export function parseLibraryParams(raw: Raw): LibraryParams {
     const value = raw instanceof URLSearchParams ? (raw.get(key) ?? undefined) : raw[key];
     return Array.isArray(value) ? value[0] : value;
   };
-  const q = get('q')?.trim().slice(0, 200);
+  const q = get('q')?.trim().slice(0, 200) || undefined;
   const page = Number(get('page'));
+  const sort = pick(SORTS, get('sort'));
   return {
     view: pick(VIEWS, get('view')) ?? 'mine',
-    q: q || undefined,
+    q,
     status: pick(STATUS_FILTERS, get('status')),
-    sort: pick(SORTS, get('sort')) ?? 'date',
+    sort: sort && (sort !== 'relevance' || q) ? sort : defaultSort(q),
     page: Number.isInteger(page) && page >= 1 ? Math.min(page, 100_000) : 1,
   };
 }
+
+/** A search ranks by relevance; the plain library lists newest first. */
+export const defaultSort = (q: string | undefined): Sort => (q ? 'relevance' : 'date');
 
 /** The URL for a library state. Defaults are left out, so links stay short. */
 export function libraryHref(params: Partial<LibraryParams>): string {
@@ -49,7 +54,7 @@ export function libraryHref(params: Partial<LibraryParams>): string {
   if (params.view && params.view !== 'mine') search.set('view', params.view);
   if (params.q) search.set('q', params.q);
   if (params.status) search.set('status', params.status);
-  if (params.sort && params.sort !== 'date') search.set('sort', params.sort);
+  if (params.sort && params.sort !== defaultSort(params.q)) search.set('sort', params.sort);
   if (params.page && params.page > 1) search.set('page', String(params.page));
   const query = search.toString();
   return query ? `/meetings?${query}` : '/meetings';

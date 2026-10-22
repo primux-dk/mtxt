@@ -48,6 +48,14 @@ describe('parseLibraryParams', () => {
     expect(libraryHref({ view: 'mine', sort: 'date', page: 1 })).toBe('/meetings');
   });
 
+  it('ranks a search by relevance unless asked otherwise, and never a plain list', () => {
+    expect(parseLibraryParams({ q: 'budget' }).sort).toBe('relevance');
+    expect(parseLibraryParams({ q: 'budget', sort: 'date' }).sort).toBe('date');
+    expect(parseLibraryParams({ sort: 'relevance' }).sort).toBe('date');
+    expect(libraryHref({ q: 'budget', sort: 'relevance' })).toBe('/meetings?q=budget');
+    expect(libraryHref({ q: 'budget', sort: 'date' })).toBe('/meetings?q=budget&sort=date');
+  });
+
   it('tells a narrowed list from a full one', () => {
     expect(isFiltered(parseLibraryParams({ q: 'x' }))).toBe(true);
     expect(isFiltered(parseLibraryParams({ status: 'ready' }))).toBe(true);

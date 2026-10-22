@@ -4,11 +4,23 @@ import { getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
 import { libraryHref, pageWindow, type LibraryParams } from '@/lib/meetings/library-params';
 
-/** Page links with the page in the URL (behaviour.md rule 6). Plain links, so Back works. */
-export async function Pagination({ params, pages }: { params: LibraryParams; pages: number }) {
+/**
+ * Page links with the page in the URL (behaviour.md rule 6). Plain links, so
+ * Back works. The library passes its params; another list passes `page` and
+ * its own `href`.
+ */
+export async function Pagination({
+  params,
+  pages,
+  href: hrefFor,
+}: {
+  params: Pick<LibraryParams, 'page'> & Partial<LibraryParams>;
+  pages: number;
+  href?: (page: number) => string;
+}) {
   const t = await getTranslations('library.pagination');
   if (pages <= 1) return null;
-  const href = (page: number) => libraryHref({ ...params, page });
+  const href = hrefFor ?? ((page: number) => libraryHref({ ...params, page }));
   const step =
     'inline-flex min-h-10 items-center gap-1 rounded-control border border-input bg-card px-3 text-sm hover:bg-secondary max-shell:min-h-11';
   return (

@@ -2,18 +2,24 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-/** The sort order, kept in the URL; changing it goes back to page 1. */
+/**
+ * A select kept in the URL, the sort order by default; changing it goes back
+ * to page 1, and the first option is the default and leaves the URL. Reused
+ * by every list with a select filter (behaviour.md rule 7).
+ */
 export function SortSelect({
   label,
   options,
+  param = 'sort',
 }: {
   label: string;
   options: { value: string; label: string }[];
+  param?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const value = searchParams.get('sort') ?? options[0]?.value;
+  const value = searchParams.get(param) ?? options[0]?.value;
   return (
     <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
       <span>{label}</span>
@@ -21,8 +27,8 @@ export function SortSelect({
         value={value}
         onChange={(event) => {
           const next = new URLSearchParams(searchParams);
-          if (event.target.value === options[0]?.value) next.delete('sort');
-          else next.set('sort', event.target.value);
+          if (event.target.value === options[0]?.value) next.delete(param);
+          else next.set(param, event.target.value);
           next.delete('page');
           const query = next.toString();
           router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
