@@ -10,10 +10,21 @@ describe('parseRange', () => {
     expect(parseRange('bytes=-300', 100)).toEqual({ offset: 0, length: 100 });
   });
 
-  it('serves the whole object when there is no single range', () => {
+  it('serves the whole object only when there is no header', () => {
     expect(parseRange(null, 100)).toBeNull();
-    expect(parseRange('bytes=0-1,5-6', 100)).toBeNull();
-    expect(parseRange('items=0-1', 100)).toBeNull();
+  });
+
+  it('refuses malformed and multiple ranges', () => {
+    for (const header of [
+      'bytes=0-1,5-6',
+      'items=0-1',
+      'bytes=abc-def',
+      'bytes=-',
+      '',
+      'bytes=1-2-3',
+    ]) {
+      expect(parseRange(header, 100), header).toBe('unsatisfiable');
+    }
   });
 
   it('refuses ranges past the end', () => {

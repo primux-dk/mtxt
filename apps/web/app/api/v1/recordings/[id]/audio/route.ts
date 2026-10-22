@@ -40,6 +40,7 @@ async function serve(request: Request, id: string, head: boolean) {
       // Checked at create; checked again, so stored data can never be served as a page.
       'content-type': isMediaType(type) ? type : 'application/octet-stream',
       'x-content-type-options': 'nosniff',
+      'content-disposition': `inline; filename="recording.${extensionOf(key)}"`,
       'content-security-policy': "default-src 'none'; sandbox",
       'cache-control': 'private, no-store',
     });
@@ -62,6 +63,9 @@ async function serve(request: Request, id: string, head: boolean) {
     return new Response(object.body, { status: range ? 206 : 200, headers });
   });
 }
+
+/** The stored file's extension, letters and digits only, for the download name. */
+const extensionOf = (key: string) => /\.([a-z0-9]{1,8})$/i.exec(key)?.[1]?.toLowerCase() ?? 'audio';
 
 type Params = { params: Promise<{ id: string }> };
 

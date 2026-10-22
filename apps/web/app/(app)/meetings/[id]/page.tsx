@@ -18,6 +18,7 @@ import { formatClock, formatDuration } from '@/components/meetings/format';
 import { Button } from '@/components/ui/button';
 import { UploadButton } from '@/components/upload/new-meeting-menu';
 import { getAdapters, getInstallSettings } from '@/lib/install';
+import { parseStartAt } from '@/lib/meetings/library-params';
 import { loadMeeting, meetingState } from '@/lib/meetings/queries';
 import { pageUser } from '@/lib/page-user';
 
@@ -90,7 +91,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
   const audioReady =
     current?.confirmedAt && !(current.failure && UPLOAD_FAILURES.includes(current.failure));
   const rawT = Array.isArray(query.t) ? query.t[0] : query.t;
-  const startAt = rawT && /^\d+$/.test(rawT) ? Number(rawT) : undefined;
+  const startAt = parseStartAt(rawT);
   const canUpload = settings.recordingSources.includes('upload');
 
   const transcriptPanel = (() => {

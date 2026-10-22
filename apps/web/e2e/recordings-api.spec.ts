@@ -75,6 +75,14 @@ test.describe('recordings API', () => {
       'content-type': 'audio/webm',
       'x-content-type-options': 'nosniff',
     });
+    expect(audio.headers()['content-disposition']).toBe('inline; filename="recording.webm"');
+    for (const range of ['bytes=abc-def', 'bytes=-', 'bytes=0-1,5-6']) {
+      const bad = await request.get(`/api/v1/recordings/${rec.id}/audio`, {
+        headers: { ...owner, range },
+      });
+      expect(bad.status(), range).toBe(416);
+      expect(bad.headers()['content-range']).toBe(`bytes */${file.length}`);
+    }
 
     // A second complete answers the same confirmation.
     const again = await request.post(`/api/v1/recordings/${rec.id}/complete`, { headers: owner });

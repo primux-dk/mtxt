@@ -1,21 +1,23 @@
 /**
- * Reads a single-range `Range: bytes=…` header against an object of `size`
- * bytes. Null means serve the whole object (no header, or one we do not
- * handle, such as several ranges); 'unsatisfiable' means answer 416.
+ * Reads a `Range` header against an object of `size` bytes. Null means no
+ * header: serve the whole object. A header that is malformed, asks for
+ * several ranges, or lies past the end is 'unsatisfiable': answer 416 with
+ * Content-Range "bytes (asterisk)/size". Only one `bytes=` range is served.
  */
 export function parseRange(
   header: string | null,
   size: number,
 ): { offset: number; length: number } | 'unsatisfiable' | null {
-  if (!header) return null;
+  if (header === null) return null;
   const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
-  if (!match) return null;
+  if (!match) return 'unsatisfiable';
   const [, startText = '', endText = ''] = match;
-  if (!startText && !endText) return null;
+  if (!startText && !endText) return 'unsatisfiable';
+  if (startText.length > 15 || endText.length > 15) return 'unsatisfiable';
   if (!startText) {
     // bytes=-500: the last 500 bytes.
     const suffix = Number(endText);
-    if (suffix === 0) return 'unsatisfiable';
+    if (suffix === 0 || size === 0) return 'unsatisfiable';
     const length = Math.min(suffix, size);
     return { offset: size - length, length };
   }

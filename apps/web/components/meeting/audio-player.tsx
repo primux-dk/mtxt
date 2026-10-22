@@ -37,8 +37,11 @@ export function AudioPlayer({
     const el = audio.current;
     if (!el || start === undefined) return;
     const seek = () => {
-      el.currentTime = start;
-      setTime(start);
+      // Never past the end the audio itself reports.
+      const end = Number.isFinite(el.duration) ? el.duration : start;
+      const at = Math.min(start, end);
+      el.currentTime = at;
+      setTime(at);
     };
     if (el.readyState >= 1) seek();
     else el.addEventListener('loadedmetadata', seek, { once: true });

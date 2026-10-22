@@ -63,3 +63,15 @@ describe('pageWindow', () => {
     expect(pageWindow(3, 5)).toEqual([1, 2, 3, 4, 5]);
   });
 });
+
+describe('parseStartAt', () => {
+  it('takes whole seconds from 0 to 24 hours and ignores the rest', async () => {
+    const { parseStartAt } = await import('../lib/meetings/library-params');
+    expect(parseStartAt('0')).toBe(0);
+    expect(parseStartAt('1834')).toBe(1834);
+    expect(parseStartAt('86400')).toBe(86_400);
+    for (const raw of ['86401', '-1', '1.5', '1e3', '9'.repeat(400), '', undefined]) {
+      expect(parseStartAt(raw), String(raw).slice(0, 10)).toBeUndefined();
+    }
+  });
+});

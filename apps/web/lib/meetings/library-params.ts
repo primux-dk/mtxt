@@ -70,3 +70,16 @@ export function pageWindow(current: number, pages: number): (number | 'gap')[] {
   }
   return out;
 }
+
+/** The longest a `?t=` link may point: 24 hours, in seconds. */
+export const MAX_START_AT = 86_400;
+
+/**
+ * `?t=1834` on a meeting link: whole seconds from 0 to 24 hours. Anything
+ * else (a fraction, a sign, 400 digits) is ignored, never passed to the player.
+ */
+export function parseStartAt(raw: string | undefined): number | undefined {
+  if (!raw || !/^\d{1,5}$/.test(raw)) return undefined;
+  const seconds = Number(raw);
+  return seconds <= MAX_START_AT ? seconds : undefined;
+}
