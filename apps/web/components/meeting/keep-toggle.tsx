@@ -1,20 +1,47 @@
 'use client';
 
 import { Pin } from 'lucide-react';
-import { useState, useTransition } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
 import { setKeep } from '@/app/(app)/meetings/actions';
-import { safely } from '@/lib/safe-action';
 import { Button } from '@/components/ui/button';
+import { safely } from '@/lib/safe-action';
 
-/** The keep flag: a pressed-state button, optimistic, rolled back if the server refuses (rule 2). */
+/**
+ * The keep flag, optimistic (behaviour.md rule 2). One request is in flight
+ * at a time; clicks meanwhile only change the wanted value, and when the
+ * request returns the latest wanted value is sent if it differs. On a
+ * failure the button goes back to the last value the server acknowledged.
+ */
 export function KeepToggle({ meetingId, keep }: { meetingId: string; keep: boolean }) {
   const t = useTranslations('meeting.keep');
-  const [saved, setSaved] = useState(keep);
   const [shown, setShown] = useState(keep);
   const [failed, setFailed] = useState(false);
-  const [, startTransition] = useTransition();
+  const acked = useRef(keep);
+  const wanted = useRef(keep);
+  const sending = useRef(false);
+
+  const flush = async () => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      while (wanted.current !== acked.current) {
+        const value = wanted.current;
+        const result = await safely(() => setKeep(meetingId, value));
+        if (!result.ok) {
+          wanted.current = acked.current;
+          setShown(acked.current);
+          setFailed(true);
+          return;
+        }
+        acked.current = value;
+      }
+    } finally {
+      sending.current = false;
+    }
+  };
+
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button
@@ -29,14 +56,8 @@ export function KeepToggle({ meetingId, keep }: { meetingId: string; keep: boole
           const next = !shown;
           setShown(next);
           setFailed(false);
-          startTransition(async () => {
-            const result = await safely(() => setKeep(meetingId, next));
-            if (result.ok) setSaved(next);
-            else {
-              setShown(saved);
-              setFailed(true);
-            }
-          });
+          wanted.current = next;
+          void flush();
         }}
       >
         <Pin aria-hidden="true" />
