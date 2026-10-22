@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+import { formatKeyterms, mergeKeyterms, parseKeyterms } from '../lib/settings/keyterms';
+
+describe('parseKeyterms', () => {
+  it('reads `term` and `term,boost` lines and skips blanks', () => {
+    expect(parseKeyterms('Primux\n\nlinje 2,1.5\r\nugeplan\n')).toEqual({
+      terms: [
+        { term: 'Primux', boost: null },
+        { term: 'linje 2', boost: 1.5 },
+        { term: 'ugeplan', boost: null },
+      ],
+      errors: [],
+    });
+  });
+
+  it('skips a header row and a byte order mark', () => {
+    expect(parseKeyterms('﻿term,boost\nPrimux,2').terms).toEqual([{ term: 'Primux', boost: 2 }]);
+  });
+
+  it('reads quoted terms with commas and doubled quotes', () => {
+    expect(parseKeyterms('"Acme, Inc.",3\n"The ""Line"" team"').terms).toEqual([
+      { term: 'Acme, Inc.', boost: 3 },
+      { term: 'The "Line" team', boost: null },
+    ]);
+  });
+
+  it('reads a semicolon file with a decimal comma', () => {
+    expect(parseKeyterms('Ærøskøbing;1,5\nÅbenrå').terms).toEqual([
+      { term: 'Ærøskøbing', boost: 1.5 },
+      { term: 'Åbenrå', boost: null },
+    ]);
+  });
+
+  it('keeps the first spelling of a repeated term', () => {
+    expect(parseKeyterms('Primux\nPRIMUX,2').terms).toEqual([{ term: 'Primux', boost: null }]);
+  });
+
+  it('reports a bad weight and an extra column with the line number', () => {
+    expect(parseKeyterms('Primux\nlinje 2,abc').errors).toEqual([
+      { code: 'badBoost', line: 2, value: 'abc', max: 10 },
+    ]);
+    expect(parseKeyterms('a,1\nb,0').errors[0]).toMatchObject({ code: 'badBoost', line: 2 });
+    expect(parseKeyterms('a,1,x').errors).toEqual([{ code: 'tooManyFields', line: 1 }]);
+  });
+
+  it('reports a term over 100 characters and a list over 1000 terms', () => {
+    expect(parseKeyterms('x'.repeat(101)).errors).toEqual([
+      { code: 'termTooLong', line: 1, max: 100 },
+    ]);
+    const many = Array.from({ length: 1001 }, (_, i) => `term ${i}`).join('\n');
+    expect(parseKeyterms(many).errors).toEqual([{ code: 'tooMany', max: 1000 }]);
+  });
+});
+
+describe('formatKeyterms and mergeKeyterms', () => {
+  it('round-trips through the textarea format', () => {
+    const terms = [
+      { term: 'Acme, Inc.', boost: 3 },
+      { term: 'Primux', boost: null },
+    ];
+    expect(formatKeyterms(terms)).toBe('"Acme, Inc.",3\nPrimux');
+    expect(parseKeyterms(formatKeyterms(terms)).terms).toEqual(terms);
+  });
+
+  it('adds imported terms after the current ones and skips terms already there', () => {
+    expect(
+      mergeKeyterms(
+        [{ term: 'Primux', boost: null }],
+        [
+          { term: 'primux', boost: 2 },
+          { term: 'ugeplan', boost: null },
+        ],
+      ),
+    ).toEqual([
+      { term: 'Primux', boost: null },
+      { term: 'ugeplan', boost: null },
+    ]);
+  });
+});

@@ -16,14 +16,14 @@ const toBase64Url = (bytes: Uint8Array) =>
     .replaceAll('/', '_')
     .replace(/=+$/, '');
 
-const fromBase64 = (text: string) => {
+const fromBase64 = (text: string): Uint8Array<ArrayBuffer> => {
   const normal = text.replaceAll('-', '+').replaceAll('_', '/');
   const binary = atob(normal + '='.repeat((4 - (normal.length % 4)) % 4));
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 };
 
 async function importKey(keyBase64: string): Promise<CryptoKey> {
-  let raw: Uint8Array;
+  let raw: Uint8Array<ArrayBuffer>;
   try {
     raw = fromBase64(keyBase64.trim());
   } catch {
@@ -40,7 +40,9 @@ export async function seal(plaintext: string, keyBase64: string): Promise<string
   const key = await importKey(keyBase64);
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const data = new TextEncoder().encode(plaintext);
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data));
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data),
+  );
   return `${VERSION}.${toBase64Url(iv)}.${toBase64Url(ciphertext)}`;
 }
 
