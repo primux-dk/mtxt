@@ -42,6 +42,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -99,18 +101,35 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: The recording is no longer accepting chunks (already confirmed or failed, `not_uploading`).
+          description: |
+            `not_uploading`: the recording no longer accepts chunks (it is
+            confirmed, failed or being verified); the body was not read.
+            `busy`: another chunk of this recording is being written; retry
+            this one after `Retry-After` seconds.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying. Sent with `busy`.
+              schema:
+                type: integer
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '413':
-          description: The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`).
+          description: The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`). The server stops reading at one byte past the limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: The request body is not `application/octet-stream` (`unsupported_media_type`).
           content:
             application/json:
               schema:
@@ -146,16 +165,28 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Chunks are missing. The body lists them; upload them and call complete again.
+          description: |
+            `missing_chunks`: chunks are missing; the body lists them. Upload
+            them and call complete again. `not_uploading`: the session is gone.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MissingChunks'
+                oneOf:
+                  - $ref: '#/components/schemas/MissingChunks'
+                  - $ref: '#/components/schemas/Error'
+        '413':
+          description: '`size_bytes` is larger than the install accepts (`too_large`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: |
             All chunks arrived but the file does not match (`hash_mismatch` or
@@ -182,6 +213,8 @@ paths:
                 $ref: '#/components/schemas/Recording'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
         '404':
           $ref: '#/components/responses/NotFound'
 components:
@@ -206,6 +239,12 @@ components:
             $ref: '#/components/schemas/Error'
     Unauthorized:
       description: No valid company login.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: Something went wrong on the server (`internal`). Safe to retry.
       content:
         application/json:
           schema:
@@ -255,6 +294,9 @@ components:
         has the whole file sends them here. One that uploads while it records
         (the browser recorder) leaves both out and sends them with complete.
       required: [duration_s, source, content_type]
+      dependentRequired:
+        sha256: [size_bytes]
+        size_bytes: [sha256]
       properties:
         duration_s:
           type: integer
@@ -270,7 +312,9 @@ components:
           $ref: '#/components/schemas/RecordingSource'
         content_type:
           type: string
-          description: MIME type of the audio, for example audio/ogg or audio/mp4.
+          maxLength: 200
+          pattern: '^(audio|video)/[A-Za-z0-9][A-Za-z0-9.+-]*(\s*;\s*[A-Za-z0-9-]+=("[^"]*"|[^;"\s]+))*$'
+          description: Audio or video MIME type, for example audio/ogg or audio/mp4. Anything else is refused.
     CreateRecordingRequest:
       description: Exactly one of `meeting_id` (a meeting that exists) or `meeting` (create one).
       oneOf:
@@ -419,7 +463,8 @@ components:
             Stable machine-readable code. v0.1 uses `unauthorized`,
             `forbidden`, `not_found`, `invalid_request`, `too_large`,
             `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
-            `hash_mismatch`, `size_mismatch` and `session_expired`.
+            `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
+            `unsupported_media_type` and `internal`.
         message:
           type: string
           description: English text for logs. The recorder shows its own localised message per code.

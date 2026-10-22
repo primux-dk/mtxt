@@ -122,7 +122,7 @@ export interface components {
             sha256?: components["schemas"]["Sha256"];
             size_bytes?: number;
             source: components["schemas"]["RecordingSource"];
-            /** @description MIME type of the audio, for example audio/ogg or audio/mp4. */
+            /** @description Audio or video MIME type, for example audio/ogg or audio/mp4. Anything else is refused. */
             content_type: string;
         };
         /** @description Exactly one of `meeting_id` (a meeting that exists) or `meeting` (create one). */
@@ -191,7 +191,8 @@ export interface components {
              * @description Stable machine-readable code. v0.1 uses `unauthorized`,
              *     `forbidden`, `not_found`, `invalid_request`, `too_large`,
              *     `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
-             *     `hash_mismatch`, `size_mismatch` and `session_expired`.
+             *     `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
+             *     `unsupported_media_type` and `internal`.
              */
             code: string;
             /** @description English text for logs. The recorder shows its own localised message per code. */
@@ -213,6 +214,15 @@ export interface components {
         };
         /** @description No valid company login. */
         Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Something went wrong on the server (`internal`). Safe to retry. */
+        Internal: {
             headers: {
                 [name: string]: unknown;
             };
@@ -291,6 +301,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["Internal"];
         };
     };
     uploadChunk: {
@@ -325,16 +336,23 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description The recording is no longer accepting chunks (already confirmed or failed, `not_uploading`). */
+            /**
+             * @description `not_uploading`: the recording no longer accepts chunks (it is
+             *     confirmed, failed or being verified); the body was not read.
+             *     `busy`: another chunk of this recording is being written; retry
+             *     this one after `Retry-After` seconds.
+             */
             409: {
                 headers: {
+                    /** @description Seconds to wait before retrying. Sent with `busy`. */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`). */
+            /** @description The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`). The server stops reading at one byte past the limit. */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -343,6 +361,16 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description The request body is not `application/octet-stream` (`unsupported_media_type`). */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["Internal"];
         };
     };
     completeRecording: {
@@ -378,13 +406,25 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Chunks are missing. The body lists them; upload them and call complete again. */
+            /**
+             * @description `missing_chunks`: chunks are missing; the body lists them. Upload
+             *     them and call complete again. `not_uploading`: the session is gone.
+             */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MissingChunks"];
+                    "application/json": components["schemas"]["MissingChunks"] | components["schemas"]["Error"];
+                };
+            };
+            /** @description `size_bytes` is larger than the install accepts (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /**
@@ -402,6 +442,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["Internal"];
         };
     };
     getRecording: {
@@ -426,6 +467,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
         };
     };
 }

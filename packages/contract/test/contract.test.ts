@@ -94,3 +94,31 @@ describe('contract', () => {
     for (const code of ERROR_CODES) expect(documented).toContain(`\`${code}\``);
   });
 });
+
+describe('contract details', () => {
+  it('documents 500 on every operation and the chunk media type', async () => {
+    const spec = parse(await readFile(specUrl, 'utf8'));
+    for (const [path, item] of Object.entries<Record<string, { responses?: object }>>(spec.paths)) {
+      for (const [method, op] of Object.entries(item)) {
+        if (!op.responses) continue;
+        expect(Object.keys(op.responses), `${method} ${path}`).toContain('500');
+      }
+    }
+    const put = spec.paths['/recordings/{id}/chunks/{n}'].put;
+    expect(Object.keys(put.requestBody.content)).toEqual(['application/octet-stream']);
+    expect(Object.keys(put.responses)).toEqual(expect.arrayContaining(['409', '413', '415']));
+    expect(Object.keys(spec.paths['/recordings/{id}/complete'].post.responses)).toContain('413');
+  });
+
+  it('encodes the paired hash and size and the media type', async () => {
+    const details = parse(await readFile(specUrl, 'utf8')).components.schemas.RecordingDetails;
+    expect(details.dependentRequired).toEqual({ sha256: ['size_bytes'], size_bytes: ['sha256'] });
+    const pattern = new RegExp(details.properties.content_type.pattern);
+    for (const ok of ['audio/webm;codecs=opus', 'audio/mp4', 'video/webm', 'audio/x-m4a']) {
+      expect(pattern.test(ok), ok).toBe(true);
+    }
+    for (const bad of ['text/html', 'application/octet-stream', 'audio/webm\r\nx: 1']) {
+      expect(pattern.test(bad), bad).toBe(false);
+    }
+  });
+});

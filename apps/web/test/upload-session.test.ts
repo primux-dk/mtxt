@@ -294,3 +294,126 @@ describe('UploadSessionCore', () => {
     expect(storage.uploads.size).toBe(1);
   });
 });
+
+/** A body that arrives in 64 KiB pieces, and counts how much of it was pulled. */
+function streamOf(bytes: Uint8Array, gate?: Promise<void>) {
+  const pulled = { bytes: 0 };
+  let at = 0;
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        if (gate) await gate;
+        if (at >= bytes.length) return controller.close();
+        const piece = bytes.subarray(at, at + 65_536);
+        at += piece.length;
+        pulled.bytes += piece.length;
+        controller.enqueue(piece);
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { stream, pulled };
+}
+
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => (resolve = r));
+  return { promise, resolve };
+};
+
+describe('UploadSessionCore under concurrency and failure', () => {
+  let storage: ReturnType<typeof memoryStorage>;
+  let store: ReturnType<typeof memoryStore>;
+  beforeEach(() => {
+    storage = memoryStorage();
+    store = memoryStore();
+  });
+
+  it('admits one chunk at a time: of three PUTs at once, one proceeds and two are busy', async () => {
+    const session = new UploadSessionCore(storage, store);
+    await session.begin(init());
+    const gate = deferred();
+    const bodies = [1, 2, 3].map((n) => streamOf(new Uint8Array(chunk(file, n)), gate.promise));
+    const results = Promise.all(bodies.map((b, i) => session.putChunk(i + 1, b.stream)));
+    gate.resolve();
+    const [first, second, third] = await results;
+    expect(first).toMatchObject({ ok: true, n: 1 });
+    expect(second).toMatchObject({ ok: false, code: 'busy' });
+    expect(third).toMatchObject({ ok: false, code: 'busy' });
+    // The refused bodies were not read.
+    expect(bodies[1]!.pulled.bytes + bodies[2]!.pulled.bytes).toBe(0);
+    for (const n of [2, 3]) await session.putChunk(n, chunk(file, n));
+    expect(await session.complete()).toMatchObject({ ok: true });
+  });
+
+  it('a late re-PUT cannot write over a confirmation', async () => {
+    const session = new UploadSessionCore(storage, store);
+    await session.begin(init());
+    for (const n of [1, 2, 3]) await session.putChunk(n, chunk(file, n));
+    const gate = deferred();
+    const late = session.putChunk(1, streamOf(new Uint8Array(chunk(file, 1)), gate.promise).stream);
+    const completing = session.complete();
+    gate.resolve();
+    await late;
+    expect(await completing).toMatchObject({ ok: true });
+    const after = streamOf(new Uint8Array(chunk(file, 1)));
+    expect(await session.putChunk(1, after.stream)).toMatchObject({ code: 'not_uploading' });
+    expect(after.pulled.bytes).toBe(0);
+    expect(store.state?.status).toBe('confirmed');
+    expect(await session.status()).toMatchObject({ status: 'confirmed' });
+  });
+
+  it('finishes after a restart between the R2 completion and the confirmation', async () => {
+    const session = new UploadSessionCore(storage, store);
+    await session.begin(init());
+    for (const n of [3, 1, 2]) await session.putChunk(n, chunk(file, n));
+    // The object is evicted right after R2 assembled the file.
+    const save = store.save;
+    store.save = async (state) => {
+      if (state.status === 'confirmed') throw new Error('evicted');
+      await save(state);
+    };
+    await expect(session.complete()).rejects.toThrow('evicted');
+    expect(store.state?.status).toBe('finalizing');
+    store.save = save;
+    // R2 no longer knows the upload id; the retry must not ask it again.
+    const restarted = new UploadSessionCore(storage, store);
+    expect(await restarted.complete()).toEqual({
+      ok: true,
+      sha256: sha(file),
+      sizeBytes: file.length,
+    });
+    expect(store.state?.status).toBe('confirmed');
+  });
+
+  it('stops reading at one byte past the chunk cap', async () => {
+    const session = new UploadSessionCore(storage, store);
+    await session.begin(init({ sha256: null, sizeBytes: null }));
+    const body = streamOf(new Uint8Array(2 * CHUNK_SIZE_BYTES));
+    expect(await session.putChunk(1, body.stream)).toMatchObject({ code: 'too_large' });
+    expect(body.pulled.bytes).toBeLessThanOrEqual(CHUNK_SIZE_BYTES + 65_536);
+    expect((await session.status()).chunksReceived).toEqual([]);
+  });
+
+  it('holds at most one chunk while 60 MiB arrive out of order, eight PUTs at a time', async () => {
+    const big = new Uint8Array(randomBytes(60 * 1024 * 1024));
+    const session = new UploadSessionCore(storage, store);
+    await session.begin(init({ sha256: sha(big), sizeBytes: big.length }));
+    const order = [8, 3, 1, 7, 2, 6, 4, 5];
+    const pending = new Set(order);
+    while (pending.size) {
+      const wave = [...pending];
+      const results = await Promise.all(
+        wave.map((n) => session.putChunk(n, streamOf(new Uint8Array(chunk(big, n))).stream)),
+      );
+      results.forEach((result, i) => {
+        if (result.ok) pending.delete(wave[i]!);
+        else expect(result.code).toBe('busy');
+      });
+    }
+    expect(await session.complete()).toMatchObject({ ok: true });
+    const { peakBufferedBytes } = await session.status();
+    expect(peakBufferedBytes).toBeLessThanOrEqual(CHUNK_SIZE_BYTES);
+    expect(peakBufferedBytes).toBeGreaterThan(CHUNK_SIZE_BYTES / 2);
+  });
+});

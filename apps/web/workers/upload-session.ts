@@ -41,12 +41,16 @@ export class UploadSession extends DurableObject<CloudflareEnv> implements Uploa
     if (at && (await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(at);
   }
 
-  putChunk(n: number, bytes: ArrayBuffer) {
-    return this.core.putChunk(n, bytes);
+  putChunk(n: number, body: ReadableStream<Uint8Array> | ArrayBuffer | null) {
+    return this.core.putChunk(n, body);
   }
 
-  complete(final?: { sha256: string; sizeBytes: number }) {
-    return this.core.complete(final);
+  async complete(final?: { sha256: string; sizeBytes: number }) {
+    const result = await this.core.complete(final);
+    // The measured bound on chunk memory (review item 13), in the Worker log.
+    const { peakBufferedBytes } = await this.core.status();
+    console.log(`upload session: peak buffered bytes ${peakBufferedBytes}`);
+    return result;
   }
 
   status() {
@@ -69,6 +73,7 @@ export class UploadSession extends DurableObject<CloudflareEnv> implements Uploa
         .where(
           and(
             eq(schema.recordings.id, state.recordingId),
+            eq(schema.recordings.installId, state.installId),
             eq(schema.recordings.status, 'uploading'),
           ),
         );

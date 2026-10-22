@@ -21,7 +21,7 @@ export interface UploadSessionInit {
 
 export type ChunkResult =
   | { ok: true; n: number; sizeBytes: number; chunksReceived: number[]; chunkCount: number | null }
-  | { ok: false; code: 'chunk_size' | 'too_large' | 'not_uploading'; message: string };
+  | { ok: false; code: 'chunk_size' | 'too_large' | 'not_uploading' | 'busy'; message: string };
 
 export type CompleteResult =
   | { ok: true; sha256: string; sizeBytes: number }
@@ -34,16 +34,25 @@ export type CompleteResult =
     };
 
 export interface SessionStatus {
-  status: 'uploading' | 'confirmed' | 'failed' | 'none';
+  /** `finalizing`: every chunk is in, the file is being assembled and verified. */
+  status: 'uploading' | 'finalizing' | 'confirmed' | 'failed' | 'none';
   chunksReceived: number[];
   chunkCount: number | null;
   failure: string | null;
+  /** The most chunk bytes the session has held in memory at once. */
+  peakBufferedBytes: number;
 }
 
 export interface UploadSession {
   /** Idempotent: a session that exists is left alone. */
   begin(init: UploadSessionInit): Promise<void>;
-  putChunk(n: number, bytes: ArrayBuffer): Promise<ChunkResult>;
+  /**
+   * One chunk. The body is read only after the session accepts it, and only
+   * up to one chunk: one more byte and the read stops with `too_large`. While
+   * another chunk is being received, written or verified, the answer is
+   * `busy` and the body is not read.
+   */
+  putChunk(n: number, body: ReadableStream<Uint8Array> | ArrayBuffer | null): Promise<ChunkResult>;
   complete(final?: { sha256: string; sizeBytes: number }): Promise<CompleteResult>;
   status(): Promise<SessionStatus>;
   /** Stops an unfinished upload and forgets the session. The finished file is not touched. */

@@ -52,6 +52,9 @@ export const ERROR_CODES = [
   'hash_mismatch',
   'size_mismatch',
   'session_expired',
+  'busy',
+  'unsupported_media_type',
+  'internal',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
