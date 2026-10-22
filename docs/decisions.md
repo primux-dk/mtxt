@@ -29,3 +29,4 @@ Dated, with the reason. Newest at the bottom. The spec in `spec.md` states the r
 - **Name: mtxt.** "Meeting text." The product name employees see is a setting per install.
 - **First install's provider: AssemblyAI EU endpoint with their DPA.** ElevenLabs Scribe was the first choice for Danish quality, but on a self-serve plan EU residency and zero retention are Enterprise-only, and audio sits in US request history. A local model is tested alongside on the same recording.
 - **Repo: primux-dk/mtxt.** Primux is the company the About page names.
+- **One repo for recorder and library**, laid out like anarlog: `apps/server`, `apps/recorder`, `packages/contract`. The upload contract is the seam, and one repo lets a contract change land in both halves in one commit. Vibe comes in with `git subtree` so its history and MIT licence travel with the code. A separate recorder repo was the earlier plan and is dropped.

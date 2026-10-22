@@ -13,8 +13,19 @@ Read `README.md` and `docs/spec.md` first. Kristian's open-source company meetin
 
 ## Layout, once the build starts
 
-- This repo is the library: Laravel app at the root, `docker/` for compose and images, `docs/` for the spec and decisions.
-- The recorder is a Vibe fork in `primux-dk/mtxt-recorder`, not here. The upload contract in `docs/spec.md` is the boundary between them.
+One repo for both halves, the anarlog way, so a change to the recorder-to-server contract lands in one commit.
+
+```
+apps/server/        Laravel library; the Docker image is built from here
+apps/recorder/      Tauri 2 recorder, the Vibe fork; Vibe's MIT LICENSE stays in this folder
+packages/contract/  the recorder-to-server contract: OpenAPI file plus generated TS and PHP types
+docker/             compose and images
+docs/               spec and decisions
+```
+
+- Each app keeps its own toolchain in its own folder: Composer under `apps/server`, Cargo and pnpm under `apps/recorder`. Nothing at the root runs code.
+- Bring Vibe in with `git subtree add --prefix apps/recorder https://github.com/thewh1teagle/vibe main` so its history and licence travel with the code. Do not copy files by hand.
+- `packages/contract` is the only thing both apps import. The server never reads recorder code and the recorder never reads server code.
 - Decisions go to `docs/decisions.md` with a date. Specs go to `docs/spec.md`. Neither is a changelog; git is.
 
 ## Working

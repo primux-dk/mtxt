@@ -4,7 +4,7 @@ None is bundled in this repository yet.
 
 Planned, to be recorded here when they land:
 
-- **Vibe** (https://github.com/thewh1teagle/vibe, MIT): the recorder is a fork, kept in its own repository.
+- **Vibe** (https://github.com/thewh1teagle/vibe, MIT): the recorder under `apps/recorder` is a fork, brought in with git subtree. Its LICENSE file stays in that folder.
 - **Parakeet TDT 0.6B v3** (NVIDIA, CC-BY-4.0): local speech-to-text model, downloaded by the recorder on first run. Attribution: "Parakeet TDT 0.6B v3 by NVIDIA, licensed under CC-BY-4.0."
 - **Whisper large-v3-turbo** (OpenAI, MIT): fallback local model.
 - **Tiptap** (@tiptap/core and open extensions, MIT): the recap editor. No Pro extensions.

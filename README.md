@@ -22,7 +22,7 @@ Meetings only. No dictation.
 ## Stack
 
 - Library: Laravel, Livewire, queue workers, Docker compose. The recap editor is Tiptap core with open extensions, in a Livewire island.
-- Recorder: Tauri 2 and Rust, a fork of Vibe, in its own repository once the build starts.
+- Recorder: Tauri 2 and Rust, a fork of Vibe, under `apps/recorder` in this repo. The library is `apps/server`; the contract between them is `packages/contract`.
 - Speech-to-text and language models are adapters. The app holds no opinion about the provider.
 
 ## Licence
