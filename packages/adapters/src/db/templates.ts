@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import type { Db } from './index';
 import { meetings, recaps, templates } from './schema';
 
@@ -93,4 +93,47 @@ export async function deleteTemplate(db: Db, installId: string, id: string) {
       .where(and(eq(recaps.installId, installId), eq(recaps.templateId, id))),
     db.delete(templates).where(and(eq(templates.installId, installId), eq(templates.id, id))),
   ]);
+}
+
+/**
+ * Brings every stored `name_key` to `templateNameKey(name)`. Migration 0002
+ * could only lower-case ASCII, so a key may be short of the full fold or carry
+ * the id it got to dodge a collision. When two names fold to one key, the
+ * later template (by rowid) is renamed "<name> (2)", or the next free number.
+ * Idempotent: with every key current it reads and writes nothing more.
+ */
+export async function refoldTemplateKeys(db: Db, installId: string) {
+  const rows = await db
+    .select({ id: templates.id, name: templates.name, nameKey: templates.nameKey })
+    .from(templates)
+    .where(eq(templates.installId, installId))
+    .orderBy(sql`rowid`);
+  const used = new Set<string>();
+  const changes: { id: string; name: string; nameKey: string }[] = [];
+  for (const row of rows) {
+    let name = row.name;
+    let key = templateNameKey(name);
+    for (let n = 2; used.has(key); n++) {
+      name = `${row.name} (${n})`;
+      key = templateNameKey(name);
+    }
+    used.add(key);
+    if (key !== row.nameKey || name !== row.name) changes.push({ id: row.id, name, nameKey: key });
+  }
+  if (changes.length === 0) return 0;
+  const where = (id: string) => and(eq(templates.installId, installId), eq(templates.id, id));
+  // Two passes in one batch, so a key moving onto another row's old key never trips the index.
+  const [first, ...rest] = [
+    ...changes.map((c) =>
+      db
+        .update(templates)
+        .set({ nameKey: `~refold~${c.id}` })
+        .where(where(c.id)),
+    ),
+    ...changes.map((c) =>
+      db.update(templates).set({ name: c.name, nameKey: c.nameKey }).where(where(c.id)),
+    ),
+  ];
+  await db.batch([first!, ...rest]);
+  return changes.length;
 }

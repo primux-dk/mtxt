@@ -22,6 +22,7 @@ export {
   createTemplate,
   deleteTemplate,
   listTemplates,
+  refoldTemplateKeys,
   setDefaultTemplate,
   templateNameKey,
   updateTemplate,

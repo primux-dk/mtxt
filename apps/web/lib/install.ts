@@ -6,6 +6,7 @@ import {
   cloudflareAdapters,
   DEFAULT_SETTINGS,
   readSettings,
+  refoldTemplateKeys,
   seal,
   type IdentityProvider,
   type Settings,
@@ -51,11 +52,26 @@ async function bootstrap(settings: Settings): Promise<boolean> {
   return true;
 }
 
+/**
+ * Template keys from migration 0002 are folded on the first request a Worker
+ * isolate serves (lib: refoldTemplateKeys, idempotent). Once per isolate, so
+ * later requests pay nothing.
+ */
+let refolded: Promise<unknown> | null = null;
+function refoldOnce(db: Parameters<typeof refoldTemplateKeys>[0], installId: string) {
+  refolded ??= refoldTemplateKeys(db, installId).catch((error) => {
+    refolded = null;
+    console.warn('Could not refold template keys:', (error as Error).message);
+  });
+  return refolded;
+}
+
 /** The install's settings row, read once per request. */
 export const getInstallSettings = cache(async (): Promise<Settings> => {
   const { db, installId } = await getAdapters();
   try {
     const settings = await readSettings(db, installId);
+    await refoldOnce(db, installId);
     return (await bootstrap(settings)) ? await readSettings(db, installId) : settings;
   } catch (error) {
     // Most likely a fresh checkout: the local database has no tables yet.
