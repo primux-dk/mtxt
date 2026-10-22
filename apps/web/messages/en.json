@@ -282,8 +282,7 @@
       "field": "Name",
       "help": "The new name applies to every line from this speaker in this meeting.",
       "save": "Save",
-      "required": "Enter a name.",
-      "label": "{name}, rename or link to a colleague"
+      "required": "Enter a name."
     },
     "link": {
       "heading": "Colleague",

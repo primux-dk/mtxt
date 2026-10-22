@@ -282,8 +282,7 @@
       "field": "Navn",
       "help": "Det nye navn gælder alle linjer fra denne taler i dette møde.",
       "save": "Gem",
-      "required": "Skriv et navn.",
-      "label": "{name}, omdøb eller tilknyt kollega"
+      "required": "Skriv et navn."
     },
     "link": {
       "heading": "Kollega",
