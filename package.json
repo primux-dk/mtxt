@@ -1,0 +1,30 @@
+{
+  "name": "mtxt",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @mtxt/web dev",
+    "preview": "pnpm --filter @mtxt/web preview",
+    "build": "pnpm --filter @mtxt/web build",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @mtxt/web test:e2e",
+    "lint": "pnpm -r lint && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "pnpm -r typecheck",
+    "generate": "pnpm --filter @mtxt/contract generate && pnpm --filter @mtxt/adapters db:generate",
+    "db:migrate": "pnpm --filter @mtxt/web db:migrate",
+    "db:seed": "pnpm --filter @mtxt/web db:seed",
+    "check:licenses": "node scripts/check-licenses.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0"
+  }
+}

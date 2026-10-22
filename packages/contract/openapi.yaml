@@ -1,0 +1,310 @@
+openapi: 3.1.0
+info:
+  title: mtxt recorder-to-server contract
+  version: 0.1.0
+  description: |
+    How a recording reaches the library (docs/spec.md). The recorder announces a
+    recording, uploads it in 8 MB chunks that can be resent, asks the server to
+    verify the whole file, and polls until the transcript exists.
+
+    "Confirmed" means the server holds the whole file and its SHA-256 matches.
+    Only then does the recorder start its 7-day local timer.
+
+    The recorder and the server share only this file and the types generated
+    from it.
+  license:
+    name: PolyForm Noncommercial 1.0.0
+    url: https://polyformproject.org/licenses/noncommercial/1.0.0/
+servers:
+  - url: /api/v1
+    description: Relative to the install's own hostname.
+security:
+  - companyLogin: []
+paths:
+  /recordings:
+    post:
+      operationId: createRecording
+      summary: Announce a recording and get an upload session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecordingRequest'
+      responses:
+        '201':
+          description: Upload session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRecordingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: The file is larger than the install accepts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /recordings/{id}/chunks/{n}:
+    parameters:
+      - $ref: '#/components/parameters/RecordingId'
+      - name: n
+        in: path
+        required: true
+        description: Chunk number, 1-based. Chunk n holds bytes (n-1) × chunk_size_bytes onwards.
+        schema:
+          type: integer
+          minimum: 1
+    put:
+      operationId: uploadChunk
+      summary: Upload one chunk. Sending the same chunk again replaces it.
+      parameters:
+        - name: Content-Length
+          in: header
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              contentMediaType: application/octet-stream
+      responses:
+        '200':
+          description: Chunk stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The recording is no longer accepting chunks (already confirmed or failed).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /recordings/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/RecordingId'
+    post:
+      operationId: completeRecording
+      summary: Ask the server to verify the whole file against the announced SHA-256.
+      responses:
+        '200':
+          description: The server holds the whole file and the hash matches. The recording is confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Chunks are missing. The body lists them; upload them and call complete again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissingChunks'
+        '422':
+          description: All chunks arrived but the hash does not match. The recorder keeps its file and starts again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /recordings/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RecordingId'
+    get:
+      operationId: getRecording
+      summary: Poll the state of a recording.
+      responses:
+        '200':
+          description: The recording.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    companyLogin:
+      type: http
+      scheme: bearer
+      description: An access token from the install's company login (OIDC). Defined in v0.2.
+  parameters:
+    RecordingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: The request is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: No valid company login.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: No recording with this id that the caller may see.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    RecordingStatus:
+      type: string
+      description: |
+        Server-side state of a recording. The recorder's own states (Recording,
+        Uploading, Pending, Warn, AskUser, Confirmed, Deleted) are local and not
+        part of this contract.
+      enum: [uploading, confirmed, transcribing, transcribed, failed]
+    RecordingSource:
+      type: string
+      enum: [desktop, browser, upload, teams, meet, device]
+    Sha256:
+      type: string
+      description: Lowercase hex SHA-256 of the whole file.
+      pattern: '^[0-9a-f]{64}$'
+    NewMeeting:
+      type: object
+      required: [title, started_at]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        started_at:
+          type: string
+          format: date-time
+    CreateRecordingRequest:
+      type: object
+      description: Either `meeting_id` for a meeting that exists, or `meeting` to create one.
+      required: [duration_s, sha256, size_bytes, source, content_type]
+      properties:
+        meeting_id:
+          type: string
+        meeting:
+          $ref: '#/components/schemas/NewMeeting'
+        duration_s:
+          type: integer
+          minimum: 0
+        sha256:
+          $ref: '#/components/schemas/Sha256'
+        size_bytes:
+          type: integer
+          minimum: 1
+        source:
+          $ref: '#/components/schemas/RecordingSource'
+        content_type:
+          type: string
+          description: MIME type of the audio, for example audio/ogg or audio/mp4.
+    CreateRecordingResponse:
+      type: object
+      required: [id, meeting_id, upload_url, chunk_size_bytes, chunk_count, status]
+      properties:
+        id:
+          type: string
+        meeting_id:
+          type: string
+        upload_url:
+          type: string
+          description: Base URL for chunks; the recorder appends `/{n}`.
+        chunk_size_bytes:
+          type: integer
+          description: Size of every chunk but the last. 8 MB (8388608) in v0.1.
+        chunk_count:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/RecordingStatus'
+    ChunkReceipt:
+      type: object
+      required: [n, size_bytes, chunks_received, chunk_count]
+      properties:
+        n:
+          type: integer
+        size_bytes:
+          type: integer
+        chunks_received:
+          type: integer
+        chunk_count:
+          type: integer
+    MissingChunks:
+      type: object
+      required: [error, missing]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+        missing:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+    Recording:
+      type: object
+      required: [id, meeting_id, status, sha256, size_bytes, duration_s, source, created_at]
+      properties:
+        id:
+          type: string
+        meeting_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/RecordingStatus'
+        sha256:
+          $ref: '#/components/schemas/Sha256'
+        size_bytes:
+          type: integer
+        duration_s:
+          type: integer
+        source:
+          $ref: '#/components/schemas/RecordingSource'
+        created_at:
+          type: string
+          format: date-time
+        confirmed_at:
+          type: [string, 'null']
+          format: date-time
+          description: Set when the hash matched. The recorder's 7-day timer starts here.
+        error:
+          oneOf:
+            - $ref: '#/components/schemas/ErrorBody'
+            - type: 'null'
+          description: Set when status is failed.
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code, for example `hash_mismatch`.
+        message:
+          type: string
+          description: English text for logs. The recorder shows its own localised message per code.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
