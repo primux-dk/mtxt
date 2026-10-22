@@ -99,7 +99,7 @@ One database per install, in the company's own account. Every row carries an ins
 ```
 users            id, oidc_subject, email, name, is_admin
 meetings         id, owner_id, title, started_at, visibility (private|shared|company),
-                 keep (bool), template_id, deleted_at
+                 keep (bool), template_id, archived_at, deleted_at   -- archived: out of the views, restorable
 meeting_shares   meeting_id, user_id                       -- "shared" visibility only
 recordings       id, meeting_id, uploaded_by, source (desktop|browser|upload|teams|meet|device),
                  is_primary, duration_s, sha256, size_bytes, storage_path,
