@@ -171,28 +171,50 @@ describe('validateSettings', () => {
     expect(errorsOf(form({ sttProvider: 'elevenlabs' })).sttApiKey).toEqual({
       code: 'secretRequired',
     });
-    for (const provider of ['workers-ai-whisper', 'local-whisper', 'local-parakeet']) {
-      const result = validateSettings(
-        form({ sttProvider: provider, sttApiKey: 'ignored' }),
-        configured,
-        SELF,
-      );
-      expect(result.ok).toBe(true);
-      expect(result.ok && result.secrets).toEqual({});
-      expect(result.ok && result.clearSttKey).toBe(true);
+    const result = validateSettings(
+      form({ sttProvider: 'workers-ai-whisper', sttApiKey: 'ignored' }),
+      configured,
+      SELF,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.secrets).toEqual({});
+    expect(result.ok && result.clearSttKey).toBe(true);
+    for (const provider of ['local-whisper', 'local-parakeet']) {
+      expect(errorsOf(form({ sttProvider: provider })).sttApiKey).toBeUndefined();
     }
+  });
+
+  it('refuses the providers this version does not have, and keeps the two it has', () => {
+    for (const provider of ['azure', 'elevenlabs', 'local-whisper', 'local-parakeet']) {
+      expect(
+        errorsOf(form({ sttProvider: provider, sttApiKey: 'k', sttRegion: 'westeurope' }))
+          .sttProvider,
+      ).toEqual({
+        code: 'notAvailable',
+      });
+    }
+    expect(
+      validateSettings(form({ sttProvider: 'assemblyai', sttApiKey: 'k' }), configured, SELF).ok,
+    ).toBe(true);
+  });
+
+  it('takes an AI Gateway id, or none', () => {
+    const ok = validateSettings(form({ aiGatewayId: 'mtxt-gateway_1' }), configured, SELF);
+    expect(ok.ok && ok.patch.aiGatewayId).toBe('mtxt-gateway_1');
+    const none = validateSettings(form({}), configured, SELF);
+    expect(none.ok && none.patch.aiGatewayId).toBeNull();
+    expect(errorsOf(form({ aiGatewayId: 'no spaces/here' })).aiGatewayId).toEqual({
+      code: 'gatewayFormat',
+    });
   });
 
   it('needs an Azure region', () => {
     expect(errorsOf(form({ sttProvider: 'azure', sttApiKey: 'k' })).sttRegion).toEqual({
       code: 'required',
     });
-    const result = validateSettings(
-      form({ sttProvider: 'azure', sttApiKey: 'k', sttRegion: 'WestEurope' }),
-      configured,
-      SELF,
-    );
-    expect(result.ok && result.patch.sttRegion).toBe('westeurope');
+    expect(
+      errorsOf(form({ sttProvider: 'azure', sttApiKey: 'k', sttRegion: 'West Europe' })).sttRegion,
+    ).toEqual({ code: 'regionFormat' });
   });
 
   it('needs at least one recording source', () => {

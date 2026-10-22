@@ -47,6 +47,7 @@ export default async function SettingsPage() {
       oidcClientId: settings.oidcClientId ?? '',
       sttProvider: settings.sttProvider,
       sttRegion: settings.sttRegion ?? '',
+      aiGatewayId: settings.aiGatewayId ?? '',
       language: settings.language,
       interfaceLanguage: settings.interfaceLanguage,
       keyterms: formatKeyterms(terms),

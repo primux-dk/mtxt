@@ -14,7 +14,7 @@ import { PageTitle } from '@/components/page-title';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatKeyterms, mergeKeyterms, parseKeyterms } from '@/lib/settings/keyterms';
-import type { Field as FieldName } from '@/lib/settings/validate';
+import { STT_AVAILABLE, type Field as FieldName } from '@/lib/settings/validate';
 import { DataFlow } from './data-flow';
 import {
   controlClass,
@@ -62,6 +62,7 @@ export interface SettingsFormProps {
     oidcClientId: string;
     sttProvider: SttProvider | null;
     sttRegion: string;
+    aiGatewayId: string;
     language: string;
     interfaceLanguage: 'en' | 'da';
     keyterms: string;
@@ -139,6 +140,7 @@ export function SettingsForm({
     sttProvider: t('stt.provider'),
     sttApiKey: t('stt.apiKey'),
     sttRegion: t('stt.region'),
+    aiGatewayId: tAll('stt.gateway.field'),
     language: t('stt.language'),
     interfaceLanguage: t('interfaceLanguage.field'),
     keyterms: t('keyterms.field'),
@@ -464,6 +466,23 @@ export function SettingsForm({
               </Field>
             )}
             <Field
+              id="aiGatewayId"
+              label={tAll('stt.gateway.field')}
+              help={tAll('stt.gateway.help')}
+              error={errors.aiGatewayId}
+              className="col-span-full"
+            >
+              <Input
+                id="aiGatewayId"
+                name="aiGatewayId"
+                defaultValue={values.aiGatewayId}
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={invalid('aiGatewayId')}
+                aria-describedby={describedBy('aiGatewayId', true, errors.aiGatewayId)}
+              />
+            </Field>
+            <Field
               id="language"
               label={t('stt.language')}
               error={errors.language}
@@ -690,6 +709,7 @@ export function SettingsForm({
         <DataFlow
           provider={stt || null}
           providerName={stt ? providerName(stt) : ''}
+          supported={STT_AVAILABLE.map(providerName)}
           audioDays={Number(audioDays) || 0}
           textDays={Number(textDays) || 0}
         />

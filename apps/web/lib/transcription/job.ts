@@ -89,10 +89,17 @@ export async function runTranscribe(
   };
 
   if (step === 'skip') return;
-  if (step === 'finish') return done();
 
   const settings = await readSettings(db, installId);
+  if (!settings.sttProvider && step === 'submit') {
+    // The data-flow panel's promise: audio is stored and transcription waits for a
+    // provider. Saving one in Settings queues every waiting recording (queueWaiting).
+    log.log('No speech-to-text provider yet; the recording waits', recordingId);
+    await markTranscribing(db, installId, recordingId);
+    return;
+  }
   try {
+    if (step === 'finish') return await done();
     if (step === 'fetch' && transcript) {
       // The job a webhook woke: ask the provider that holds it.
       const provider = await deps.provider({
@@ -101,7 +108,7 @@ export async function runTranscribe(
       });
       if (!provider.fetch) throw new SttError('stt_failed', 'The provider has no async jobs.');
       const fetched = await provider.fetch(transcript.providerJobId!);
-      if (fetched.kind === 'done') return finish(transcript.id, fetched.result);
+      if (fetched.kind === 'done') return await finish(transcript.id, fetched.result);
       if (fetched.kind === 'failed') {
         await markFailed(db, installId, recordingId, transcript.id, 'stt_failed', fetched.reason);
         return;
@@ -131,7 +138,7 @@ export async function runTranscribe(
       await setJobId(db, installId, transcript.id, submitted.handle);
       return;
     }
-    return finish(transcript.id, submitted.result);
+    return await finish(transcript.id, submitted.result);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const retry = !(error instanceof SttError) || error.retryable;

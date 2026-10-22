@@ -166,6 +166,29 @@ describe('the transcribe job', () => {
     expect(h.sent).toHaveLength(1);
   });
 
+  it('fails on the third delivery when writing the result keeps failing', async () => {
+    const h = harness({ submit: async () => ({ kind: 'done', result: RESULT }) });
+    h.queue.send = async () => {
+      throw new Error('queue down');
+    };
+    await expect(runTranscribe(deps(h), 'rec-1', 1)).rejects.toThrow('queue down');
+    await expect(runTranscribe(deps(h), 'rec-1', 2)).rejects.toThrow('queue down');
+    await runTranscribe(deps(h), 'rec-1', 3);
+    expect(rows(`select status, failure from recordings`)).toEqual([
+      { status: 'failed', failure: 'stt_failed' },
+    ]);
+  });
+
+  it('waits, without failing, while no provider is chosen', async () => {
+    ctx.raw.exec(`UPDATE settings SET stt_provider = NULL`);
+    const h = harness({ submit: vi.fn() });
+    await runTranscribe(deps(h), 'rec-1', 1);
+    expect(h.provider.submit).not.toHaveBeenCalled();
+    expect(rows(`select status, failure from recordings`)).toEqual([
+      { status: 'transcribing', failure: null },
+    ]);
+  });
+
   it('fails at once on an error that will not pass, with the code and the reason', async () => {
     const h = harness({
       submit: async () => {

@@ -38,6 +38,10 @@ export const TRANSCRIPTION_LANGUAGES = [
 /** Providers that need an API key. Workers AI uses the Worker's own binding; local models run on the install. */
 export const STT_NEEDS_KEY: readonly SttProvider[] = ['assemblyai', 'azure', 'elevenlabs'];
 export const ELEVENLABS_REGIONS = ['', 'eu'] as const;
+/** The providers this build transcribes with (lib/stt AVAILABLE_PROVIDERS); the rest are refused at save. */
+export const STT_AVAILABLE: readonly SttProvider[] = ['assemblyai', 'workers-ai-whisper'];
+/** A Cloudflare AI Gateway id: letters, digits, - and _. */
+const GATEWAY_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 /** The order fields appear on the page, so the error summary lists them top to bottom. */
 export const FIELDS = [
@@ -52,6 +56,7 @@ export const FIELDS = [
   'sttProvider',
   'sttApiKey',
   'sttRegion',
+  'aiGatewayId',
   'language',
   'interfaceLanguage',
   'keyterms',
@@ -73,6 +78,8 @@ export type FieldError =
   | { code: 'domainFormat' }
   | { code: 'secretRequired' }
   | { code: 'regionFormat' }
+  | { code: 'notAvailable' }
+  | { code: 'gatewayFormat' }
   | KeytermError
   | { code: 'atLeastOneSource' }
   | { code: 'range'; min: number; max: number }
@@ -92,6 +99,7 @@ export interface SettingsPatch {
   oidcClientId: string;
   sttProvider: SttProvider | null;
   sttRegion: string | null;
+  aiGatewayId: string | null;
   language: string;
   interfaceLanguage: Settings['interfaceLanguage'];
   liveTranscriptDefault: boolean;
@@ -194,6 +202,8 @@ export function validateSettings(
     errors.sttProvider = { code: 'invalid' };
   } else if (sttProviderText) {
     sttProvider = sttProviderText as SttProvider;
+    // Still in the select, so an admin sees what is coming; not saved until this build has it.
+    if (!STT_AVAILABLE.includes(sttProvider)) errors.sttProvider = { code: 'notAvailable' };
     const keepsKey = current.hasSttKey && current.sttProvider === sttProvider;
     if (STT_NEEDS_KEY.includes(sttProvider) && !sttApiKey && !keepsKey)
       errors.sttApiKey = { code: 'secretRequired' };
@@ -207,6 +217,9 @@ export function validateSettings(
       else sttRegion = region || null;
     }
   }
+
+  const aiGatewayId = text('aiGatewayId');
+  if (aiGatewayId && !GATEWAY_ID.test(aiGatewayId)) errors.aiGatewayId = { code: 'gatewayFormat' };
 
   const language = text('language');
   if (!oneOf(TRANSCRIPTION_LANGUAGES, language)) errors.language = { code: 'invalid' };
@@ -265,6 +278,7 @@ export function validateSettings(
       oidcClientId,
       sttProvider,
       sttRegion,
+      aiGatewayId: aiGatewayId || null,
       language,
       interfaceLanguage: interfaceLanguage as Settings['interfaceLanguage'],
       liveTranscriptDefault: form.get('liveTranscriptDefault') === 'on',

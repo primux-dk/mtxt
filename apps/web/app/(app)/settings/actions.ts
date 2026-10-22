@@ -16,6 +16,7 @@ import {
 import { getSessionUser } from '@/lib/auth/session';
 import { getAdapters, getEnv, getInstallSettings } from '@/lib/install';
 import { fieldMessage } from '@/lib/settings/messages';
+import { queueWaiting } from '@/lib/transcription/store';
 import {
   FIELDS,
   validateSettings,
@@ -95,6 +96,13 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
   } catch (error) {
     console.error('Could not save the settings:', error);
     return { status: 'error', message: t('errors.saveFailed') };
+  }
+  // Recordings that waited for a provider start now (docs/decisions.md, packet 4).
+  if (result.patch.sttProvider && result.patch.sttProvider !== current.sttProvider) {
+    const { db, installId, queue } = await getAdapters();
+    await queueWaiting(db, installId, queue).catch((error) =>
+      console.error('Could not queue the waiting recordings:', error),
+    );
   }
   // The shell, the theme and the language come from this row on every page.
   revalidatePath('/', 'layout');

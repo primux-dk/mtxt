@@ -3,7 +3,7 @@
   segments and the recording's status. Every statement carries install_id.
 */
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import { schema, type Db, type Transcript } from '@mtxt/adapters';
+import { schema, type Db, type Job, type Transcript } from '@mtxt/adapters';
 import type { SttFailure, SttResult } from '../stt/types';
 import { planSpeakers } from './speakers';
 
@@ -176,10 +176,11 @@ export async function writeResult(
   await db.batch([
     db.delete(g).where(and(eq(g.installId, installId), eq(g.transcriptId, transcriptId))),
     ...batches.map((json) =>
-      db.run(sql`insert into segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text)
-        select json_extract(value, '$[0]'), ${installId}, ${transcriptId}, json_extract(value, '$[1]'),
+      db.insert(g).select(
+        sql`select json_extract(value, '$[0]'), ${installId}, ${transcriptId}, json_extract(value, '$[1]'),
           json_extract(value, '$[2]'), json_extract(value, '$[3]'), json_extract(value, '$[4]')
-        from json_each(${json})`),
+        from json_each(${json})`,
+      ),
     ),
     db
       .update(t)
@@ -207,4 +208,38 @@ export async function markTranscribed(db: Db, installId: string, recordingId: st
     )
     .returning({ id: r.id });
   return updated.length > 0;
+}
+
+/**
+ * Recordings waiting for a provider: confirmed or transcribing with no
+ * transcript row. Queued again when an admin saves a provider, a hundred
+ * jobs per batch (the Queues limit), oldest first.
+ */
+export async function queueWaiting(
+  db: Db,
+  installId: string,
+  queue: { sendBatch(jobs: { body: Job }[]): Promise<void> },
+  limit = 1000,
+): Promise<number> {
+  const waiting = await db
+    .select({ id: r.id })
+    .from(r)
+    .where(
+      and(
+        eq(r.installId, installId),
+        inArray(r.status, ['confirmed', 'transcribing']),
+        sql`not exists (select 1 from transcripts x
+          where x.install_id = ${installId} and x.recording_id = ${r.id} and x.is_comparison = 0)`,
+      ),
+    )
+    .orderBy(r.createdAt)
+    .limit(limit);
+  for (let i = 0; i < waiting.length; i += 100) {
+    await queue.sendBatch(
+      waiting.slice(i, i + 100).map((w) => ({
+        body: { type: 'transcribe', recording_id: w.id, install_id: installId } as Job,
+      })),
+    );
+  }
+  return waiting.length;
 }

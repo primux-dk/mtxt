@@ -22,13 +22,20 @@ export function DataFlow({
   providerName,
   audioDays,
   textDays,
+  supported,
 }: {
   provider: SttProvider | null;
   providerName: string;
   audioDays: number;
   textDays: number;
+  /** The providers this build transcribes with, by name. */
+  supported: string[];
 }) {
   const t = useTranslations('settings.dataflow');
+  const ts = useTranslations('stt');
+  const list = new Intl.ListFormat(useTranslations('locale')('intl'), {
+    type: 'conjunction',
+  }).format(supported);
   const step2 = !provider
     ? t('step2None')
     : ROUTE[provider] === 'direct'
@@ -53,6 +60,7 @@ export function DataFlow({
       <p className="mt-4">
         <strong className="font-[650]">{t('promise')}</strong> {t('caveats')}
       </p>
+      <p className="mt-4">{ts('supported', { providers: list })}</p>
       <p className="mt-4">{t('local')}</p>
     </aside>
   );
