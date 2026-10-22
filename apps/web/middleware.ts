@@ -1,5 +1,5 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { cloudflareAdapters, readSettings } from '@mtxt/adapters';
+import { cloudflareAdapters, findUser } from '@mtxt/adapters';
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
 import { isPublicPath, SESSION_MAX_AGE, sessionCookieName } from './lib/auth/session-config';
@@ -7,9 +7,11 @@ import { isPublicPath, SESSION_MAX_AGE, sessionCookieName } from './lib/auth/ses
 /*
   The gate: every page and API route needs a session, except the login page
   and Auth.js's own routes. Pages without one go to the login page and come
-  back after; API routes answer 401 JSON. /settings also needs the address on
-  the admin list; anyone else gets the "Admins only" page with status 403.
-  Pages and routes still read the user and the admin list themselves.
+  back after; API routes answer 401 JSON. The cookie only names a user: its
+  subject is resolved to the current user row on every request, and a cookie
+  whose user row is gone counts as signed out. /settings needs that row's
+  is_admin; anyone else gets the "Admins only" page with status 403. Pages
+  and routes resolve the row again themselves (lib/auth/session.ts).
 */
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -26,15 +28,18 @@ export async function middleware(request: NextRequest) {
       })
     : null;
   const fresh = token && Date.now() - Number(token.signedInAt ?? 0) <= SESSION_MAX_AGE * 1000;
-  if (fresh) {
-    if (path === '/settings' || path.startsWith('/settings/')) {
-      const { db, installId } = cloudflareAdapters(env);
-      const { adminEmails } = await readSettings(db, installId);
-      if (!adminEmails.includes(String(token.email ?? '').toLowerCase())) {
+  if (fresh && typeof token.sub === 'string' && token.sub) {
+    const { db, installId } = cloudflareAdapters(env);
+    const user = await findUser(db, installId, token.sub);
+    if (user) {
+      // A server action checks admin itself and answers with a message the form shows;
+      // a 403 page in its place would leave the form waiting.
+      const action = request.method === 'POST' && request.headers.has('next-action');
+      if ((path === '/settings' || path.startsWith('/settings/')) && !user.isAdmin && !action) {
         return NextResponse.rewrite(new URL('/admins-only', request.url), { status: 403 });
       }
+      return NextResponse.next();
     }
-    return NextResponse.next();
   }
 
   if (path.startsWith('/api/')) {
