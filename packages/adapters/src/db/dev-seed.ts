@@ -4,10 +4,11 @@
  * 13). Never written to a deployed install; the seed script refuses
  * `--remote` with these.
  *
- * Kept free of imports, like seed.ts, so the seed script can load it with
+ * Imports only plain .ts files, like seed.ts, so the seed script can load it with
  * Node's own TypeScript support. Every value is generated here, so the SQL
  * is safe to build by string.
  */
+import { foldTitle } from './fold.ts';
 
 /** The users AUTH_TEST_MODE signs in as, by `oidc_subject`. Names are invented. */
 export const DEV_USERS = [
@@ -29,9 +30,6 @@ export const DEV_USERS = [
 ] as const;
 
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
-
-/** The search fold the app uses (meetings.title_folded). */
-export const foldTitle = (title: string) => title.normalize('NFKC').toLocaleLowerCase();
 
 function checkInstallId(installId: string) {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(installId)) {

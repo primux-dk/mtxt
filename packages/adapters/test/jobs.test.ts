@@ -4,7 +4,7 @@ import type { JobMessage } from '../src/queue';
 
 const message = (body: unknown, id = 'm1') => {
   const m = { id, body, attempts: 1, ack: vi.fn(), retry: vi.fn() };
-  return m as typeof m & JobMessage<Job>;
+  return m as typeof m & JobMessage<unknown>;
 };
 
 describe('jobs', () => {

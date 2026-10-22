@@ -1,17 +1,78 @@
 import { DurableObject } from 'cloudflare:workers';
+import { and, eq } from 'drizzle-orm';
+import {
+  cloudflareAdapters,
+  schema,
+  type UploadSession as UploadSessionApi,
+  type UploadSessionInit,
+} from '@mtxt/adapters';
+import { UploadSessionCore, type SessionState } from '../lib/uploads/session';
+
+const KEY = 'session';
+/** How long a finished or expired session is kept before it is forgotten. */
+const KEEP_FINISHED_MS = 30 * 24 * 3600_000;
 
 /**
  * One resumable upload session per recording (docs/spec.md "How a recording
- * reaches the library"). Tracks which 8 MB chunks arrived. Created with
- * `env.UPLOAD_SESSIONS.jurisdiction('eu')` so session state stays in the EU.
- *
- * Packet 1 declares the class so the binding exists; the upload packet fills it in.
+ * reaches the library"), created with `jurisdiction('eu')` so its state stays
+ * in the EU. The bookkeeping is UploadSessionCore; this class gives it
+ * Durable Object storage, R2 through the storage adapter, and an alarm that
+ * aborts an upload still open after 7 days.
  */
-export class UploadSession extends DurableObject<CloudflareEnv> {
-  override async fetch(): Promise<Response> {
-    return Response.json(
-      { error: { code: 'not_implemented', message: 'Upload sessions arrive in a later packet.' } },
-      { status: 501 },
-    );
+export class UploadSession extends DurableObject<CloudflareEnv> implements UploadSessionApi {
+  private readonly core: UploadSessionCore;
+
+  constructor(ctx: DurableObjectState, env: CloudflareEnv) {
+    super(ctx, env);
+    const { storage } = cloudflareAdapters(env);
+    this.core = new UploadSessionCore(storage, {
+      load: () => ctx.storage.get<SessionState>(KEY),
+      save: (state) => ctx.storage.put(KEY, state),
+      clear: async () => {
+        await ctx.storage.deleteAlarm();
+        await ctx.storage.deleteAll();
+      },
+    });
+  }
+
+  async begin(init: UploadSessionInit) {
+    await this.core.begin(init);
+    const at = this.core.expiresAt();
+    if (at && (await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(at);
+  }
+
+  putChunk(n: number, bytes: ArrayBuffer) {
+    return this.core.putChunk(n, bytes);
+  }
+
+  complete(final?: { sha256: string; sizeBytes: number }) {
+    return this.core.complete(final);
+  }
+
+  status() {
+    return this.core.status();
+  }
+
+  abort() {
+    return this.core.abort();
+  }
+
+  override async alarm() {
+    const state = await this.ctx.storage.get<SessionState>(KEY);
+    const expired = await this.core.expire();
+    if (expired && state) {
+      // The recording row says so too, unless something else moved it on.
+      const { db } = cloudflareAdapters(this.env);
+      await db
+        .update(schema.recordings)
+        .set({ status: 'failed', failure: 'session_expired' })
+        .where(
+          and(
+            eq(schema.recordings.id, state.recordingId),
+            eq(schema.recordings.status, 'uploading'),
+          ),
+        );
+      await this.ctx.storage.setAlarm(Date.now() + KEEP_FINISHED_MS);
+    }
   }
 }

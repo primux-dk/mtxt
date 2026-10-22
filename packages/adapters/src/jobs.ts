@@ -32,13 +32,13 @@ export function isJob(value: unknown): value is Job {
 export type JobHandlers<Env> = {
   [K in JobType]?: (
     job: Extract<Job, { type: K }>,
-    message: JobMessage<Job>,
+    message: JobMessage<unknown>,
     env: Env,
   ) => Promise<void>;
 };
 
 /**
- * One consumer for every job type. A handler that throws has its message
+ * One consumer for every job type. Messages arrive untyped and are checked. A handler that throws has its message
  * retried; a message that is not a job is dropped with a log line. A type
  * without a handler is logged and left alone, which the queue counts as
  * delivered.
@@ -46,7 +46,7 @@ export type JobHandlers<Env> = {
 export function routeJobs<Env>(
   handlers: JobHandlers<Env>,
   log: Pick<Console, 'error'> = console,
-): JobHandler<Job, Env> {
+): JobHandler<unknown, Env> {
   return async (messages, env) => {
     for (const message of messages) {
       const job: unknown = message.body;
@@ -56,7 +56,7 @@ export function routeJobs<Env>(
         continue;
       }
       const handler = handlers[job.type] as
-        ((job: Job, message: JobMessage<Job>, env: Env) => Promise<void>) | undefined;
+        ((job: Job, message: JobMessage<unknown>, env: Env) => Promise<void>) | undefined;
       if (!handler) {
         log.error(`No handler for ${job.type} jobs yet`, message.id);
         continue;

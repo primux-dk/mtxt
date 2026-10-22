@@ -13,7 +13,9 @@ export interface CloudflareBindings {
   DB: D1Database;
   AUDIO: R2Bucket;
   JOBS: Queue<Job>;
-  UPLOAD_SESSIONS: DurableObjectNamespace;
+  // The class lives in apps/web; any DO class with the UploadSession methods fits.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  UPLOAD_SESSIONS: DurableObjectNamespace<any>;
   INSTALL_ID: string;
 }
 
