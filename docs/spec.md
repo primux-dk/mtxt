@@ -73,6 +73,8 @@ Recorder                         Platform                        STT provider
    |<-- status: transcribed --------|
 ```
 
+Each chunk is one part of a multipart upload in R2, tracked by an upload session (a Durable Object per recording, EU jurisdiction). The file lands at `recordings/{install_id}/{meeting_id}/{recording_id}.{ext}`. `GET /recordings/{id}` lists `chunks_received` while uploading, so an interrupted upload resumes with the chunks the server lacks. A recorder that uploads while it records (the browser recorder) leaves `sha256` and `size_bytes` out of the create request and sends them with complete. A session admits one chunk at a time: a second PUT meanwhile answers 409 `busy` with `Retry-After: 1`, and the body of a refused chunk is never read. A chunk is `application/octet-stream`, at most 8 MiB, read no further than one byte past that. A session not completed within 7 days is aborted and the recording is `failed` with `session_expired`. On confirm the platform queues a transcribe job and the status moves to `transcribing`. Audio is never on a public URL: the library streams it from `GET /api/v1/recordings/{id}/audio`, with Range support, after the permission check.
+
 "Confirmed" means the platform holds the whole file and its hash matches. Only then does the recorder's 7-day local timer start. Without a confirm the recorder keeps the file and retries; it warns the user after 24 hours and asks the user after 7 days.
 
 Recorder states per recording: Recording, Uploading, Pending (no network), Warn (24 h), AskUser (7 d), Confirmed, Deleted (7 d after confirm).
@@ -100,12 +102,14 @@ One database per install, in the company's own account. Every row carries an ins
 
 ```
 users            id, oidc_subject, email (one user per address), name, is_admin
-meetings         id, owner_id, title, started_at, visibility (private|shared|company),
+meetings         id, owner_id, title, title_folded, started_at, visibility (private|shared|company),
                  keep (bool), template_id, archived_at, deleted_at   -- archived: out of the views, restorable
 meeting_shares   meeting_id, user_id                       -- "shared" visibility only
 recordings       id, meeting_id, uploaded_by, source (desktop|browser|upload|teams|meet|device),
-                 is_primary, duration_s, sha256, size_bytes, storage_path,
-                 status (uploading|confirmed|transcribing|transcribed|failed), delete_audio_at
+                 is_primary, duration_s, sha256, size_bytes, content_type, storage_path,
+                 status (uploading|confirmed|transcribing|transcribed|failed), failure,
+                 created_at, confirmed_at, delete_audio_at
+                 -- sha256 '' and size_bytes 0 while a browser recording is still being made
 transcripts      id, recording_id, provider, model, language, raw_json, created_at
 segments         id, transcript_id, speaker_id, start_ms, end_ms, text
 speakers         id, meeting_id, label, user_id (nullable)  -- a label can link to a directory user
@@ -128,7 +132,10 @@ Rules:
 - A sealed column holds AES-GCM ciphertext under the Worker secret `SETTINGS_KEY`, bound to its column as additional data. The settings page shows only whether it is set.
 - Identity is the OIDC subject. An address belongs to one user row; a sign-in with that address and another subject is refused. The admin list names addresses and applies to the user row that owns each.
 - The first sign-in on a fresh install becomes admin and sets `admin_bootstrap_claimed_at`; the claim never runs again, however empty the list becomes.
-- A meeting can have several recordings; one is primary.
+- A meeting can have several recordings; one is primary. The first confirmed recording becomes primary; the owner can move it to another confirmed one.
+- `title_folded` is the title NFKC-normalised and lower-cased by the app, for search: SQLite folds ASCII only. Rows from before it existed are filled at start-up.
+- `failure` holds a contract error code when status is `failed`: `hash_mismatch`, `size_mismatch` and `session_expired` mean the upload failed and the audio is gone; anything else is a transcription failure with the audio kept.
+- Every query, join and mutation carries `install_id`, child rows and shares included. A row whose install differs from the Worker's is ignored, whatever it points at; a meeting that another install's rows depend on is not deleted or archived.
 - Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way.
 - Admin queries never join `segments`, `recaps` or `recap_versions` for a private meeting. Admin sees title, owner, dates and the audit log.
 - Only the owner changes visibility. Shared colleagues read; they do not re-share.
