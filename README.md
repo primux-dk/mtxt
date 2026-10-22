@@ -27,6 +27,6 @@ Meetings only. No dictation.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for third-party code and model attributions.
+PolyForm Noncommercial 1.0.0, the same as scene-loop. Free for noncommercial use; a company that runs it in its business needs a commercial licence from Primux. Source-available, not open source in the OSI sense. See [LICENSE.md](LICENSE.md) and [NOTICE.md](NOTICE.md) for third-party code and model attributions.
 
 Built by [Primux](https://primux.dk).

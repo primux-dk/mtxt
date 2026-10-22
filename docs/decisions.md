@@ -7,7 +7,7 @@ Dated, with the reason. Newest at the bottom. The spec in `spec.md` states the r
 - **Meetings only, no dictation.** Dictation needs sub-second local models and OS-level text insertion, a different product with different constraints. Wispr Flow, TypeWhisper and Monologue exist for it.
 - **Own build, not Speakr.** Speakr (AGPL-3.0) has most of the server features, but its surface is a homelab tool: a 0.x alpha, a dense UI, one maintainer. An IT department reads that as vendor risk. The enterprise layer, a calm UI, an admin surface IT can sign off, a version 1.0 with a company behind it, is the product.
 - **Not TypeWhisper as the foundation.** A personal dictation app, GPL-3.0, one user per machine, no server. Worth taking: knowledge of local engines and the keyterm idea. Not code.
-- **Permissive licence, MIT.** So a company's IT can adopt it without licence questions. No copying from GPL, AGPL or MPL projects.
+- **Licence: PolyForm Noncommercial 1.0.0**, the same as scene-loop. Changed from MIT the same day. Free to read, run and change for noncommercial use; a company running it in its business licenses it from Primux, which is the business model. Source-available rather than open source. Dependencies stay permissive (MIT, Apache-2.0, BSD, ISC); no GPL, AGPL or MPL copied in.
 - **Docker, installs anywhere.** The first installs are a Microsoft house with Azure and a Dropbox house with no Azure. Not Azure-only.
 - **Desktop recorder is capture route 1.** Pulling Teams or Meet recordings only works for meetings the company organised. A participant in someone else's meeting gets nothing. The recorder is a fork of Vibe (MIT, Tauri 2, about 27k lines of Rust), not anarlog (MIT core, about 318k lines, a product company's monorepo with a commercial enterprise layer) and not written from scratch.
 - **Library stack: Laravel and Livewire.** The author's fastest stack. Queues plus provider adapters are the whole backend. The recap editor sits in a `wire:ignore` island.
@@ -22,7 +22,7 @@ Dated, with the reason. Newest at the bottom. The spec in `spec.md` states the r
 - **Only the owner changes visibility.** Shared colleagues read, they do not re-share.
 - **Retention is per install with a keep flag per meeting.** Board minutes stay, the weekly standup goes.
 - **Several recap templates per install, admin edits, user picks.** Board minutes, team decisions and an interview summary are three shapes at one small organisation alone.
-- **The recap is an editable document inside the platform.** Notion-style Tiptap editor, rebuilt on Tiptap core and open extensions from a design the author already shipped elsewhere. Tiptap's own Notion-like template needs a paid plan in production and a Pro licence, so it cannot sit in an MIT repo.
+- **The recap is an editable document inside the platform.** Notion-style Tiptap editor, rebuilt on Tiptap core and open extensions from a design the author already shipped elsewhere. Tiptap's own Notion-like template needs a paid plan in production and a Pro licence, so it cannot be redistributed in this repo.
 - **MCP per user only, OAuth with the company login.** No service identity in v1. Read tools plus write tools (save minutes, set visibility, share), each write an audit row.
 - **Live transcript in a small floating window, always on top, preview only.** One transcript per recording, made with keyterms and diarization on the server. No two versions to reconcile.
 - **Browser recorder and file upload in v0.1, phone app later.** A browser recorder is a week; a phone app is a quarter.
