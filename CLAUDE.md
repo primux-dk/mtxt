@@ -40,4 +40,5 @@ Kristian's setup for this project, 2026-10-22: a **Fable 5.1 (1M, high)** thread
 
 - Node 22 and pnpm are on agent-server; wrangler runs locally with `wrangler dev`. Deploys to any Cloudflare account wait for Kristian's go.
 - Branch work on agent-server goes in a worktree under `/srv/work/mtxt-<name>`, never in `/srv/work/mtxt` itself.
-- Deploys, merges and anything a client sees wait for Kristian's explicit go, per action.
+- Deploys to any Cloudflare account and anything a client sees wait for Kristian's explicit go, per action.
+- **Standing go for v0.1 merges, given 2026-10-22.** The lead runs the packets end to end: a draft PR with its artifact per packet, a Codex review, the fixes, then the lead merges and starts the next packet without asking. Kristian reviews the whole platform once it runs end to end. This covers merges to main only, not deploys.
