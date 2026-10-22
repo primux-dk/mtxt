@@ -161,9 +161,12 @@ export async function retryTranscription(
 ): Promise<ActionResult> {
   return outcome(() =>
     asOwner(meetingId, async ({ db, queue, installId }) => {
+      const before = await db.query.recordings.findFirst({
+        where: and(eq(r.id, recordingId), eq(r.installId, installId)),
+      });
       const [updated] = await db
         .update(r)
-        .set({ status: 'transcribing', failure: null })
+        .set({ status: 'transcribing', failure: null, failureReason: null })
         .where(
           and(
             eq(r.id, recordingId),
@@ -179,9 +182,14 @@ export async function retryTranscription(
       try {
         await queue.send({ type: 'transcribe', recording_id: recordingId, install_id: installId });
       } catch (error) {
+        // Back to the failure the page showed, reason and all.
         await db
           .update(r)
-          .set({ status: 'failed' })
+          .set({
+            status: 'failed',
+            failure: before?.failure ?? null,
+            failureReason: before?.failureReason ?? null,
+          })
           .where(and(eq(r.id, recordingId), eq(r.installId, installId)));
         throw error;
       }

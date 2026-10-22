@@ -199,18 +199,6 @@
         "title": "Uploader",
         "body": "Optagelsen uploades stadig. Transskriptionen starter, når hele filen er her."
       },
-      "transcribing": {
-        "title": "Transskriberer",
-        "body": "Transskriptionen kommer her, når den er klar. Du kan godt forlade siden."
-      },
-      "failed": {
-        "title": "Transskriptionen fejlede",
-        "body": "{provider} kunne ikke transskribere optagelsen.",
-        "bodyUnknown": "Tale-til-tekst-udbyderen kunne ikke transskribere optagelsen.",
-        "retry": "Prøv igen",
-        "retryFailed": "Ikke sat i kø. Prøv igen.",
-        "switchProvider": "Skift udbyder"
-      },
       "uploadFailed": {
         "title": "Uploaden blev ikke færdig",
         "body": "Serveren beholdt ikke filen: {reason, select, hash_mismatch {den ændrede sig undervejs} size_mismatch {størrelsen passede ikke} session_expired {den blev ikke færdig inden for 7 dage} other {den blev afvist}}. Upload den igen.",
@@ -249,20 +237,67 @@
     "conflict": "Data fra en anden installation afhænger af mødet, så det er ikke ændret. Kontakt din administrator."
   },
   "transcript": {
-    "head": "{language} · {count, plural, one {# taler} other {# talere}} · Klik på en taler for at omdøbe",
-    "headShort": "{language} · {count, plural, one {# taler} other {# talere}}",
+    "head": "{language} · {count, plural, =0 {ingen talere} one {# taler} other {# talere}} · Klik på en taler for at omdøbe",
+    "headShort": "{language} · {count, plural, =0 {ingen talere} one {# taler} other {# talere}}",
     "speaker": {
       "rename": "{name}, omdøb eller tilknyt kollega",
       "unnamed": "Taler {number}"
     },
-    "position": "Viser {position} af {duration}"
+    "position": "Viser {position} af {duration}",
+    "label": "Transskription",
+    "seek": "Gå til {time}",
+    "playing": "Afspilles nu",
+    "state": {
+      "transcribing": {
+        "body": "Transskriberer med {provider}. Transskriptionen kommer her, når den er klar. Du kan godt forlade siden.",
+        "waiting": "Venter på en tale-til-tekst-udbyder. Transskriptionen starter, når en administrator vælger en under Indstillinger."
+      },
+      "failed": {
+        "title": "Transskriptionen fejlede",
+        "detail": "{provider} svarede: {reason}",
+        "retry": "Prøv igen",
+        "retryFailed": "Ikke sat i kø. Prøv igen.",
+        "switchProvider": "Skift udbyder",
+        "askAdmin": "Bed en administrator om at skifte udbyder."
+      },
+      "empty": {
+        "title": "Der blev ikke fundet tale",
+        "body": "Optagelsen blev transskriberet, men {provider} hørte ingen tale i den."
+      }
+    },
+    "failure": {
+      "stt_failed": "{provider} kunne ikke transskribere optagelsen.",
+      "stt_too_long": "Optagelsen er for lang til {provider}; skift udbyder under Indstillinger.",
+      "stt_auth": "{provider} afviste API-nøglen. En administrator kan indtaste en ny nøgle under Indstillinger.",
+      "stt_no_provider": "Der er ikke valgt en tale-til-tekst-udbyder. En administrator vælger en under Indstillinger.",
+      "stt_unavailable": "{provider} findes ikke i denne version; skift udbyder under Indstillinger.",
+      "stt_config": "Installationen mangler en indstilling for at nå {provider}. Kontakt din administrator."
+    },
+    "providerUnknown": "Tale-til-tekst-udbyderen",
+    "languageUnknown": "Sprog ikke genkendt"
   },
   "speaker": {
     "rename": {
       "title": "Omdøb taler",
       "field": "Navn",
-      "help": "Det nye navn gælder alle linjer fra denne taler i dette møde."
-    }
+      "help": "Det nye navn gælder alle linjer fra denne taler i dette møde.",
+      "save": "Gem",
+      "required": "Skriv et navn.",
+      "label": "{name}, omdøb eller tilknyt kollega"
+    },
+    "link": {
+      "heading": "Kollega",
+      "help": "En tilknyttet taler bærer kollegaens navn i alle møder.",
+      "search": "Søg efter kolleger",
+      "searchHelp": "Navn eller e-mailadresse",
+      "none": "Ingen kollega passer.",
+      "searching": "Søger",
+      "searchFailed": "Søgningen virkede ikke. Prøv igen.",
+      "linked": "Tilknyttet {name}",
+      "choose": "Tilknyt {name}, {email}",
+      "unlink": "Fjern tilknytning"
+    },
+    "failed": "Taleren blev ikke ændret. Den er tilbage, som den var."
   },
   "recap": {
     "template": {
@@ -567,7 +602,9 @@
       "keepSelf": "Behold din egen adresse, {email}, på listen. En anden administrator kan fjerne den.",
       "duplicate": "Der findes allerede en skabelon med navnet {name}. Vælg et andet navn.",
       "saveFailed": "Indstillingerne kunne ikke gemmes, og intet blev ændret. Prøv igen.",
-      "unterminatedQuote": "Post {record}: et anførselstegn åbnes og lukkes aldrig. Intet blev importeret."
+      "unterminatedQuote": "Post {record}: et anførselstegn åbnes og lukkes aldrig. Intet blev importeret.",
+      "notAvailable": "Findes ikke i denne version.",
+      "gatewayFormat": "Skriv gateway-id'et: bogstaver, tal, - og _."
     },
     "saved": "Indstillingerne er gemt."
   },
@@ -626,5 +663,12 @@
       "rejected": "Serveren afviste filen ({code}). Kontakt din administrator."
     },
     "retry": "Prøv igen"
+  },
+  "stt": {
+    "supported": "Denne version transskriberer med {providers}. De andre udbydere på listen kommer senere.",
+    "gateway": {
+      "field": "AI Gateway-id",
+      "help": "Kald til Workers AI, og senere til referatmodellen, går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde Workers AI direkte."
+    }
   }
 }

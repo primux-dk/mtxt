@@ -131,6 +131,18 @@ export function demoMeetings(count: number, now = Date.UTC(2026, 9, 22, 9, 0)): 
     meetings[3].title = 'Planlægning uden optagelse';
     meetings[3].recording = null;
   }
+  // Transcripts (demoTranscriptsSql): figure 04's meeting, a 4-hour day with 14 speakers,
+  // a transcript with no speakers and one with no speech.
+  if (meetings[0])
+    meetings[0].recording = { status: 'transcribed', durationS: 2526, failure: null };
+  if (meetings[4]) {
+    meetings[4].title = 'Telefonmøde uden talere';
+    meetings[4].recording = { status: 'transcribed', durationS: 600, failure: null };
+  }
+  if (meetings[5]) {
+    meetings[5].title = 'Optagelse uden tale';
+    meetings[5].recording = { status: 'transcribed', durationS: 120, failure: null };
+  }
 
   const others = Math.max(3, Math.round(count / 10));
   for (let i = 0; i < others; i++) {
@@ -283,5 +295,166 @@ export function demoSql(installId: string, count: number, now?: number): string 
   }
   sql += graphSql(installId);
   sql += foreignInstallSql(installId);
+  if (count > 5) sql += demoTranscriptsSql(installId);
+  return sql;
+}
+
+/** Figure 04's lines, then more of the same meeting until 42 minutes are filled. */
+const FIGURE_04 = [
+  [
+    0,
+    'Så er vi samlet. Lad os begynde med kapaciteten på linje 2. Jonas, hvor står vi med testen?',
+  ],
+  [
+    1,
+    'Vi nåede de 240 enheder i går. Vi mangler stadig at teste det nye skift, før vi ændrer planen.',
+  ],
+  [2, 'Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi sætte det i drift fra mandag.'],
+  [
+    0,
+    'Godt. Så aftaler vi, at Søren melder tilbage fredag. Anne, vil du samle tallene i ugeplanen?',
+  ],
+  [3, 'Ja. Jeg opdaterer planen, så alle kan se kapaciteten inden fredag klokken tolv.'],
+] as const;
+const PHRASES = [
+  'Lageret melder, at materialerne til næste uge er bestilt',
+  'Vi skal have kvaliteten på plads, før vi øger tempoet',
+  'Kunden i Århus har spurgt til leveringen i november',
+  'Jeg foreslår, at vi tager det op på mødet om økonomi',
+  'Det nye skift kører med to mand færre end det gamle',
+  'Er der nogen, der har set tallene fra Ærø-afdelingen',
+  'Vi har haft tre stop på linje 2 siden mandag',
+  'Planen er sendt rundt, og ugeplanen er opdateret',
+];
+
+interface SeedSegment {
+  speaker: number | null;
+  start: number;
+  end: number;
+  text: string;
+}
+
+function transcriptRows(
+  installId: string,
+  key: string,
+  recordingId: string,
+  meetingId: string,
+  speakers: { label: string; userId: string | null }[],
+  segments: SeedSegment[],
+): string {
+  const i = quote(installId);
+  const tid = `${key}-t`;
+  let sql = `INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json, status) VALUES (${quote(tid)}, ${i}, ${quote(recordingId)}, 'assemblyai', 'universal-3-pro', 'da', '{}', 'done');\n`;
+  if (speakers.length) {
+    sql += insertRows(
+      'speakers',
+      ['id', 'install_id', 'meeting_id', 'label', 'user_id', 'speaker_index'],
+      speakers.map((sp, n) => [
+        quote(`${key}-s${n}`),
+        i,
+        quote(meetingId),
+        quote(sp.label),
+        sp.userId ? quote(sp.userId) : 'NULL',
+        String(n),
+      ]),
+    );
+  }
+  if (segments.length) {
+    sql += insertRows(
+      'segments',
+      ['id', 'install_id', 'transcript_id', 'speaker_id', 'start_ms', 'end_ms', 'text'],
+      segments.map((g, n) => [
+        quote(`${key}-g${n}`),
+        i,
+        quote(tid),
+        g.speaker === null ? 'NULL' : quote(`${key}-s${g.speaker}`),
+        String(g.start),
+        String(g.end),
+        quote(g.text),
+      ]),
+    );
+  }
+  return sql;
+}
+
+/** Sentences from PHRASES, deterministic, until `until` ms, rotating through `speakers`. */
+function fill(from: number, until: number, speakers: number, seed: number, every = 2400) {
+  const random = generator(seed);
+  const out: SeedSegment[] = [];
+  for (let at = from, n = 0; at < until; n++) {
+    const length = every + Math.floor(random() * every);
+    const words = 1 + Math.floor(random() * 2);
+    const text = Array.from(
+      { length: words },
+      () => PHRASES[Math.floor(random() * PHRASES.length)]!,
+    )
+      .join('. ')
+      .concat('.');
+    out.push({
+      speaker: speakers ? Math.floor(random() * speakers) : null,
+      start: at,
+      end: Math.min(until, at + length - 300),
+      text,
+    });
+    at += length;
+  }
+  return out;
+}
+
+/**
+ * Transcripts for the demo library (behaviour.md rule 13): demo-0000 is
+ * figure 04 (four speakers, three linked to the dev users, Speaker 3 not),
+ * demo-0002 is a 4-hour day of 6,000 segments and 14 speakers, demo-0004
+ * has segments with no speaker, demo-0005 was transcribed and has no speech.
+ */
+export function demoTranscriptsSql(installId: string): string {
+  const [dev, colleague, newcomer] = DEV_USERS;
+  let sql = '';
+  const figure: SeedSegment[] = FIGURE_04.map(([speaker, text], n) => ({
+    speaker,
+    start: [0, 18000, 36000, 49000, 63000][n]!,
+    end: [17400, 35200, 48100, 62300, 71800][n]!,
+    text,
+  }));
+  sql += transcriptRows(
+    installId,
+    'demo-0000',
+    'demo-0000-r1',
+    'demo-0000',
+    [
+      { label: 'Mette Lund', userId: dev.id },
+      { label: 'Jonas Skov', userId: colleague.id },
+      { label: 'Speaker 3', userId: null },
+      { label: 'Anne Holm', userId: newcomer.id },
+    ],
+    [...figure, ...fill(73000, 2526_000, 4, 4, 9000)],
+  );
+  sql += transcriptRows(
+    installId,
+    'demo-0002',
+    'demo-0002-r1',
+    'demo-0002',
+    Array.from({ length: 14 }, (_, n) =>
+      n === 0
+        ? { label: 'Mette Lund', userId: dev.id }
+        : { label: `Speaker ${n + 1}`, userId: null },
+    ),
+    // 4 hours over 6,000 segments: 2.4 s each.
+    Array.from({ length: 6000 }, (_, n) => ({
+      speaker: (n * 5) % 14,
+      start: n * 2400,
+      end: n * 2400 + 2200,
+      text: `${PHRASES[n % PHRASES.length]!}, punkt ${n + 1}.`,
+    })),
+  );
+  sql += transcriptRows(
+    installId,
+    'demo-0004',
+    'demo-0004-r1',
+    'demo-0004',
+    [],
+    fill(0, 600_000, 0, 9),
+  );
+  sql += transcriptRows(installId, 'demo-0005', 'demo-0005-r1', 'demo-0005', [], []);
   return sql;
 }

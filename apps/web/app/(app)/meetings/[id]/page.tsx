@@ -1,4 +1,4 @@
-import { Download, FileText, Loader, Lock, TriangleAlert, Upload } from 'lucide-react';
+import { Download, FileText, Loader, Lock, MicOff, TriangleAlert, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -13,7 +13,9 @@ import { MeetingTitle } from '@/components/meeting/meeting-title';
 import { MakePrimary, RetryTranscription } from '@/components/meeting/recording-actions';
 import { LocalTime } from '@/components/local-time';
 import { RetentionNotice } from '@/components/meeting/retention-notice';
+import { RefreshWhile } from '@/components/meeting/refresh-while';
 import { VisibilityBadge } from '@/components/meetings/badges';
+import { TranscriptView } from '@/components/transcript/transcript-view';
 import { formatClock, formatDuration } from '@/components/meetings/format';
 import { Button } from '@/components/ui/button';
 import { UploadButton } from '@/components/upload/new-meeting-menu';
@@ -21,6 +23,9 @@ import { getAdapters, getInstallSettings } from '@/lib/install';
 import { parseStartAt } from '@/lib/meetings/library-params';
 import { loadMeeting, meetingState } from '@/lib/meetings/queries';
 import { requireUser } from '@/lib/auth/session';
+import { keytermList } from '@/lib/transcription/job';
+import { isSttFailure } from '@/lib/stt/types';
+import { loadTranscript } from '@/lib/transcript/queries';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -65,8 +70,9 @@ function PanelState({
 
 /*
   A meeting (figure 04, figure 10 on a phone): title, metadata, the actions
-  row, the player, and Recap and Transcript as tabs. The transcript and recap
-  themselves arrive in packets 4 and 5; this page shows where each stands.
+  row, the player, and Recap and Transcript as tabs. The transcript tab has
+  four states (rule 8): transcribing, failed with its two next steps (rule
+  9), the transcript, and no speech. The recap arrives in packet 5.
   `?t=1834` opens the transcript tab with the player at 30:34 (rule 5).
 */
 export default async function MeetingPage({ params, searchParams }: Props) {
@@ -76,15 +82,19 @@ export default async function MeetingPage({ params, searchParams }: Props) {
   // Not readable looks the same as absent: a link is never permission.
   if (!detail) notFound();
 
-  const [t, tv, ts, tf, tlocale, settings] = await Promise.all([
+  const { meeting, access, recordings, current, hasRecap } = detail;
+  const [t, tv, ts, tf, tlocale, tt, tstt, settings, view, keyterms] = await Promise.all([
     getTranslations('meeting'),
     getTranslations('visibility'),
     getTranslations('status'),
     getTranslations('format'),
     getTranslations('locale'),
+    getTranslations('transcript'),
+    getTranslations('settings.stt'),
     getInstallSettings(),
+    current ? loadTranscript(db, installId, meeting.id, current.id) : Promise.resolve(null),
+    keytermList(db, installId),
   ]);
-  const { meeting, access, recordings, current, hasRecap } = detail;
   const intl = tlocale('intl');
   const owner = access === 'owner';
   const state = meetingState(current?.status);
@@ -93,6 +103,37 @@ export default async function MeetingPage({ params, searchParams }: Props) {
   const rawT = Array.isArray(query.t) ? query.t[0] : query.t;
   const startAt = parseStartAt(rawT);
   const canUpload = settings.recordingSources.includes('upload');
+  const providerLabel = (id: string | null | undefined) => {
+    switch (id) {
+      case 'assemblyai':
+      case 'azure':
+      case 'elevenlabs':
+        return tstt(`providers.${id}`);
+      case 'workers-ai-whisper':
+        return tstt('providers.workersAi');
+      case 'local-whisper':
+        return tstt('local', { model: 'Whisper' });
+      case 'local-parakeet':
+        return tstt('local', { model: 'Parakeet' });
+      default:
+        return tt('providerUnknown');
+    }
+  };
+  // The provider that ran, or is running, the transcript; else the one chosen now.
+  const provider = providerLabel(view?.transcript.provider ?? settings.sttProvider);
+  const transcribed = current?.status === 'transcribed' && view?.transcript.status === 'done';
+  const speakerCount = transcribed
+    ? new Set(view.segments.map((g) => g[2]).filter(Boolean)).size
+    : 0;
+  const languageName = (code: string) => {
+    if (!code) return tt('languageUnknown');
+    try {
+      const name = new Intl.DisplayNames([tlocale('intl')], { type: 'language' }).of(code) ?? code;
+      return name.charAt(0).toLocaleUpperCase() + name.slice(1);
+    } catch {
+      return code;
+    }
+  };
 
   const transcriptPanel = (() => {
     if (!current) {
@@ -127,29 +168,35 @@ export default async function MeetingPage({ params, searchParams }: Props) {
       );
     }
     if (current.status === 'failed') {
+      const code = isSttFailure(current.failure) ? current.failure : 'stt_failed';
       return (
         <PanelState
           tone="warning"
           Icon={TriangleAlert}
-          title={t('transcript.failed.title')}
-          body={
-            settings.sttProvider
-              ? t('transcript.failed.body', { provider: settings.sttProvider })
-              : t('transcript.failed.bodyUnknown')
-          }
+          title={tt('state.failed.title')}
+          body={tt(`failure.${code}`, { provider })}
         >
+          {current.failureReason && (
+            <p className="basis-full text-xs break-words text-muted-foreground">
+              {tt('state.failed.detail', { provider, reason: current.failureReason })}
+            </p>
+          )}
           {owner && (
             <RetryTranscription
               meetingId={meeting.id}
               recordingId={current.id}
-              label={t('transcript.failed.retry')}
-              failedLabel={t('transcript.failed.retryFailed')}
+              label={tt('state.failed.retry')}
+              failedLabel={tt('state.failed.retryFailed')}
             />
           )}
-          {user.isAdmin && (
+          {user.isAdmin ? (
             <Button asChild variant="quiet">
-              <Link href="/settings">{t('transcript.failed.switchProvider')}</Link>
+              <Link href="/settings#stt">{tt('state.failed.switchProvider')}</Link>
             </Button>
+          ) : (
+            <p className="basis-full text-xs text-muted-foreground">
+              {tt('state.failed.askAdmin')}
+            </p>
           )}
         </PanelState>
       );
@@ -163,13 +210,44 @@ export default async function MeetingPage({ params, searchParams }: Props) {
         />
       );
     }
-    // confirmed, transcribing, and (until packet 4 renders it) transcribed.
+    if (transcribed && view.segments.length === 0) {
+      return (
+        <PanelState
+          Icon={MicOff}
+          title={tt('state.empty.title')}
+          body={tt('state.empty.body', { provider })}
+        />
+      );
+    }
+    if (transcribed) {
+      return (
+        <TranscriptView
+          meetingId={meeting.id}
+          canEdit={owner}
+          segments={view.segments}
+          speakers={view.speakers}
+          keyterms={keyterms}
+          durationS={current.durationS}
+          language={view.transcript.language}
+          languageName={languageName(view.transcript.language)}
+          startAt={startAt}
+        />
+      );
+    }
+    // Confirmed or transcribing: a calm line with the provider, and the page looks again
+    // every few seconds so the transcript appears without a reload.
+    const waiting = !view && !settings.sttProvider;
+    // The heading is the library badge's word for the state (rule 7).
     return (
       <PanelState
         Icon={Loader}
-        title={t('transcript.transcribing.title')}
-        body={t('transcript.transcribing.body')}
-      />
+        title={ts('transcribing')}
+        body={
+          waiting ? tt('state.transcribing.waiting') : tt('state.transcribing.body', { provider })
+        }
+      >
+        <RefreshWhile seconds={8} />
+      </PanelState>
     );
   })();
 
@@ -185,6 +263,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     ) : (
       <span key="duration">{t('noRecording')}</span>
     ),
+    ...(speakerCount ? [<span key="speakers">{t('speakers', { count: speakerCount })}</span>] : []),
   ];
 
   const sourceLabel = (rec: Recording) => t(`source.${rec.source}`);

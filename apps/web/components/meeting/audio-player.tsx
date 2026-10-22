@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { formatClock } from '@/components/meetings/format';
+import { registerAudio, reportTime } from '@/lib/playback';
 
 const RATES = [1, 1.25, 1.5, 2];
 
@@ -32,6 +33,12 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(durationS);
   const [rate, setRate] = useState(1);
   const [failed, setFailed] = useState(false);
+
+  // The transcript reads the playhead and seeks through lib/playback.
+  useEffect(() => {
+    registerAudio(audio.current);
+    return () => registerAudio(null);
+  }, []);
 
   useEffect(() => {
     const el = audio.current;
@@ -61,7 +68,14 @@ export function AudioPlayer({
           preload="metadata"
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
-          onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+          onTimeUpdate={(e) => {
+            setTime(e.currentTarget.currentTime);
+            reportTime(e.currentTarget.currentTime);
+          }}
+          onSeeked={(e) => {
+            setTime(e.currentTarget.currentTime);
+            reportTime(e.currentTarget.currentTime);
+          }}
           onDurationChange={(e) => {
             const d = e.currentTarget.duration;
             if (Number.isFinite(d) && d > 0) setDuration(d);
@@ -102,6 +116,7 @@ export function AudioPlayer({
             const value = Number(e.target.value);
             setTime(value);
             if (audio.current) audio.current.currentTime = value;
+            reportTime(value);
           }}
           className="h-1 min-w-5 flex-1 accent-accent-strong"
         />
