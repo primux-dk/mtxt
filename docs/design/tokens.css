@@ -1,0 +1,195 @@
+/* Mona Sans by GitHub. SIL Open Font License 1.1. See fonts/LICENSE-mona-sans.txt. */
+@font-face {
+  font-family: "Mona Sans";
+  src: url("./fonts/mona-sans.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+  Theme inputs. An install changes these two values and nothing else.
+  Every accent and primary value below is derived from them with
+  color-mix() in oklab, in light and dark mode. The neutral scale and the
+  warning hue are fixed.
+*/
+:root {
+  --theme-accent: #566b45;
+  --theme-primary: #111111;
+
+  --font-sans: "Mona Sans", system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --radius: 0.6rem;
+  --radius-control: var(--radius);
+  --radius-card: 0.75rem;
+  --radius-panel: 1rem;
+  --radius-pill: 2rem;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-display: 3.5rem;
+  --motion-duration: 150ms;
+  --motion-ease: ease-out;
+}
+
+/* Fixed neutral scale and warning hue, light. `.light` forces light tokens on a subtree. */
+:root,
+.light {
+  color-scheme: light;
+  --background: #fafafa;
+  --foreground: #222222;
+  --card: #ffffff;
+  --card-foreground: #222222;
+  --popover: #ffffff;
+  --popover-foreground: #222222;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #444444;
+  --muted: #eeeeee;
+  --muted-foreground: #666666;
+  --destructive: #ad5437;
+  --destructive-foreground: #ffffff;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --chart-3: #333333;
+  --chart-4: #666666;
+  --chart-5: #999999;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #444444;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-border: #eeeeee;
+  /* Alias for shadcn versions that use the longer sidebar name. */
+  --sidebar-background: var(--sidebar);
+  --line-subtle: #eeeeee;
+  --text-muted: #999999;
+  --text-strong: #333333;
+  --floating-shadow: 0 16px 48px #1111111a;
+  --overlay: #11111155;
+}
+
+/* Fixed neutral scale and warning hue, dark. Add `.dark` to `html`. */
+.dark {
+  color-scheme: dark;
+  --background: #111111;
+  --foreground: #f5f5f5;
+  --card: #1a1a1a;
+  --card-foreground: #f5f5f5;
+  --popover: #1a1a1a;
+  --popover-foreground: #f5f5f5;
+  --primary-foreground: #111111;
+  --secondary: #242424;
+  --secondary-foreground: #e5e5e5;
+  --muted: #292929;
+  --muted-foreground: #b3b3b3;
+  --destructive: #d4876a;
+  --destructive-foreground: #111111;
+  --border: #333333;
+  --input: #444444;
+  --chart-3: #eeeeee;
+  --chart-4: #b3b3b3;
+  --chart-5: #888888;
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #e5e5e5;
+  --sidebar-primary-foreground: #111111;
+  --sidebar-border: #333333;
+  --sidebar-background: var(--sidebar);
+  --line-subtle: #292929;
+  --text-muted: #999999;
+  --text-strong: #eeeeee;
+  --floating-shadow: 0 16px 48px #00000055;
+  --overlay: #00000099;
+}
+
+/*
+  Derived from the two theme inputs, light.
+  Custom properties resolve where they are declared, so a subtree that sets
+  its own --theme-accent or --theme-primary (a settings preview) carries
+  `data-theme-preview` to get these values recomputed.
+  The nearest theme ancestor decides which derivation a preview gets: a
+  preview inside `.light` inside `.dark` derives light values, and a preview
+  inside `.dark` inside `.light` derives dark values. The nested selectors
+  below carry three classes, so they beat `.dark [data-theme-preview]`. This
+  holds while at most two theme classes sit above the preview, which is as
+  deep as the pages go.
+  Defaults in the comments are the results for #566b45 and #111111.
+*/
+:root,
+.light,
+[data-theme-preview],
+.dark .light [data-theme-preview],
+.dark .light[data-theme-preview] {
+  --primary: var(--theme-primary);                                              /* #111111 */
+  --primary-hover: color-mix(in oklab, var(--theme-primary), white 17%);       /* #323232 */
+  --accent-strong: var(--theme-accent);                                         /* #566b45 */
+  --accent-secondary: color-mix(in oklab, var(--theme-accent), #888888 13%);   /* #5c6f4e */
+  --accent-text: color-mix(in oklab, var(--theme-accent), white 7%);           /* #617551 */
+  --accent-light: color-mix(in oklab, var(--theme-accent), white 33%);         /* #8a9a7f */
+  --accent-tint: color-mix(in oklab, var(--theme-accent), white 94%);          /* #f4f6f3 */
+  --accent-tint-soft: color-mix(in oklab, var(--theme-accent), white 95%);     /* #f6f7f5 */
+  --accent-tint-strong: color-mix(in oklab, var(--theme-accent), white 91%);   /* #eff1ed */
+  --accent-line: color-mix(in oklab, var(--theme-accent), white 87%);          /* #e7ebe5 */
+  --accent-line-strong: color-mix(in oklab, var(--theme-accent), white 84%);   /* #e2e6df */
+  --accent-line-control: color-mix(in oklab, var(--theme-accent), white 81%);  /* #dde1d9 */
+  --accent-deep: color-mix(in oklab, var(--theme-accent), #111111 67%);        /* #262c21 */
+  --accent: var(--accent-tint);
+  --accent-foreground: var(--accent-strong);
+  --ring: var(--accent-strong);
+  --chart-1: var(--accent-strong);
+  --chart-2: var(--accent-light);
+  --sidebar-primary: var(--primary);
+  --sidebar-accent: var(--accent-tint);
+  --sidebar-accent-foreground: var(--accent-strong);
+  --sidebar-ring: var(--accent-strong);
+}
+
+/* Derived from the two theme inputs, dark. Same nesting rule as above. */
+.dark,
+.dark [data-theme-preview],
+.light .dark [data-theme-preview],
+.light .dark[data-theme-preview] {
+  --primary: color-mix(in oklab, var(--theme-primary) 4%, white);              /* #f4f4f4 */
+  --primary-hover: color-mix(in oklab, var(--theme-primary) 12%, white);       /* #dedede */
+  --accent-strong: color-mix(in oklab, var(--theme-accent), white 33%);        /* #8a9a7f */
+  --accent-secondary: color-mix(in oklab, var(--theme-accent), white 46%);     /* #a0ad97 */
+  --accent-text: color-mix(in oklab, var(--theme-accent), white 46%);          /* #a0ad97 */
+  --accent-light: color-mix(in oklab, var(--theme-accent), white 61%);         /* #bac3b3 */
+  --accent-tint: color-mix(in oklab, var(--theme-accent), #111111 71%);        /* #23291f */
+  --accent-tint-soft: color-mix(in oklab, var(--theme-accent), #111111 79%);   /* #1e221b */
+  --accent-tint-strong: color-mix(in oklab, var(--theme-accent), #111111 58%); /* #2c3426 */
+  --accent-line: color-mix(in oklab, var(--theme-accent), #111111 49%);        /* #323c2b */
+  --accent-line-strong: color-mix(in oklab, var(--theme-accent), #111111 31%); /* #3f4d34 */
+  --accent-line-control: var(--theme-accent);                                   /* #566b45 */
+  --accent-deep: color-mix(in oklab, var(--theme-accent), white 82%);          /* #dee3db */
+  --accent: var(--accent-tint);
+  --accent-foreground: var(--accent-strong);
+  --ring: var(--accent-strong);
+  --chart-1: var(--accent-strong);
+  --chart-2: var(--accent-light);
+  --sidebar-primary: var(--primary);
+  --sidebar-accent: var(--accent-tint);
+  --sidebar-accent-foreground: var(--accent-strong);
+  --sidebar-ring: var(--accent-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-duration: 0ms; }
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

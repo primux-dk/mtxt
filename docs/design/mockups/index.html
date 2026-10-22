@@ -1,0 +1,1885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>mtxt · Screens</title>
+<link rel="stylesheet" href="../tokens.css">
+<style>
+*{box-sizing:border-box}
+html{font-size:16px;scroll-behavior:smooth}
+body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button,a,input,select,textarea,summary{touch-action:manipulation}
+button,select,summary{cursor:pointer}
+button{font-weight:550}
+a{color:inherit;text-decoration:none}
+a:hover{color:var(--accent-strong)}
+button,a,input,select,textarea{transition:background var(--motion-duration) var(--motion-ease),color var(--motion-duration) var(--motion-ease),border-color var(--motion-duration) var(--motion-ease)}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+button{border:0}
+h1,h2,h3,h4,p,figure{margin:0}
+h1,h2,h3,h4{font-weight:650;line-height:1.2;letter-spacing:-.03em}
+h1{font-size:32px;letter-spacing:-.04em}
+h2{font-size:24px}
+h3{font-size:20px}
+small,.small{font-size:12px;line-height:1.5}
+.muted{color:var(--muted-foreground)}
+.accent-fg{color:var(--accent-strong)}
+.warn{color:var(--destructive)}
+.row{display:flex;align-items:center;gap:12px}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.stack{display:grid;gap:16px}
+.icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);font-size:14px;white-space:nowrap}
+.btn:hover{background:var(--secondary);border-color:var(--text-muted)}
+.btn.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary);border-radius:var(--radius-pill)}
+.btn.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn.quiet{background:transparent;border-color:transparent}
+.btn.icon-only{width:40px;padding:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px 9px;font-size:12px;white-space:nowrap;background:var(--card);line-height:1.5}
+.badge .icon{width:14px;height:14px}
+.badge.soft{border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-foreground)}
+.state{font-size:12px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent-strong);display:inline-block;flex-shrink:0}
+.avatar{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--accent-line-strong);border-radius:50%;background:var(--accent-tint);color:var(--accent-foreground);font-size:11px;font-weight:650;flex-shrink:0}
+.field{display:grid;gap:6px;min-width:0;font-size:14px;align-content:start}
+.field>span:first-child,.field>label:first-child{font-weight:550}
+.field input,.field select,.field textarea,.control{width:100%;min-width:0;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:9px 12px;min-height:40px;font-size:14px;line-height:1.5}
+.field textarea{resize:vertical;min-height:96px}
+.field small{color:var(--muted-foreground)}
+input::placeholder{color:var(--muted-foreground)}
+input[type=checkbox]{accent-color:var(--accent-strong);width:16px;height:16px;flex-shrink:0}
+.pill{padding:7px 14px;min-height:36px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);font-size:14px;white-space:nowrap}
+.pill[aria-pressed=true]{background:var(--accent-tint);border-color:var(--accent-line-control);color:var(--accent-foreground)}
+.pill .count{margin-left:8px;color:var(--muted-foreground)}
+.page{max-width:1344px;margin:0 auto;padding:48px 32px 80px}
+.gallery-head{padding:0 0 32px;border-bottom:1px solid var(--border)}
+.eyebrow{font-size:12px;color:var(--muted-foreground);letter-spacing:.1em;font-weight:550;text-transform:uppercase}
+.gallery-head h1{margin:12px 0;font-size:40px;letter-spacing:-.055em}
+.gallery-head p{margin:12px 0 20px;color:var(--muted-foreground)}
+.gallery-nav{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px}
+.gallery-nav a{text-decoration:underline;text-underline-offset:4px}
+.section-label{margin:48px 0 16px;display:flex;justify-content:space-between;align-items:baseline;gap:16px}
+.section-label h2{font-size:20px}
+.section-label span{color:var(--muted-foreground);font-size:12px}
+.frame-scroll{overflow:auto;padding:2px;scrollbar-width:thin}
+.screen{width:1280px;container-type:inline-size;background:var(--background);border:1px solid var(--border);border-radius:var(--radius-panel);overflow:hidden}
+.caption{font-size:13px;color:var(--muted-foreground);padding:12px 0 0}
+.screen.mobile{width:390px}
+.mobile-grid{display:flex;flex-direction:column;gap:40px}
+.shell{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:748px}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--sidebar-border);display:flex;flex-direction:column;padding:28px 16px 20px;gap:28px}
+.brand{font-size:16px;font-weight:650;letter-spacing:-.03em;line-height:1.3}
+.org{font-size:12px;color:var(--muted-foreground);margin-top:4px}
+.nav-items{display:grid;gap:4px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;font-size:14px;min-height:44px;color:var(--sidebar-foreground);border-radius:var(--radius-control)}
+.nav-item[aria-current=page]{color:var(--sidebar-accent-foreground);background:var(--sidebar-accent);font-weight:550}
+.nav-item .icon{width:18px;height:18px}
+.sidebar-bottom{margin-top:auto;padding-top:24px;border-top:1px solid var(--sidebar-border);font-size:13px}
+.mobilebar{display:none}
+.content{padding:32px;min-width:0}
+.content-top{margin-bottom:32px}
+.subheading{font-size:14px;color:var(--muted-foreground);margin-top:8px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:0 12px;height:40px;width:420px;max-width:100%;color:var(--muted-foreground)}
+.search input{border:0;background:transparent;outline:none;width:100%;min-width:0;font-size:14px}
+.search:focus-within{outline:2px solid var(--ring);outline-offset:2px}
+.library-title{margin:32px 0 24px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}
+.list-head{display:flex;justify-content:space-between;margin-bottom:12px;font-size:12px;color:var(--muted-foreground)}
+.meet-list{border:1px solid var(--border);background:var(--card);border-radius:var(--radius-card);overflow:hidden}
+.meet-row{padding:20px;display:grid;grid-template-columns:minmax(0,1fr) 130px 118px;gap:16px;align-items:center;border-bottom:1px solid var(--line-subtle)}
+.meet-row:last-child{border-bottom:0}
+.meet-row h3{font-size:16px;font-weight:550;letter-spacing:-.015em}
+.meet-row h3 a:hover{text-decoration:underline;text-underline-offset:4px}
+.meet-meta{font-size:12px;color:var(--muted-foreground);display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;line-height:1.6}
+.meet-meta .separator{color:var(--text-muted)}
+.list-foot{margin-top:16px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted-foreground)}
+.empty{display:grid;place-items:center;min-height:340px;text-align:center;padding:40px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card)}
+.empty>div>.icon{width:32px;height:32px;color:var(--accent-strong);margin:0 auto 20px}
+.empty h2{font-size:20px}
+.empty p{margin:12px 0 24px;color:var(--muted-foreground);font-size:14px}
+.login{min-height:760px;display:flex;align-items:center;justify-content:center;position:relative}
+.login-box{width:400px;padding:40px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel)}
+.login-box .brand{font-size:28px;letter-spacing:-.045em}
+.login-box .org{margin:12px 0 32px}
+.login-box .btn{width:100%;margin-top:12px;min-height:44px}
+.provider-mark{font-weight:650;font-size:17px;line-height:1;width:20px}
+.login-footer{position:absolute;bottom:28px;font-size:12px;color:var(--muted-foreground)}
+.back{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-foreground);margin-bottom:24px}
+.meeting-title h1{font-size:30px}
+.meeting-actions{display:flex;gap:8px;margin:20px 0 24px;flex-wrap:wrap}
+.keep[aria-pressed=true]{background:var(--accent-tint);border-color:var(--accent-line-control);color:var(--accent-foreground)}
+.meeting-actions select{width:auto}
+.audio{display:flex;align-items:center;gap:16px;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--card);padding:12px 16px;margin-bottom:24px}
+.audio .btn{border-radius:50%;width:36px;min-height:36px;padding:8px}
+.audio time{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.seek{accent-color:var(--accent-strong);flex:1;min-width:20px;height:4px}
+.audio select{background:transparent;border:0;font-size:12px}
+.tablist{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:24px}
+.tablist [role=tab]{background:transparent;border-radius:0;padding:10px 14px;min-height:44px;font-size:14px;color:var(--muted-foreground);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tablist [role=tab]:hover{color:var(--foreground)}
+.tablist [role=tab][aria-selected=true]{color:var(--foreground);border-bottom-color:var(--accent-strong)}
+.tablist [role=tab] .count{margin-left:8px;color:var(--text-muted)}
+[role=tabpanel][hidden]{display:none}
+.editor-panel{min-width:0;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--card);overflow:hidden}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line-subtle);min-height:56px}
+.panel-head span{font-size:12px;color:var(--muted-foreground)}
+.transcript{padding:24px 20px;display:grid;gap:24px}
+.content.meeting-page{max-width:904px}
+.segment-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.speaker{font-size:13px;display:inline-flex;align-items:center;gap:8px;background:transparent;padding:0;min-height:32px;text-align:left}
+.speaker .avatar{width:24px;height:24px;font-size:9px}
+.speaker .icon{width:12px;height:12px;color:var(--muted-foreground)}
+.segment-head time{font-size:12px;color:var(--muted-foreground);margin-left:auto;font-variant-numeric:tabular-nums}
+.segment p{font-size:16px;line-height:1.7;letter-spacing:-.01em}
+.segment mark{color:var(--accent-foreground);background:var(--accent);padding:1px 3px;border-radius:3px}
+.playing{border-left:2px solid var(--accent-strong);padding-left:12px;margin-left:-14px}
+.recap-version{font-size:11px;color:var(--muted-foreground);padding:10px 20px;border-bottom:1px solid var(--line-subtle);line-height:1.6}
+.template{font-size:12px;border:1px solid var(--input);border-radius:6px;padding:6px;background:var(--card);max-width:190px}
+.editor-tools{display:flex;align-items:center;gap:4px;padding:8px 16px;border-bottom:1px solid var(--line-subtle)}
+.editor-tools button{font-size:13px;width:28px;min-height:28px;background:transparent;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.editor-tools button .icon{width:16px;height:16px}
+.editor-tools .undo{width:auto;padding:0 8px;font-size:12px;color:var(--muted-foreground)}
+.editor-tools button:hover{background:var(--secondary)}
+.editor-body{padding:24px 20px;font-size:14px}
+.editor-body h3{font-size:22px;margin-bottom:16px;letter-spacing:-.035em}
+.editor-body h4{font-size:15px;margin:24px 0 12px}
+.callout{padding:12px;background:var(--accent-tint-soft);border:1px solid var(--accent-line);border-radius:var(--radius-control);display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.65}
+.callout .icon{margin-top:2px;width:16px;height:16px;color:var(--accent-strong)}
+.decisions{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.decisions li{display:flex;gap:8px;align-items:flex-start}
+.decisions input{margin:4px 0 0}
+.mention{color:var(--accent-foreground);background:var(--accent);padding:1px 4px;border-radius:4px;white-space:nowrap}
+.recap-table{width:100%;border-collapse:collapse;font-size:12px;margin:24px 0}
+.recap-table th,.recap-table td{text-align:left;border:1px solid var(--border);padding:8px}
+.recap-table th{font-weight:550;background:var(--background)}
+.editor-body details{border-top:1px solid var(--line-subtle);padding-top:16px}
+.editor-body details p{margin-top:12px}
+.editor-foot{margin-top:24px;color:var(--muted-foreground);font-size:12px}
+.native-stage{min-height:680px;display:grid;place-items:center;background:var(--accent-tint-soft)}
+.recorder-window{width:360px;height:520px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel);box-shadow:var(--floating-shadow);overflow:hidden;display:flex;flex-direction:column}
+.nativebar{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line-subtle);font-size:10px;color:var(--muted-foreground);flex-shrink:0}
+.traffic{display:flex;gap:6px}
+.traffic span{width:9px;height:9px;border:1px solid var(--text-muted);border-radius:50%;background:var(--secondary)}
+.recorder-body{padding:12px 20px 8px}
+.recorder-brand{font-size:16px;letter-spacing:-.03em;font-weight:650;margin-bottom:8px}
+.recorder-body .field{font-size:12px;gap:4px}
+.recorder-body .field input{font-size:13px;min-height:36px;padding:7px 10px}
+.record-area{display:flex;align-items:center;gap:16px;padding:12px 0}
+.record-button{width:60px;height:60px;border-radius:50%;border:1px solid var(--input);background:var(--primary);color:var(--primary-foreground);display:grid;place-items:center;flex-shrink:0}
+.record-button span{width:17px;height:17px;background:currentColor;border-radius:3px}
+.record-clock{font-variant-numeric:tabular-nums;font-size:24px;font-weight:550;letter-spacing:-.035em;line-height:1.2}
+.record-area small{display:block;margin-top:4px;color:var(--muted-foreground)}
+.meters{display:grid;gap:8px;padding-bottom:12px}
+.meter-row{display:grid;grid-template-columns:18px 84px 1fr;gap:8px;align-items:center;font-size:11px;color:var(--muted-foreground)}
+.meter-row .icon{width:14px;height:14px}
+.meter-row meter{width:100%;height:8px;accent-color:var(--accent-strong)}
+meter::-webkit-meter-bar{background:var(--muted);border:0}
+meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
+.toggle{display:inline-flex;align-items:center;width:32px;min-width:32px;height:20px;border-radius:20px;background:var(--muted);border:1px solid var(--input);padding:2px}
+.toggle:before{content:'';display:block;background:var(--card);border:1px solid var(--border);width:14px;height:14px;border-radius:50%}
+.toggle[aria-pressed=true]{background:var(--accent-strong);border-color:var(--accent-strong)}
+.toggle[aria-pressed=true]:before{margin-left:auto;background:var(--card)}
+.live-setting{border-top:1px solid var(--line-subtle);padding:8px 0;font-size:12px}
+.queue{border-top:1px solid var(--line-subtle);padding-top:8px}
+.queue-heading{font-size:10px;color:var(--muted-foreground);margin-bottom:4px;display:flex;justify-content:space-between}
+.queue-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;min-height:25px}
+.queue-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.queue-status{white-space:nowrap;font-size:10px;display:flex;align-items:center;gap:5px}
+.queue-status .icon{width:12px;height:12px}
+.queue-action{background:transparent;padding:0;font-size:10px;color:inherit;text-decoration:underline;text-underline-offset:3px}
+.recorder-footer{margin-top:auto;padding:10px 20px;border-top:1px solid var(--line-subtle);font-size:11px}
+.recorder-footer .avatar{width:24px;height:24px;font-size:9px}
+.recorder-footer select{font-size:10px;background:transparent;border:0;padding:0;width:148px}
+.teams-stage{height:680px;position:relative;display:grid;place-items:center;overflow:hidden}
+.fake-teams{position:absolute;inset:40px;background:var(--card);border:1px solid var(--border);border-radius:16px;filter:blur(5px);padding:24px;pointer-events:none}
+.teams-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0;height:400px}
+.teams-person{background:var(--secondary);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-size:14px}
+.teams-person .avatar{width:80px;height:80px;font-size:24px}
+.teams-controls{display:flex;justify-content:center;gap:16px}
+.teams-controls span{width:44px;height:44px;background:var(--secondary);border-radius:50%;display:grid;place-items:center}
+.live-window{position:relative;z-index:1;width:420px;height:200px;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel);box-shadow:var(--floating-shadow);overflow:hidden}
+.live-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line-subtle);font-size:12px}
+.live-head .dot{background:var(--destructive)}
+.live-head .btn{padding:4px;min-height:28px;width:28px}
+.live-head .icon{width:16px;height:16px}
+.live-copy{padding:12px 20px;overflow:hidden;font-size:15px;line-height:1.6}
+.live-copy p:first-child{color:var(--muted-foreground);margin-bottom:6px}
+.live-foot{font-size:10px;color:var(--muted-foreground);padding:4px 20px 12px;margin-top:auto}
+.settings-section{border-top:1px solid var(--border);padding:24px 0;display:grid;grid-template-columns:204px minmax(0,1fr);gap:32px}
+.settings-label h2{font-size:16px}
+.settings-label p{font-size:12px;color:var(--muted-foreground);margin-top:8px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.full{grid-column:1/-1}
+.choice{display:flex;align-items:center;gap:8px;font-size:14px}
+.setting-toggle{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.setting-toggle p{font-size:14px}
+.setting-toggle small{color:var(--muted-foreground)}
+.keyterm-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.template-list{display:flex;gap:8px;margin-bottom:12px}
+.dataflow{background:var(--accent-tint-soft);border:1px solid var(--accent-line-strong);border-radius:var(--radius-panel);padding:24px;margin-top:8px;font-size:14px}
+.dataflow h2{font-size:20px;margin-bottom:16px}
+.dataflow ol{margin:0;padding-left:20px;display:grid;gap:8px}
+.dataflow p{margin-top:16px}
+.savebar{border-top:1px solid var(--border);padding-top:24px;margin-top:24px}
+.marketing{font-size:18px;line-height:1.7;padding:32px 64px 24px;background:var(--background)}
+.marketing-nav{display:flex;justify-content:space-between;align-items:center;font-size:14px;border-bottom:1px solid var(--line-subtle);padding-bottom:24px}
+.marketing-logo{font-size:24px;font-weight:650;letter-spacing:-.055em}
+.marketing-hero{padding:64px 0 40px}
+.marketing h1{font-size:56px;line-height:1.06;letter-spacing:-.055em}
+.marketing h1 span{color:var(--accent-strong)}
+.marketing-copy{margin-top:28px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;color:var(--muted-foreground)}
+.screenshot-placeholder{margin:0;border:1px solid var(--accent-line-strong);background:var(--accent-tint);border-radius:var(--radius-panel);height:244px;padding:24px;display:flex;gap:24px;align-items:center}
+.placeholder-sidebar{width:150px;border-right:1px solid var(--accent-line-strong);height:100%;padding:12px 20px 12px 0;display:grid;align-content:start;gap:16px}
+.placeholder-line{height:6px;background:var(--accent-line-control);border-radius:4px}
+.placeholder-content{flex:1;display:grid;gap:16px}
+.placeholder-content>div{border:1px solid var(--accent-line-strong);border-radius:8px;padding:12px;display:flex;justify-content:space-between;font-size:13px;color:var(--accent-foreground)}
+.placeholder-label{font-size:13px;letter-spacing:0;line-height:1.5;color:var(--muted-foreground)}
+.marketing-foot{font-size:12px;display:flex;justify-content:space-between;gap:24px;margin-top:28px;border-top:1px solid var(--line-subtle);padding-top:20px;color:var(--muted-foreground)}
+.sheet{border:1px solid var(--border);padding:24px;background:var(--card);color:var(--foreground);width:320px;max-width:calc(100% - 24px);height:100dvh;max-height:100dvh;margin:0;border-radius:0 16px 16px 0}
+.sheet::backdrop{background:var(--overlay)}
+.sheet .nav-items{margin-top:24px}
+.sheet-top{display:flex;justify-content:space-between;align-items:center}
+.footnote{font-size:12px;color:var(--muted-foreground);margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
+
+@container (max-width:719px){.shell{grid-template-columns:1fr;min-height:820px}
+.sidebar{display:none}
+.mobilebar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;min-height:56px;border-bottom:1px solid var(--border);background:var(--card)}
+.mobilebar .brand{font-size:14px}
+.content{padding:24px 20px}
+.content h1{font-size:24px}
+.content-top{margin-bottom:24px}
+.desktop-action{display:none}
+.library-title{margin-top:24px}
+.library-title .btn{font-size:12px;padding:8px 12px}
+.library-title h1{font-size:24px}
+.search{width:100%;height:44px}
+.filters{gap:6px;margin:20px 0}
+.pill{font-size:12px;min-height:44px;padding:7px 12px}
+.meet-row{grid-template-columns:1fr 1fr;padding:16px;gap:12px}
+.meet-row>div:first-child{grid-column:1/-1}
+.meet-row .state{justify-self:end}
+.meet-row h3{font-size:15px}
+.meet-meta{gap:6px}
+.list-foot{gap:12px}
+.meeting-actions{gap:8px}
+.meeting-actions .btn{font-size:12px;min-height:44px;padding:8px 10px}
+.meeting-actions select{font-size:12px;min-height:44px;max-width:140px}
+.tablist{margin-bottom:20px}
+.tablist [role=tab]{padding:10px 12px}
+.audio{gap:8px;padding:12px}
+.audio .total{display:none}
+.audio time{font-size:11px}
+.audio .btn{width:44px;min-width:44px;min-height:44px}
+.audio select{width:44px;min-height:44px}
+.panel-head{padding:12px 16px}
+.transcript,.editor-body{padding:20px 16px}
+.recap-version{padding:10px 16px}
+.segment p{font-size:16px}
+.back{margin-bottom:20px}
+.btn.icon-only{min-height:44px;width:44px}
+.speaker{min-height:44px}
+.template{max-width:154px;min-height:44px;font-size:11px}
+.editor-tools button{width:44px;min-height:44px}
+.editor-tools .undo{width:auto;min-height:44px}
+.recap-table{font-size:11px}
+.recap-table td,.recap-table th{padding:6px}
+.decisions{font-size:13px}
+.mention{white-space:normal}
+.sheet .nav-item{min-height:44px}
+}
+
+@media(max-width:700px){.page{padding:24px 16px 48px}
+.gallery-head h1{font-size:32px}
+.section-label{align-items:flex-start;flex-direction:column;gap:4px}
+.section-label span{font-size:11px}
+.gallery-nav{gap:8px 16px}
+.mobile-grid{align-items:flex-start}
+.frame-scroll{width:100%}
+}
+.switches{display:flex;flex-wrap:wrap;gap:8px}
+.segmented{display:inline-flex;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:2px;gap:2px}
+.segmented button{min-height:34px;padding:4px 12px;border-radius:calc(var(--radius-control) - 2px);background:transparent;font-size:14px}
+.segmented button[aria-pressed=true]{background:var(--accent-tint);color:var(--accent-foreground)}
+.gallery-links{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px;margin-bottom:16px}
+.gallery-links a{text-decoration:underline;text-underline-offset:4px}
+.color-field{display:flex;align-items:center;gap:12px}
+.field input[type=color]{width:48px;min-width:48px;height:40px;padding:4px;cursor:pointer}
+.hex{font-variant-numeric:tabular-nums;font-size:14px}
+.theme-preview{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px;border:1px solid var(--line-subtle);border-radius:var(--radius-card);background:var(--background)}
+.theme-preview .label{font-size:12px;color:var(--muted-foreground);margin-right:4px}
+.theme-note{font-size:12px;color:var(--muted-foreground)}
+.empty .actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-meetings" viewBox="0 0 24 24">
+<rect x="3" y="4" width="18" height="17" rx="2"/>
+<path d="M7 2v4m10-4v4M3 10h18m-13 5h2m4 0h2"/>
+</symbol>
+<symbol id="i-shared" viewBox="0 0 24 24">
+<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75"/>
+<circle cx="9" cy="7" r="4"/>
+</symbol>
+<symbol id="i-building" viewBox="0 0 24 24">
+<rect x="4" y="3" width="16" height="18" rx="1"/>
+<path d="M9 21v-4h6v4M8 7h1m6 0h1m-8 4h1m6 0h1"/>
+</symbol>
+<symbol id="i-settings" viewBox="0 0 24 24">
+<path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/>
+<circle cx="12" cy="12" r="6"/>
+<circle cx="12" cy="12" r="2"/>
+</symbol>
+<symbol id="i-search" viewBox="0 0 24 24">
+<circle cx="10.5" cy="10.5" r="6.5"/>
+<path d="m16 16 4.5 4.5"/>
+</symbol>
+<symbol id="i-plus" viewBox="0 0 24 24">
+<path d="M12 5v14M5 12h14"/>
+</symbol>
+<symbol id="i-upload" viewBox="0 0 24 24">
+<path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/>
+</symbol>
+<symbol id="i-lock" viewBox="0 0 24 24">
+<rect x="5" y="10" width="14" height="11" rx="2"/>
+<path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+</symbol>
+<symbol id="i-check" viewBox="0 0 24 24">
+<path d="m5 12 4 4L19 6"/>
+</symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24">
+<path d="m8 10 4 4 4-4"/>
+</symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24">
+<path d="M19 12H5m6-6-6 6 6 6"/>
+</symbol>
+<symbol id="i-pin" viewBox="0 0 24 24">
+<path d="m16 3 5 5-5 2-2 6-3-3-6 6m2-8 6-2z"/>
+</symbol>
+<symbol id="i-download" viewBox="0 0 24 24">
+<path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/>
+</symbol>
+<symbol id="i-play" viewBox="0 0 24 24">
+<path d="m9 5 10 7-10 7z"/>
+</symbol>
+<symbol id="i-pause" viewBox="0 0 24 24">
+<path d="M8 5v14M16 5v14"/>
+</symbol>
+<symbol id="i-edit" viewBox="0 0 24 24">
+<path d="m15 4 5 5M4 20l5-1L21 7l-5-5L4 14z"/>
+</symbol>
+<symbol id="i-info" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="9"/>
+<path d="M12 11v6m0-10v.1"/>
+</symbol>
+<symbol id="i-mic" viewBox="0 0 24 24">
+<rect x="9" y="2" width="6" height="12" rx="3"/>
+<path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>
+</symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24">
+<rect x="2" y="3" width="20" height="14" rx="2"/>
+<path d="M12 17v5m-5 0h10"/>
+</symbol>
+<symbol id="i-network" viewBox="0 0 24 24">
+<path d="m2 8 3 3m3 3 4 4m-7-7a12 12 0 0 1 14 0M2 7a17 17 0 0 1 20 0M9 15a5 5 0 0 1 6 0M3 3l18 18"/>
+</symbol>
+<symbol id="i-warning" viewBox="0 0 24 24">
+<path d="m12 3 10 18H2zM12 9v5m0 3v.1"/>
+</symbol>
+<symbol id="i-hide" viewBox="0 0 24 24">
+<path d="M3 12h18"/>
+</symbol>
+<symbol id="i-video" viewBox="0 0 24 24">
+<rect x="2" y="5" width="14" height="14" rx="2"/>
+<path d="m16 10 6-4v12l-6-4"/>
+</symbol>
+<symbol id="i-menu" viewBox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"/>
+</symbol>
+<symbol id="i-close" viewBox="0 0 24 24">
+<path d="m6 6 12 12M18 6 6 18"/>
+</symbol>
+<symbol id="i-link" viewBox="0 0 24 24">
+<path d="m10 13 4-4m-6 6-2 2a3 3 0 0 0 4 4l4-4a3 3 0 0 0 0-4m2-4 2-2a3 3 0 0 0-4-4l-4 4a3 3 0 0 0 0 4"/>
+</symbol>
+<symbol id="i-heading" viewBox="0 0 24 24">
+<path d="M4 6v12m8-12v12M4 12h8m5-1.5 3-2V18"/>
+</symbol>
+<symbol id="i-list" viewBox="0 0 24 24">
+<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>
+</symbol>
+<symbol id="i-undo" viewBox="0 0 24 24">
+<path d="M9 14 4 9l5-5"/>
+<path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+</symbol>
+</defs>
+</svg>
+<main class="page">
+<header class="gallery-head" lang="en">
+<div class="row between wrap">
+<span class="eyebrow">mtxt · Design reference · 22 October 2026</span>
+<div class="switches">
+<div class="segmented" role="group" aria-label="Screen language">
+<button type="button" data-lang="en" aria-pressed="true" lang="en">English</button>
+<button type="button" data-lang="da" aria-pressed="false" lang="da">Dansk</button>
+</div>
+<button class="btn" id="theme" type="button" aria-pressed="false">Dark theme</button>
+</div>
+</div>
+<h1>Screens and states</h1>
+<p>Every screen of the library, the recorder and mtxt.co at 1280 px, with phone layouts at 390 px. The interface is English at source; the language switch shows the Danish translation from the locale files. The company is Primux, the author's own install. People, meetings and transcript text are invented. Buttons show the design unless stated otherwise.</p>
+<nav class="gallery-links" aria-label="Design documents">
+<a href="../guidelines.html">Design guidelines</a>
+<a href="../README.md">README</a>
+<a href="../behaviour.md">Behaviour rules</a>
+</nav>
+<nav class="gallery-nav" aria-label="Screens">
+<a href="#login">Login</a>
+<a href="#library">Meeting library</a>
+<a href="#empty">Empty library</a>
+<a href="#meeting">Meeting and recap</a>
+<a href="#recorder">Desktop recorder</a>
+<a href="#live">Live transcript</a>
+<a href="#settings">Settings</a>
+<a href="#marketing">mtxt.co</a>
+<a href="#library-mobile">Meeting library on a phone</a>
+<a href="#meeting-mobile">Meeting on a phone</a>
+<a href="#settings-theme">Settings excerpt, theme changed</a>
+</nav>
+</header>
+<section id="login" aria-labelledby="label-login">
+<div class="section-label" lang="en">
+<h2 id="label-login">01 / Login</h2>
+<span>1280 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="login">
+<div class="login">
+<div class="login-box">
+<h1 class="brand" lang="da">Primux Møder</h1>
+<p class="org" lang="da">PRIMUX DIGITAL, S.L.</p>
+<button type="button" class="btn primary"><span class="provider-mark" aria-hidden="true">⊞</span><span data-i18n="login.signInWith" data-i18n-args='{"provider":"Microsoft"}'>Sign in with Microsoft</span></button>
+</div>
+<p data-i18n="login.footer" data-i18n-args='{"company":"PRIMUX DIGITAL, S.L."}' class="login-footer">An installation for PRIMUX DIGITAL, S.L.</p>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 01. Login, 1280 px. The configured provider gets the one primary button. The footer names the installing company; mtxt does not appear.</figcaption>
+</figure>
+</section>
+<section id="library" aria-labelledby="label-library">
+<div class="section-label" lang="en">
+<h2 id="label-library">02 / Meeting library</h2>
+<span>1280 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="library">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content">
+<div class="row between content-top">
+<label class="search" for="search-desktop">
+<svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+<input id="search-desktop" type="search" data-i18n-attr="placeholder:library.search.placeholder,aria-label:library.search.label" placeholder="Search meetings and transcripts" aria-label="Search the meetings you can see">
+</label>
+<div class="desktop-action">
+<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
+</div>
+</div>
+<div class="row between library-title">
+<div>
+<h1 data-i18n="nav.myMeetings">My meetings</h1>
+<p data-i18n="library.mine.subheading" class="subheading">Meetings you recorded or uploaded.</p>
+</div>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+</div>
+<div class="filters" role="group" data-i18n-attr="aria-label:library.filters.label" aria-label="Filters">
+<button class="pill" type="button" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="6">6</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.shared">Shared</span><span class="count" data-i18n-num="4">4</span></button>
+</div>
+<div class="list-head">
+<span data-i18n="library.count" data-i18n-args='{"count":12}'>12 meetings</span>
+<span><span data-i18n="library.sort.newest">Newest first</span> <span aria-hidden="true">↓</span></span>
+</div>
+<div class="meet-list">
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Produktionsmøde, uge 43</a></h3>
+<div class="meet-meta"><time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="medium">22 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":42}'>42 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Jonas","Søren"]'>Mette, Jonas and Søren</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg><span data-i18n="visibility.private">Private</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Leverancer og kapacitet</a></h3>
+<div class="meet-meta"><time datetime="2026-10-21" data-i18n-date="2026-10-21" data-i18n-date-style="medium">21 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":28}'>28 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Anne"]'>Mette and Anne</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Plan for november</a></h3>
+<div class="meet-meta"><time datetime="2026-10-21" data-i18n-date="2026-10-21" data-i18n-date-style="medium">21 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":56}'>56 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Jonas"]' data-i18n-more="3">Mette, Jonas and 3 others</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="visibility.company">Company</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Opfølgning på linje 2</a></h3>
+<div class="meet-meta"><time datetime="2026-10-20" data-i18n-date="2026-10-20" data-i18n-date-style="medium">20 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":18}'>18 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Søren"]'>Mette and Søren</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg><span data-i18n="visibility.private">Private</span></span></div>
+<span class="state muted"><span class="dot"></span><span data-i18n="status.transcribing">Transcribing</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Kvalitet og nye rutiner</a></h3>
+<div class="meet-meta"><time datetime="2026-10-19" data-i18n-date="2026-10-19" data-i18n-date-style="medium">19 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":34}'>34 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Anne","Jonas"]'>Mette, Anne and Jonas</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+</div>
+<div class="list-foot">
+<span data-i18n="library.showing" data-i18n-args='{"shown":5,"total":12}'>Showing 5 of 12 meetings</span>
+<a href="#library"><span data-i18n="library.showMore">Show more meetings</span> <span aria-hidden="true">↓</span></a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 02. Meeting library, 1280 px. "New meeting" is the one primary action.</figcaption>
+</figure>
+</section>
+<section id="empty" aria-labelledby="label-empty">
+<div class="section-label" lang="en">
+<h2 id="label-empty">03 / Empty library</h2>
+<span>1280 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="empty">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content">
+<div class="row between content-top">
+<label class="search" for="search-empty">
+<svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+<input id="search-empty" type="search" data-i18n-attr="placeholder:library.search.placeholder,aria-label:library.search.label" placeholder="Search meetings and transcripts" aria-label="Search the meetings you can see">
+</label>
+<div class="desktop-action">
+<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
+</div>
+</div>
+<div class="row between library-title">
+<div>
+<h1 data-i18n="nav.myMeetings">My meetings</h1>
+<p data-i18n="library.mine.subheading" class="subheading">Meetings you recorded or uploaded.</p>
+</div>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+</div>
+<div class="filters" role="group" data-i18n-attr="aria-label:library.filters.label" aria-label="Filters">
+<button class="pill" type="button" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="0">0</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="0">0</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="0">0</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.shared">Shared</span><span class="count" data-i18n-num="0">0</span></button>
+</div>
+<div class="empty">
+<div>
+<svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg>
+<h2 data-i18n="library.empty.first.title">No meetings yet</h2>
+<p data-i18n="library.empty.first.body">Record a meeting with the desktop recorder or upload an audio file. It stays private until you share it.</p>
+<div class="actions">
+<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="library.empty.first.download">Download the recorder</span></button>
+<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.empty.first.upload">Upload a file</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 03. Empty library, 1280 px, first use. The two ways to add a meeting, per behaviour rule 8.</figcaption>
+</figure>
+</section>
+<section id="meeting" aria-labelledby="label-meeting">
+<div class="section-label" lang="en">
+<h2 id="label-meeting">04 / Meeting and recap</h2>
+<span>1280 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="meeting">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content meeting-page">
+<a href="#library" class="back"><svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg><span data-i18n="meeting.back">All meetings</span></a>
+<div class="meeting-title">
+<h1 lang="da">Produktionsmøde, uge 43</h1>
+<p class="subheading"><time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="long">22 October 2026</time> <span class="separator" aria-hidden="true">·</span> <time datetime="09:00" data-i18n-time="09:00">09:00</time> <span class="separator" aria-hidden="true">·</span> <span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":42}'>42 min</span> <span class="separator" aria-hidden="true">·</span> <span data-i18n="meeting.speakers" data-i18n-args='{"count":4}'>4 speakers</span></p>
+</div>
+<div class="meeting-actions">
+<label class="row small">
+<svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg>
+<select class="control" data-i18n-attr="aria-label:meeting.visibility.label" aria-label="Visibility, only the owner can change it">
+<option data-i18n="visibility.private">Private</option>
+<option data-i18n="visibility.shared">Shared</option>
+<option data-i18n="visibility.company">Company</option>
+</select>
+</label>
+<button type="button" class="btn keep" aria-pressed="true" data-i18n-attr="aria-label:meeting.keep.label" aria-label="Keep this meeting from automatic deletion"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg><span data-i18n="meeting.keep">Keep</span></button>
+<div class="grow"></div>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="meeting.export">Export</span></button>
+</div>
+<div class="audio" role="group" data-i18n-attr="aria-label:meeting.player.label" aria-label="Audio player">
+<button type="button" class="btn" data-i18n-attr="aria-label:meeting.player.play" aria-label="Play recording"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
+<time datetime="PT0M18S" data-i18n-dur="18">00:18</time>
+<input class="seek" type="range" min="0" max="2526" value="18" data-i18n-attr="aria-label:meeting.player.position" aria-label="Position in the recording, seconds">
+<time class="total" datetime="PT42M6S" data-i18n-dur="2526">42:06</time>
+<select data-i18n-attr="aria-label:meeting.player.rate" aria-label="Playback speed">
+<option data-i18n="format.rate" data-i18n-args='{"rate":1}'>1×</option>
+<option data-i18n="format.rate" data-i18n-args='{"rate":1.5}'>1.5×</option>
+<option data-i18n="format.rate" data-i18n-args='{"rate":2}'>2×</option>
+</select>
+</div>
+<div class="tablist" role="tablist" data-i18n-attr="aria-label:meeting.tabs.label" aria-label="Meeting content">
+<button type="button" role="tab" id="tab-recap-desktop" aria-selected="true" aria-controls="recap-desktop"><span data-i18n="meeting.tabs.recap">Recap</span></button>
+<button type="button" role="tab" id="tab-transcript-desktop" aria-selected="false" aria-controls="transcript-desktop" tabindex="-1"><span data-i18n="meeting.tabs.transcript">Transcript</span><span class="count" data-i18n-dur="2526">42:06</span></button>
+</div>
+<div class="tabs">
+<section class="editor-panel" id="transcript-desktop" role="tabpanel" aria-labelledby="tab-transcript-desktop" tabindex="0" hidden>
+<div class="panel-head">
+<span data-i18n="transcript.head" data-i18n-args='{"language":"@language.da","count":4}'>Danish · 4 speakers · Click a speaker to rename</span>
+</div>
+<div class="transcript">
+<div class="segment playing">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Mette Lund"}' aria-label="Mette Lund, rename or link to a colleague"><span class="avatar" aria-hidden="true">ML</span>Mette Lund</button>
+<time datetime="PT0M0S" data-i18n-dur="0">00:00</time>
+</div>
+<p lang="da">Så er vi samlet. Lad os begynde med kapaciteten på <mark>linje 2</mark>. Jonas, hvor står vi med testen?</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Jonas Skov"}' aria-label="Jonas Skov, rename or link to a colleague"><span class="avatar" aria-hidden="true">JS</span>Jonas Skov</button>
+<time datetime="PT0M18S" data-i18n-dur="18">00:18</time>
+</div>
+<p lang="da">Vi nåede de 240 enheder i går. Vi mangler stadig at teste det nye skift, før vi ændrer planen.</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"@transcript.speaker.unnamed","number":3}' aria-label="Speaker 3, rename or link to a colleague"><span data-i18n="transcript.speaker.unnamed" data-i18n-args='{"number":3}'>Speaker 3</span> <svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg></button>
+<time datetime="PT0M36S" data-i18n-dur="36">00:36</time>
+</div>
+<p lang="da">Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi sætte det i drift fra mandag.</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Mette Lund"}' aria-label="Mette Lund, rename or link to a colleague"><span class="avatar" aria-hidden="true">ML</span>Mette Lund</button>
+<time datetime="PT0M49S" data-i18n-dur="49">00:49</time>
+</div>
+<p lang="da">Godt. Så aftaler vi, at Søren melder tilbage fredag. Anne, vil du samle tallene i <mark>ugeplanen</mark>?</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Anne Holm"}' aria-label="Anne Holm, rename or link to a colleague"><span class="avatar" aria-hidden="true">AH</span>Anne Holm</button>
+<time datetime="PT1M3S" data-i18n-dur="63">01:03</time>
+</div>
+<p lang="da">Ja. Jeg opdaterer planen, så alle kan se kapaciteten inden fredag klokken tolv.</p>
+</div>
+<p data-i18n="transcript.position" data-i18n-args='{"position":{"duration":63},"duration":{"duration":2526}}' class="small muted">Showing 01:03 of 42:06</p>
+</div>
+</section>
+<section class="editor-panel" id="recap-desktop" role="tabpanel" aria-labelledby="tab-recap-desktop" tabindex="0">
+<div class="panel-head">
+<span data-i18n="recap.template.heading">Recap template</span>
+<select class="template" data-i18n-attr="aria-label:recap.template.label" aria-label="Choose recap template">
+<option lang="da">Produktionsmøde</option>
+<option lang="da">Projektstatus</option>
+<option lang="da">Frit referat</option>
+</select>
+</div>
+<div class="recap-version"><span data-i18n="recap.versions" data-i18n-args='{"name":"Mette","version":4}'>AI draft v1, edited by Mette v4</span> <span class="accent-fg">· <span data-i18n="recap.status.saved">Saved</span></span></div>
+<div class="editor-tools" role="toolbar" data-i18n-attr="aria-label:recap.toolbar.label" aria-label="Recap formatting">
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.heading" aria-label="Apply heading"><svg class="icon" aria-hidden="true"><use href="#i-heading"></use></svg></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.bold" aria-label="Toggle bold"><b aria-hidden="true">B</b></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.italic" aria-label="Toggle italic"><i aria-hidden="true">I</i></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.bulletList" aria-label="Toggle bulleted list"><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.link" aria-label="Add link"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg></button>
+<span class="grow"></span>
+<button type="button" class="undo"><svg class="icon" aria-hidden="true"><use href="#i-undo"></use></svg><span data-i18n="recap.toolbar.undo">Undo</span></button>
+</div>
+<div class="editor-body">
+<h3 lang="da">En rolig opstart på linje 2</h3>
+<div class="callout">
+<svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+<p lang="da">Vi øger først kapaciteten, når torsdagens test er godkendt.</p>
+</div>
+<h4 lang="da">Beslutninger</h4>
+<ul class="decisions">
+<li>
+<input type="checkbox" data-i18n-attr="aria-label:recap.decision.markDone" data-i18n-args='{"task":"Test det nye skift torsdag."}' aria-label="Mark as done: Test det nye skift torsdag.">
+<span><span lang="da">Test det nye skift torsdag.</span><br>
+<span class="mention">@Søren Bak</span> · <time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="dayMonth">22 Oct</time></span>
+</li>
+<li>
+<input type="checkbox" checked data-i18n-attr="aria-label:recap.decision.markDone" data-i18n-args='{"task":"Saml kapacitetstallene."}' aria-label="Mark as done: Saml kapacitetstallene.">
+<span><span lang="da">Saml kapacitetstallene.</span><br>
+<span class="mention">@Anne Holm</span> · <time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="dayMonth">22 Oct</time></span>
+</li>
+</ul>
+<table class="recap-table" lang="da">
+<caption class="small muted" style="text-align:left;margin-bottom:8px">Næste skridt</caption>
+<thead>
+<tr><th scope="col">Opgave</th><th scope="col">Ansvarlig</th><th scope="col">Frist</th></tr>
+</thead>
+<tbody>
+<tr><td>Skiftetest</td><td>Søren</td><td>22. okt.</td></tr>
+<tr><td>Opdatér ugeplan</td><td>Anne</td><td>23. okt.</td></tr>
+</tbody>
+</table>
+<details lang="da">
+<summary>Åbne spørgsmål til næste møde</summary>
+<p>Kan det nye skift dække fredagens ekstra ordre?</p>
+</details>
+<p data-i18n="recap.editorHint" class="editor-foot">Type / for blocks. Use @ for colleagues.</p>
+</div>
+</section>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 04. Meeting and recap, 1280 px. Owner view with visibility, Keep and versions. Recap and transcript are tabs; the recap opens first when it exists. The tabs work.</figcaption>
+</figure>
+</section>
+<section id="recorder" aria-labelledby="label-recorder">
+<div class="section-label" lang="en">
+<h2 id="label-recorder">05 / Desktop recorder</h2>
+<span>1280 px canvas · window 360 × 520 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="recorder">
+<div class="native-stage">
+<div class="recorder-window">
+<div class="nativebar">
+<div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>
+<span lang="da">Primux Møder</span>
+<span style="width:39px"></span>
+</div>
+<div class="recorder-body">
+<h1 class="recorder-brand" lang="da">Primux Møder</h1>
+<label class="field">
+<span data-i18n="recorder.meetingTitle">Meeting title</span>
+<input type="text" value="Produktionsmøde, uge 43" lang="da">
+</label>
+<div class="record-area">
+<button class="record-button" type="button" data-i18n-attr="aria-label:recorder.stop" aria-label="Stop recording"><span></span></button>
+<div>
+<div class="record-clock" data-i18n-dur="1122" data-i18n-dur-style="clock">00:18:42</div>
+<small><span class="dot" style="background:var(--destructive)"></span> <span data-i18n="recorder.capturing">Recording microphone and system audio</span></small>
+</div>
+</div>
+<div class="meters">
+<div class="meter-row"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg><span data-i18n="recorder.mic">Microphone</span><meter min="0" max="100" value="64" data-i18n-attr="aria-label:recorder.mic.level" aria-label="Microphone level"></meter></div>
+<div class="meter-row"><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg><span data-i18n="recorder.system">System audio</span><meter min="0" max="100" value="42" data-i18n-attr="aria-label:recorder.system.level" aria-label="System audio level"></meter></div>
+</div>
+<div class="row between live-setting">
+<span data-i18n="recorder.live">Live transcript</span>
+<button type="button" class="toggle" aria-pressed="true" data-i18n-attr="aria-label:recorder.live" aria-label="Live transcript"></button>
+</div>
+<div class="queue">
+<div class="queue-heading">
+<span data-i18n="recorder.queue.heading">Recent recordings</span>
+<span data-i18n="recorder.queue.count" data-i18n-args='{"count":4}'>4 files</span>
+</div>
+<div class="queue-row">
+<span class="queue-title" lang="da">Produktionsmøde</span>
+<span class="queue-status "><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="recorder.queue.uploading" data-i18n-args='{"done":2,"total":5}'>Uploading 2/5</span></span>
+</div>
+<div class="queue-row">
+<span class="queue-title" lang="da">Leverancer</span>
+<span class="queue-status accent-fg"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="recorder.queue.confirmed">Confirmed</span></span>
+</div>
+<div class="queue-row">
+<span class="queue-title" lang="da">Plan for november</span>
+<span class="queue-status muted"><svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg><span data-i18n="recorder.queue.pendingNetwork">Waiting for network · Retrying</span></span>
+</div>
+<div class="queue-row">
+<span class="queue-title" lang="da">Opfølgning, linje 2</span>
+<span class="queue-status warn"><svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg><button type="button" class="queue-action"><span data-i18n="recorder.queue.warn24h">Warning: not uploaded for 24 hours · Try now</span></button></span>
+</div>
+</div>
+</div>
+<div class="recorder-footer">
+<div class="row between">
+<span class="row" style="gap:6px"><span class="avatar" aria-hidden="true">ML</span>Mette Lund</span>
+<span class="accent-fg"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg></span>
+</div>
+<div class="row between" style="margin-top:6px">
+<select data-i18n-attr="aria-label:recorder.model.label" aria-label="Local model">
+<option data-i18n="recorder.model.downloaded" data-i18n-args='{"model":"Parakeet"}'>Parakeet · Downloaded</option>
+<option data-i18n="recorder.model.download" data-i18n-args='{"model":"Whisper"}'>Whisper · Download model</option>
+</select>
+<span data-i18n="recorder.model.label" class="muted">Local model</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 05. Desktop recorder, 1280 px canvas, window 360 × 520 px. Recording and the upload queue. macOS title bar for reference.</figcaption>
+</figure>
+</section>
+<section id="live" aria-labelledby="label-live">
+<div class="section-label" lang="en">
+<h2 id="label-live">06 / Live transcript</h2>
+<span>1280 px canvas · floating window 420 × 200 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="live">
+<div class="teams-stage">
+<div class="fake-teams" aria-hidden="true">
+<div class="row between"><span>Teams · Produktionsmøde, uge 43</span><span>18:42</span></div>
+<div class="teams-grid">
+<div class="teams-person"><span class="avatar" aria-hidden="true">ML</span><span>Mette Lund</span></div>
+<div class="teams-person"><span class="avatar" aria-hidden="true">JS</span><span>Jonas Skov</span></div>
+<div class="teams-person"><span class="avatar" aria-hidden="true">SB</span><span>Søren Bak</span></div>
+<div class="teams-person"><span class="avatar" aria-hidden="true">AH</span><span>Anne Holm</span></div>
+</div>
+<div class="teams-controls"><span><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span><span><svg class="icon" aria-hidden="true"><use href="#i-video"></use></svg></span><span><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg></span></div>
+</div>
+<div class="live-window">
+<div class="live-head">
+<span class="dot"></span>
+<strong data-i18n="live.label">Live</strong>
+<span class="muted" lang="da">Primux Møder</span>
+<span class="grow"></span>
+<button type="button" class="btn quiet" data-i18n-attr="aria-label:live.pause" aria-label="Pause live text"><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg></button>
+<button type="button" class="btn quiet" data-i18n-attr="aria-label:live.hide" aria-label="Hide live text"><svg class="icon" aria-hidden="true"><use href="#i-hide"></use></svg></button>
+</div>
+<div class="live-copy" lang="da">
+<p>Jonas: Vi mangler stadig at teste det nye skift.</p>
+<p>Søren: Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi starte mandag.</p>
+</div>
+<div data-i18n="live.foot" class="live-foot">Local preview · Recording continues when you hide the text.</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 06. Live transcript, 1280 px canvas, floating window 420 × 200 px. Always on top, over a blurred example Teams meeting.</figcaption>
+</figure>
+</section>
+<section id="settings" aria-labelledby="label-settings">
+<div class="section-label" lang="en">
+<h2 id="label-settings">07 / Settings</h2>
+<span>1280 px · the whole admin surface</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="settings">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content">
+<div class="row between content-top">
+<div>
+<p class="eyebrow" lang="da">PRIMUX DIGITAL, S.L.</p>
+<h1 data-i18n="settings.title" style="margin-top:8px">Settings</h1>
+<p data-i18n="settings.subheading" class="subheading">The company's setup. Admins only.</p>
+</div>
+<span data-i18n="settings.adminBadge" class="badge">Admin</span>
+</div>
+<form>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.productName.heading">Product name</h2>
+<p data-i18n="settings.productName.help">The name on the login page, in the recorder and in the menu bar.</p>
+</div>
+<div>
+<label class="field">
+<span data-i18n="settings.productName.field">Name</span>
+<input type="text" value="Primux Møder" lang="da">
+</label>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.theme.heading">Theme</h2>
+<p data-i18n="settings.theme.help">Two colours. Everything else follows from them.</p>
+</div>
+<div>
+<div class="stack">
+<div class="form-grid">
+<div class="field">
+<label for="theme-accent"><span data-i18n="settings.theme.accent">Accent colour</span></label>
+<span class="color-field"><input type="color" id="theme-accent" data-theme-input="--theme-accent"><span class="hex">…</span></span>
+<small data-i18n="settings.theme.accentHelp">Selection, focus and small signals.</small>
+</div>
+<div class="field">
+<label for="theme-primary"><span data-i18n="settings.theme.primary">Button colour</span></label>
+<span class="color-field"><input type="color" id="theme-primary" data-theme-input="--theme-primary"><span class="hex">…</span></span>
+<small data-i18n="settings.theme.primaryHelp">The one main action on each screen.</small>
+</div>
+</div>
+<p data-i18n="settings.theme.note" class="theme-note">Tints, lines, the focus ring and dark mode are derived from these two values. Accent text on the background, button text on the button, and accent on a card must each reach 4.5:1 in both themes. The recorder reads the same values at login.</p>
+<div class="theme-preview" role="group" data-i18n-attr="aria-label:settings.theme.preview" aria-label="Preview">
+<span data-i18n="settings.theme.preview" class="label" aria-hidden="true">Preview</span>
+<button type="button" class="pill" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
+<button type="button" class="pill" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
+<button type="button" class="toggle" aria-pressed="true" data-i18n-attr="aria-label:recorder.live" aria-label="Live transcript"></button>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+<span class="badge soft"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span>
+</div>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.login.heading">Company login</h2>
+<p data-i18n="settings.login.help">No local accounts or passwords.</p>
+</div>
+<div>
+<div class="form-grid">
+<label class="field full">
+<span data-i18n="settings.login.provider">Identity provider</span>
+<select>
+<option>Microsoft Entra ID</option>
+<option>Google Workspace</option>
+</select>
+</label>
+<label class="field">
+<span data-i18n="settings.login.tenantId">Tenant ID</span>
+<input type="text" value="00000000-0000-4000-8000-000000000001">
+</label>
+<label class="field">
+<span data-i18n="settings.login.clientId">Client ID</span>
+<input type="text" value="00000000-0000-4000-8000-000000000002">
+</label>
+<label class="field full">
+<span data-i18n="settings.login.clientSecret">Client secret</span>
+<input type="password" value="demo-secret-not-a-credential">
+<small data-i18n="settings.login.secretHelp">Secrets are never shown in clear text.</small>
+</label>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.stt.heading">Transcription</h2>
+<p data-i18n="settings.stt.help">One provider for the whole install.</p>
+</div>
+<div>
+<div class="form-grid">
+<label class="field full">
+<span data-i18n="settings.stt.provider">Speech-to-text provider</span>
+<select>
+<option>AssemblyAI (EU)</option>
+<option>Azure Speech</option>
+<option>ElevenLabs Scribe</option>
+<option data-i18n="settings.stt.local" data-i18n-args='{"model":"Whisper"}'>Local Whisper</option>
+<option data-i18n="settings.stt.local" data-i18n-args='{"model":"Parakeet"}'>Local Parakeet</option>
+</select>
+</label>
+<label class="field">
+<span data-i18n="settings.stt.apiKey">API key</span>
+<input type="password" value="demo-api-key-not-a-credential">
+</label>
+<label class="field">
+<span data-i18n="settings.stt.region">Region</span>
+<select>
+<option data-i18n="settings.stt.regionEu">EU</option>
+<option data-i18n="settings.stt.regionDefault">Provider default</option>
+</select>
+<small data-i18n="settings.stt.regionHelp">Azure lists its available regions.</small>
+</label>
+<label class="field full">
+<span data-i18n="settings.stt.language">Default transcription language</span>
+<select>
+<option data-i18n="language.option" data-i18n-args='{"code":"da","name":"@language.da"}'>da · Danish</option>
+<option data-i18n="language.option" data-i18n-args='{"code":"auto","name":"@settings.stt.autoDetect"}'>auto · Detect automatically</option>
+<option data-i18n="language.option" data-i18n-args='{"code":"en","name":"@language.en"}'>en · English</option>
+</select>
+</label>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.interfaceLanguage.heading">Interface language</h2>
+<p data-i18n="settings.interfaceLanguage.help">The default for this install.</p>
+</div>
+<div>
+<label class="field">
+<span data-i18n="settings.interfaceLanguage.field">Default interface language</span>
+<select>
+<option data-i18n="language.option" data-i18n-args='{"code":"en","name":"@language.en"}'>en · English</option>
+<option data-i18n="language.option" data-i18n-args='{"code":"da","name":"@language.da"}'>da · Danish</option>
+</select>
+<small data-i18n="settings.interfaceLanguage.note">A user's browser or operating system language wins when a translation exists.</small>
+</label>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.keyterms.heading">Company words</h2>
+<p data-i18n="settings.keyterms.help">Product names, people and jargon.</p>
+</div>
+<div>
+<div class="stack">
+<label class="field">
+<span data-i18n="settings.keyterms.field">Keyterms</span>
+<textarea rows="3" lang="da">Primux
+linje 2
+ugeplan</textarea>
+<small data-i18n="settings.keyterms.fieldHelp">One word or phrase per line.</small>
+</label>
+<div><button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="settings.keyterms.import">Import CSV</span></button></div>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.defaults.heading">Defaults</h2>
+<p data-i18n="settings.defaults.help">Users can switch the live transcript on for themselves.</p>
+</div>
+<div>
+<div class="stack">
+<div class="setting-toggle">
+<div>
+<p data-i18n="settings.defaults.liveDefault">Live transcript by default</p>
+<small data-i18n="settings.defaults.liveDefaultHelp">Off. The local text is only a preview.</small>
+</div>
+<button class="toggle" type="button" aria-pressed="false" data-i18n-attr="aria-label:settings.defaults.liveDefault" aria-label="Live transcript by default"></button>
+</div>
+<label class="field">
+<span data-i18n="settings.defaults.visibility">Visibility for new meetings</span>
+<select>
+<option data-i18n="visibility.private">Private</option>
+<option data-i18n="settings.defaults.visibilityShared">Shared with chosen colleagues</option>
+<option data-i18n="settings.defaults.visibilityCompany">Whole company</option>
+</select>
+<small data-i18n="settings.defaults.visibilityHelp">Only the meeting owner can change visibility.</small>
+</label>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.sources.heading">Recording sources</h2>
+<p data-i18n="settings.sources.help">Teams and Meet cover only meetings the company organised.</p>
+</div>
+<div>
+<div class="stack">
+<label class="choice"><input type="checkbox" checked><span data-i18n="settings.sources.desktop">Desktop recorder</span></label>
+<label class="choice"><input type="checkbox" checked><span data-i18n="settings.sources.upload">Audio file upload</span></label>
+<label class="choice"><input type="checkbox" checked><span data-i18n="settings.sources.browser">Browser recorder</span></label>
+<label class="choice"><input type="checkbox"><span data-i18n="settings.sources.onedrive">OneDrive · Teams recordings</span></label>
+<label class="choice"><input type="checkbox"><span data-i18n="settings.sources.drive">Google Drive · Meet recordings</span></label>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.templates.heading">Recap templates</h2>
+<p data-i18n="settings.templates.help">Several templates. The employee picks one per meeting.</p>
+</div>
+<div>
+<div class="template-list">
+<button type="button" class="pill" aria-pressed="true" lang="da">Produktionsmøde</button>
+<button type="button" class="pill" aria-pressed="false" lang="da">Projektstatus</button>
+</div>
+<div class="stack">
+<label class="field">
+<span data-i18n="settings.templates.name">Template name</span>
+<input type="text" value="Produktionsmøde" lang="da">
+</label>
+<label class="field">
+<span data-i18n="settings.templates.body">Content in Markdown</span>
+<textarea rows="6" lang="da"># Overblik
+
+&gt; [!NOTE]
+&gt; Det vigtigste fra mødet
+
+## Beslutninger
+- [ ] Opgave · @ansvarlig · frist
+
+## Næste skridt</textarea>
+</label>
+<div><button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="settings.templates.add">Add template</span></button></div>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.retention.heading">Retention</h2>
+<p data-i18n="settings.retention.help">Automatic deletion runs every night. The keep flag exempts the whole meeting.</p>
+</div>
+<div>
+<div class="form-grid">
+<label class="field">
+<span data-i18n="settings.retention.audio">Audio, days</span>
+<input type="number" value="30">
+</label>
+<label class="field">
+<span data-i18n="settings.retention.text">Transcripts and recaps, days</span>
+<input type="number" value="365">
+</label>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.mcp.heading">MCP</h2>
+<p data-i18n="settings.mcp.help">AI tools use the employee's own company login.</p>
+</div>
+<div>
+<div class="setting-toggle">
+<div>
+<p data-i18n="settings.mcp.server">MCP server</p>
+<small data-i18n="settings.mcp.serverHelp">Permitted meetings only. Reads and changes are logged.</small>
+</div>
+<button class="toggle" type="button" aria-pressed="true" data-i18n-attr="aria-label:settings.mcp.server" aria-label="MCP server"></button>
+</div>
+</div>
+</section>
+<aside class="dataflow">
+<h2 data-i18n="settings.dataflow.heading">Data flow</h2>
+<ol>
+<li data-i18n="settings.dataflow.step1">The recorder sends audio to the company's own Cloudflare account. R2 audio storage uses EU jurisdiction; Durable Objects upload sessions use jurisdiction eu. Both are available without Enterprise.</li>
+<li data-i18n="settings.dataflow.step2" data-i18n-args='{"provider":"AssemblyAI (EU)"}'>AssemblyAI (EU) receives audio and keyterms directly and returns text and speakers.</li>
+<li data-i18n="settings.dataflow.step3">The configured language model writes the recap from the transcript, with requests passing through AI Gateway. Meeting data is stored in D1.</li>
+<li data-i18n="settings.dataflow.step4" data-i18n-args='{"audioDays":30,"textDays":365}'>Audio is deleted after 30 days. Transcripts and recaps are deleted after 365 days. Keep prevents both deletions.</li>
+</ol>
+<p><strong data-i18n="settings.dataflow.promise">Processing is not guaranteed to stay in the EU.</strong> <span data-i18n="settings.dataflow.caveats">D1 has no jurisdiction setting. Worker placement is best effort, normally at the data centre nearest the request; regional restrictions require the Enterprise-only Data Localization Suite. Workers AI and AI Gateway are not covered by Regional Services.</span></p>
+<p data-i18n="settings.dataflow.local">A local live transcript stays on the computer and is discarded when the meeting ends. After the server confirms a recording, the recorder keeps the audio locally for 7 days. Without a confirmation it keeps the file and retries.</p>
+</aside>
+<div class="row between savebar">
+<span data-i18n="settings.footer" class="small muted">Changes apply to this installation.</span>
+<button type="button" class="btn primary"><span data-i18n="settings.save">Save settings</span></button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 07. Settings, 1280 px, the whole admin surface. Only settings from the spec. The data flow does not promise EU-only processing.</figcaption>
+</figure>
+</section>
+<section id="marketing" aria-labelledby="label-marketing">
+<div class="section-label" lang="en">
+<h2 id="label-marketing">08 / mtxt.co</h2>
+<span>1280 px · 18 px body</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="marketing">
+<div class="marketing" lang="en" data-i18n-skip>
+<nav class="marketing-nav" aria-label="mtxt.co">
+<a class="marketing-logo" href="#marketing">mtxt</a>
+<a href="https://github.com/primux-dk/mtxt">Source on GitHub <span aria-hidden="true">↗</span></a>
+</nav>
+<div class="marketing-hero">
+<h1>Good meetings deserve<br><span>a better memory.</span></h1>
+<div class="marketing-copy">
+<p>A small recorder on each computer captures the microphone and system audio. No bot joins the call.</p>
+<p>Transcripts and editable recaps go to a library in the company's own Cloudflare account. Each meeting is private, shared or company-wide.</p>
+<p>Choose the speech-to-text provider, add the company's own words and recap templates, and give AI tools access through MCP.</p>
+</div>
+</div>
+<figure class="screenshot-placeholder">
+<div class="placeholder-sidebar" aria-hidden="true">
+<span class="brand" lang="da">Primux<br>Møder</span>
+<span class="placeholder-line"></span>
+<span class="placeholder-line"></span>
+<span class="placeholder-line"></span>
+</div>
+<div class="placeholder-content">
+<p class="placeholder-label">Screenshot of the meeting library<br>Placeholder · example data from Primux's own install</p>
+<div><span lang="da">Produktionsmøde, uge 43</span><span>Private</span></div>
+<div><span lang="da">Leverancer og kapacitet</span><span>Shared</span></div>
+</div>
+</figure>
+<footer class="marketing-foot">
+<span>Built by Primux · mtxt.co</span>
+<span>PolyForm Noncommercial 1.0.0 · Commercial use needs a commercial licence.</span>
+</footer>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 08. mtxt.co, 1280 px, 18 px body. The marketing site is English only and is not part of the locale files.</figcaption>
+</figure>
+</section>
+<section id="library-mobile" aria-labelledby="label-library-mobile">
+<div class="section-label" lang="en">
+<h2 id="label-library-mobile">09 / Meeting library on a phone</h2>
+<span>390 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen mobile" data-screen="library-mobile">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content">
+<div class="row between content-top">
+<label class="search" for="search-mobile">
+<svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+<input id="search-mobile" type="search" data-i18n-attr="placeholder:library.search.placeholder,aria-label:library.search.label" placeholder="Search meetings and transcripts" aria-label="Search the meetings you can see">
+</label>
+<div class="desktop-action">
+<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
+</div>
+</div>
+<div class="row between library-title">
+<div>
+<h1 data-i18n="nav.myMeetings">My meetings</h1>
+<p data-i18n="library.mine.subheading" class="subheading">Meetings you recorded or uploaded.</p>
+</div>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+</div>
+<div class="filters" role="group" data-i18n-attr="aria-label:library.filters.label" aria-label="Filters">
+<button class="pill" type="button" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="6">6</span></button>
+<button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.shared">Shared</span><span class="count" data-i18n-num="4">4</span></button>
+</div>
+<div class="list-head">
+<span data-i18n="library.count" data-i18n-args='{"count":12}'>12 meetings</span>
+<span><span data-i18n="library.sort.newest">Newest first</span> <span aria-hidden="true">↓</span></span>
+</div>
+<div class="meet-list">
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Produktionsmøde, uge 43</a></h3>
+<div class="meet-meta"><time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="medium">22 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":42}'>42 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Jonas","Søren"]'>Mette, Jonas and Søren</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg><span data-i18n="visibility.private">Private</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Leverancer og kapacitet</a></h3>
+<div class="meet-meta"><time datetime="2026-10-21" data-i18n-date="2026-10-21" data-i18n-date-style="medium">21 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":28}'>28 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Anne"]'>Mette and Anne</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Plan for november</a></h3>
+<div class="meet-meta"><time datetime="2026-10-21" data-i18n-date="2026-10-21" data-i18n-date-style="medium">21 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":56}'>56 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Jonas"]' data-i18n-more="3">Mette, Jonas and 3 others</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="visibility.company">Company</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Opfølgning på linje 2</a></h3>
+<div class="meet-meta"><time datetime="2026-10-20" data-i18n-date="2026-10-20" data-i18n-date-style="medium">20 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":18}'>18 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Søren"]'>Mette and Søren</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg><span data-i18n="visibility.private">Private</span></span></div>
+<span class="state muted"><span class="dot"></span><span data-i18n="status.transcribing">Transcribing</span></span>
+</article>
+<article class="meet-row">
+<div>
+<h3><a href="#meeting" lang="da">Kvalitet og nye rutiner</a></h3>
+<div class="meet-meta"><time datetime="2026-10-19" data-i18n-date="2026-10-19" data-i18n-date-style="medium">19 Oct 2026</time><span class="separator" aria-hidden="true">·</span><span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":34}'>34 min</span><span class="separator" aria-hidden="true">·</span><span data-i18n-list='["Mette","Anne","Jonas"]'>Mette, Anne and Jonas</span></div>
+</div>
+<div><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span></div>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+</article>
+</div>
+<div class="list-foot">
+<span data-i18n="library.showing" data-i18n-args='{"shown":5,"total":12}'>Showing 5 of 12 meetings</span>
+<a href="#library"><span data-i18n="library.showMore">Show more meetings</span> <span aria-hidden="true">↓</span></a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 09. Meeting library on a phone, 390 px. The menu button opens navigation.</figcaption>
+</figure>
+</section>
+<section id="meeting-mobile" aria-labelledby="label-meeting-mobile">
+<div class="section-label" lang="en">
+<h2 id="label-meeting-mobile">10 / Meeting on a phone</h2>
+<span>390 px</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen mobile" data-screen="meeting-mobile">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content meeting-page">
+<a href="#library" class="back"><svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg><span data-i18n="meeting.back">All meetings</span></a>
+<div class="meeting-title">
+<h1 lang="da">Produktionsmøde, uge 43</h1>
+<p class="subheading"><time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="long">22 October 2026</time> <span class="separator" aria-hidden="true">·</span> <time datetime="09:00" data-i18n-time="09:00">09:00</time> <span class="separator" aria-hidden="true">·</span> <span data-i18n="format.durationMinutes" data-i18n-args='{"minutes":42}'>42 min</span> <span class="separator" aria-hidden="true">·</span> <span data-i18n="meeting.speakers" data-i18n-args='{"count":4}'>4 speakers</span></p>
+</div>
+<div class="meeting-actions">
+<label class="row small">
+<svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg>
+<select class="control" data-i18n-attr="aria-label:meeting.visibility.label" aria-label="Visibility, only the owner can change it">
+<option data-i18n="visibility.private">Private</option>
+<option data-i18n="visibility.shared">Shared</option>
+<option data-i18n="visibility.company">Company</option>
+</select>
+</label>
+<button type="button" class="btn keep" aria-pressed="true" data-i18n-attr="aria-label:meeting.keep.label" aria-label="Keep this meeting from automatic deletion"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg><span data-i18n="meeting.keep">Keep</span></button>
+<div class="grow"></div>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="meeting.export">Export</span></button>
+</div>
+<div class="audio" role="group" data-i18n-attr="aria-label:meeting.player.label" aria-label="Audio player">
+<button type="button" class="btn" data-i18n-attr="aria-label:meeting.player.play" aria-label="Play recording"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg></button>
+<time datetime="PT0M18S" data-i18n-dur="18">00:18</time>
+<input class="seek" type="range" min="0" max="2526" value="18" data-i18n-attr="aria-label:meeting.player.position" aria-label="Position in the recording, seconds">
+<time class="total" datetime="PT42M6S" data-i18n-dur="2526">42:06</time>
+<select data-i18n-attr="aria-label:meeting.player.rate" aria-label="Playback speed">
+<option data-i18n="format.rate" data-i18n-args='{"rate":1}'>1×</option>
+<option data-i18n="format.rate" data-i18n-args='{"rate":1.5}'>1.5×</option>
+<option data-i18n="format.rate" data-i18n-args='{"rate":2}'>2×</option>
+</select>
+</div>
+<div class="tablist" role="tablist" data-i18n-attr="aria-label:meeting.tabs.label" aria-label="Meeting content">
+<button type="button" role="tab" id="tab-recap-mobile" aria-selected="false" aria-controls="recap-mobile" tabindex="-1"><span data-i18n="meeting.tabs.recap">Recap</span></button>
+<button type="button" role="tab" id="tab-transcript-mobile" aria-selected="true" aria-controls="transcript-mobile"><span data-i18n="meeting.tabs.transcript">Transcript</span><span class="count" data-i18n-dur="2526">42:06</span></button>
+</div>
+<div class="tabs">
+<section class="editor-panel" id="transcript-mobile" role="tabpanel" aria-labelledby="tab-transcript-mobile" tabindex="0">
+<div class="panel-head">
+<span data-i18n="transcript.headShort" data-i18n-args='{"language":"@language.da","count":4}'>Danish · 4 speakers</span>
+</div>
+<div class="transcript">
+<div class="segment playing">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Mette Lund"}' aria-label="Mette Lund, rename or link to a colleague"><span class="avatar" aria-hidden="true">ML</span>Mette Lund</button>
+<time datetime="PT0M0S" data-i18n-dur="0">00:00</time>
+</div>
+<p lang="da">Så er vi samlet. Lad os begynde med kapaciteten på <mark>linje 2</mark>. Jonas, hvor står vi med testen?</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Jonas Skov"}' aria-label="Jonas Skov, rename or link to a colleague"><span class="avatar" aria-hidden="true">JS</span>Jonas Skov</button>
+<time datetime="PT0M18S" data-i18n-dur="18">00:18</time>
+</div>
+<p lang="da">Vi nåede de 240 enheder i går. Vi mangler stadig at teste det nye skift, før vi ændrer planen.</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"@transcript.speaker.unnamed","number":3}' aria-label="Speaker 3, rename or link to a colleague"><span data-i18n="transcript.speaker.unnamed" data-i18n-args='{"number":3}'>Speaker 3</span> <svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg></button>
+<time datetime="PT0M36S" data-i18n-dur="36">00:36</time>
+</div>
+<p lang="da">Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi sætte det i drift fra mandag.</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Mette Lund"}' aria-label="Mette Lund, rename or link to a colleague"><span class="avatar" aria-hidden="true">ML</span>Mette Lund</button>
+<time datetime="PT0M49S" data-i18n-dur="49">00:49</time>
+</div>
+<p lang="da">Godt. Så aftaler vi, at Søren melder tilbage fredag. Anne, vil du samle tallene i <mark>ugeplanen</mark>?</p>
+</div>
+<div class="segment">
+<div class="segment-head">
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Anne Holm"}' aria-label="Anne Holm, rename or link to a colleague"><span class="avatar" aria-hidden="true">AH</span>Anne Holm</button>
+<time datetime="PT1M3S" data-i18n-dur="63">01:03</time>
+</div>
+<p lang="da">Ja. Jeg opdaterer planen, så alle kan se kapaciteten inden fredag klokken tolv.</p>
+</div>
+<p data-i18n="transcript.position" data-i18n-args='{"position":{"duration":63},"duration":{"duration":2526}}' class="small muted">Showing 01:03 of 42:06</p>
+</div>
+</section>
+<section class="editor-panel" id="recap-mobile" role="tabpanel" aria-labelledby="tab-recap-mobile" tabindex="0" hidden>
+<div class="panel-head">
+<span data-i18n="recap.template.heading">Recap template</span>
+<select class="template" data-i18n-attr="aria-label:recap.template.label" aria-label="Choose recap template">
+<option lang="da">Produktionsmøde</option>
+<option lang="da">Projektstatus</option>
+<option lang="da">Frit referat</option>
+</select>
+</div>
+<div class="recap-version"><span data-i18n="recap.versions" data-i18n-args='{"name":"Mette","version":4}'>AI draft v1, edited by Mette v4</span> <span class="accent-fg">· <span data-i18n="recap.status.saved">Saved</span></span></div>
+<div class="editor-tools" role="toolbar" data-i18n-attr="aria-label:recap.toolbar.label" aria-label="Recap formatting">
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.heading" aria-label="Apply heading"><svg class="icon" aria-hidden="true"><use href="#i-heading"></use></svg></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.bold" aria-label="Toggle bold"><b aria-hidden="true">B</b></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.italic" aria-label="Toggle italic"><i aria-hidden="true">I</i></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.bulletList" aria-label="Toggle bulleted list"><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg></button>
+<button type="button" data-i18n-attr="aria-label:recap.toolbar.link" aria-label="Add link"><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg></button>
+<span class="grow"></span>
+<button type="button" class="undo"><svg class="icon" aria-hidden="true"><use href="#i-undo"></use></svg><span data-i18n="recap.toolbar.undo">Undo</span></button>
+</div>
+<div class="editor-body">
+<h3 lang="da">En rolig opstart på linje 2</h3>
+<div class="callout">
+<svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+<p lang="da">Vi øger først kapaciteten, når torsdagens test er godkendt.</p>
+</div>
+<h4 lang="da">Beslutninger</h4>
+<ul class="decisions">
+<li>
+<input type="checkbox" data-i18n-attr="aria-label:recap.decision.markDone" data-i18n-args='{"task":"Test det nye skift torsdag."}' aria-label="Mark as done: Test det nye skift torsdag.">
+<span><span lang="da">Test det nye skift torsdag.</span><br>
+<span class="mention">@Søren Bak</span> · <time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="dayMonth">22 Oct</time></span>
+</li>
+<li>
+<input type="checkbox" checked data-i18n-attr="aria-label:recap.decision.markDone" data-i18n-args='{"task":"Saml kapacitetstallene."}' aria-label="Mark as done: Saml kapacitetstallene.">
+<span><span lang="da">Saml kapacitetstallene.</span><br>
+<span class="mention">@Anne Holm</span> · <time datetime="2026-10-22" data-i18n-date="2026-10-22" data-i18n-date-style="dayMonth">22 Oct</time></span>
+</li>
+</ul>
+<table class="recap-table" lang="da">
+<caption class="small muted" style="text-align:left;margin-bottom:8px">Næste skridt</caption>
+<thead>
+<tr><th scope="col">Opgave</th><th scope="col">Ansvarlig</th><th scope="col">Frist</th></tr>
+</thead>
+<tbody>
+<tr><td>Skiftetest</td><td>Søren</td><td>22. okt.</td></tr>
+<tr><td>Opdatér ugeplan</td><td>Anne</td><td>23. okt.</td></tr>
+</tbody>
+</table>
+<details lang="da">
+<summary>Åbne spørgsmål til næste møde</summary>
+<p>Kan det nye skift dække fredagens ekstra ordre?</p>
+</details>
+<p data-i18n="recap.editorHint" class="editor-foot">Type / for blocks. Use @ for colleagues.</p>
+</div>
+</section>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 10. Meeting on a phone, 390 px. The same tabs as on desktop, here with the transcript selected.</figcaption>
+</figure>
+</section>
+<section id="settings-theme" aria-labelledby="label-settings-theme">
+<div class="section-label" lang="en">
+<h2 id="label-settings-theme">11 / Settings excerpt, theme changed</h2>
+<span>1280 px · excerpt of figure 07 · accent <code>#4a6382</code></span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="settings-theme" data-theme-preview style="--theme-accent:#4a6382">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+<div class="sidebar-bottom row">
+<span class="avatar" aria-hidden="true">ML</span>
+<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content">
+<div class="row between content-top">
+<div>
+<p class="eyebrow" lang="da">PRIMUX DIGITAL, S.L.</p>
+<h1 data-i18n="settings.title" style="margin-top:8px">Settings</h1>
+<p data-i18n="settings.subheading" class="subheading">The company's setup. Admins only.</p>
+</div>
+<span data-i18n="settings.adminBadge" class="badge">Admin</span>
+</div>
+<form>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.productName.heading">Product name</h2>
+<p data-i18n="settings.productName.help">The name on the login page, in the recorder and in the menu bar.</p>
+</div>
+<div>
+<label class="field">
+<span data-i18n="settings.productName.field">Name</span>
+<input type="text" value="Primux Møder" lang="da">
+</label>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.theme.heading">Theme</h2>
+<p data-i18n="settings.theme.help">Two colours. Everything else follows from them.</p>
+</div>
+<div>
+<div class="stack">
+<div class="form-grid">
+<div class="field">
+<label for="theme-blue-accent"><span data-i18n="settings.theme.accent">Accent colour</span></label>
+<span class="color-field"><input type="color" id="theme-blue-accent" value="#4a6382"><span class="hex">#4a6382</span></span>
+<small data-i18n="settings.theme.accentHelp">Selection, focus and small signals.</small>
+</div>
+<div class="field">
+<label for="theme-blue-primary"><span data-i18n="settings.theme.primary">Button colour</span></label>
+<span class="color-field"><input type="color" id="theme-blue-primary" value="#111111"><span class="hex">#111111</span></span>
+<small data-i18n="settings.theme.primaryHelp">The one main action on each screen.</small>
+</div>
+</div>
+<p data-i18n="settings.theme.note" class="theme-note">Tints, lines, the focus ring and dark mode are derived from these two values. Accent text on the background, button text on the button, and accent on a card must each reach 4.5:1 in both themes. The recorder reads the same values at login.</p>
+<div class="theme-preview" role="group" data-i18n-attr="aria-label:settings.theme.preview" aria-label="Preview">
+<span data-i18n="settings.theme.preview" class="label" aria-hidden="true">Preview</span>
+<button type="button" class="pill" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
+<button type="button" class="pill" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
+<button type="button" class="toggle" aria-pressed="true" data-i18n-attr="aria-label:recorder.live" aria-label="Live transcript"></button>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+<span class="badge soft"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span>
+</div>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.mcp.heading">MCP</h2>
+<p data-i18n="settings.mcp.help">AI tools use the employee's own company login.</p>
+</div>
+<div>
+<div class="setting-toggle">
+<div>
+<p data-i18n="settings.mcp.server">MCP server</p>
+<small data-i18n="settings.mcp.serverHelp">Permitted meetings only. Reads and changes are logged.</small>
+</div>
+<button class="toggle" type="button" aria-pressed="true" data-i18n-attr="aria-label:settings.mcp.server" aria-label="MCP server"></button>
+</div>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.templates.heading">Recap templates</h2>
+<p data-i18n="settings.templates.help">Several templates. The employee picks one per meeting.</p>
+</div>
+<div>
+<div class="template-list">
+<button type="button" class="pill" aria-pressed="true" lang="da">Produktionsmøde</button>
+<button type="button" class="pill" aria-pressed="false" lang="da">Projektstatus</button>
+</div>
+</div>
+</section>
+<div class="row between savebar">
+<span data-i18n="settings.footer" class="small muted">Changes apply to this installation.</span>
+<button type="button" class="btn primary"><span data-i18n="settings.save">Save settings</span></button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 11. An excerpt of the settings screen, 1280 px: the Theme section and the controls that change with it, with the accent changed to <code>#4a6382</code>, a muted blue, and the button colour left at <code>#111111</code>. Selected navigation, pills, the toggle, the state dot and the badge follow from the one value. Figure 07 is the full screen.</figcaption>
+</figure>
+</section>
+<footer class="footnote" lang="en">A design reference, not a built product. The theme switch, the language switch, the meeting tabs and the mobile navigation work. Login, recording, editing and export are static examples. Mona Sans is bundled locally under the SIL Open Font License 1.1.</footer>
+</main>
+<dialog class="sheet" id="mobile-nav" aria-labelledby="sheet-title">
+<div class="sheet-top">
+<h2 class="brand" id="sheet-title" lang="da">Primux Møder</h2>
+<button type="button" class="btn quiet icon-only" id="close-menu" data-i18n-attr="aria-label:nav.close" aria-label="Close navigation"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button>
+</div>
+<p class="org" lang="da">PRIMUX DIGITAL, S.L.</p>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.mobile.label" aria-label="Mobile navigation">
+<a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
+</nav>
+</dialog>
+<script>
+// Minimal ICU subset: {name} and {name, plural, =0 {...} one {...} other {...}} with #.
+// Args: numbers are formatted for the locale; strings starting with @ are other keys;
+// {"duration": seconds} is a media duration.
+function i18nFormat(dict, key, args) {
+  const msg = dict[key];
+  if (msg === undefined) return key;
+  const intl = dict['locale.intl'];
+  const num = n => new Intl.NumberFormat(intl).format(n);
+  const val = v => typeof v === 'number' ? num(v) : v && typeof v === 'object' ? i18nDuration(dict, v.duration) : (typeof v === 'string' && v[0] === '@' ? i18nFormat(dict, v.slice(1), args) : String(v));
+  const block = (s, i) => { let depth = 0; for (let j = i; j < s.length; j++) { if (s[j] === '{') depth++; else if (s[j] === '}' && --depth === 0) return j; } return s.length; };
+  const run = (s, hash) => {
+    let out = '';
+    for (let i = 0; i < s.length;) {
+      if (s[i] === '#' && hash !== undefined) { out += hash; i++; continue; }
+      if (s[i] !== '{') { out += s[i++]; continue; }
+      const end = block(s, i), body = s.slice(i + 1, end); i = end + 1;
+      const m = body.match(/^\s*(\w+)\s*,\s*plural\s*,([\s\S]*)$/);
+      if (!m) { const name = body.trim(); out += args && name in args ? val(args[name]) : '{' + body + '}'; continue; }
+      const n = Number(args[m[1]]), opts = {}, rest = m[2];
+      for (let p = 0; p < rest.length;) {
+        const sel = rest.slice(p).match(/^\s*(=\d+|\w+)\s*\{/);
+        if (!sel) break;
+        const open = p + sel[0].length - 1, close = block(rest, open);
+        opts[sel[1]] = rest.slice(open + 1, close); p = close + 1;
+      }
+      const pick = opts['=' + n] ?? opts[new Intl.PluralRules(intl).select(n)] ?? opts.other ?? '';
+      out += run(pick, num(n));
+    }
+    return out;
+  };
+  return run(msg);
+}
+
+const I18N_DATE_STYLES = { medium: { dateStyle: 'medium' }, long: { dateStyle: 'long' }, dayMonth: { day: 'numeric', month: 'short' } };
+
+function i18nDate(dict, iso, style) {
+  return new Intl.DateTimeFormat(dict['locale.intl'], I18N_DATE_STYLES[style || 'medium']).format(new Date(iso + 'T12:00:00'));
+}
+
+function i18nTime(dict, hhmm) {
+  return new Intl.DateTimeFormat(dict['locale.intl'], { hour: '2-digit', minute: '2-digit' }).format(new Date('2026-01-01T' + hhmm + ':00'));
+}
+
+function i18nNumber(dict, n) {
+  return new Intl.NumberFormat(dict['locale.intl']).format(n);
+}
+
+// Media durations: mm:ss, h:mm:ss from an hour, hh:mm:ss for the recorder clock.
+// The separator is the locale's own time separator, ":" in en-GB and "." in da-DK.
+function i18nDuration(dict, seconds, style) {
+  const intl = dict['locale.intl'];
+  const sep = new Intl.DateTimeFormat(intl, { hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(2026, 0, 1, 9, 5)).find(p => p.type === 'literal').value;
+  const two = new Intl.NumberFormat(intl, { minimumIntegerDigits: 2, useGrouping: false });
+  const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
+  if (style === 'clock') return [h, m, s].map(two.format).join(sep);
+  return h ? [new Intl.NumberFormat(intl).format(h), two.format(m), two.format(s)].join(sep) : [two.format(m), two.format(s)].join(sep);
+}
+
+function i18nList(dict, names, more) {
+  const items = names.slice();
+  if (more) items.push(i18nFormat(dict, 'format.others', { count: more }));
+  return new Intl.ListFormat(dict['locale.intl'], { type: 'conjunction' }).format(items);
+}
+
+const LOCALES = {};
+function applyLocale(lang) {
+  const dict = LOCALES[lang];
+  if (!dict) return;
+  const args = el => el.dataset.i18nArgs ? JSON.parse(el.dataset.i18nArgs) : {};
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = i18nFormat(dict, el.dataset.i18n, args(el)); });
+  document.querySelectorAll('[data-i18n-attr]').forEach(el => {
+    el.dataset.i18nAttr.split(',').forEach(pair => { const [name, key] = pair.split(':'); el.setAttribute(name, i18nFormat(dict, key, args(el))); });
+  });
+  document.querySelectorAll('[data-i18n-date]').forEach(el => { el.textContent = i18nDate(dict, el.dataset.i18nDate, el.dataset.i18nDateStyle); });
+  document.querySelectorAll('[data-i18n-time]').forEach(el => { el.textContent = i18nTime(dict, el.dataset.i18nTime); });
+  document.querySelectorAll('[data-i18n-list]').forEach(el => { el.textContent = i18nList(dict, JSON.parse(el.dataset.i18nList), Number(el.dataset.i18nMore || 0)); });
+  document.querySelectorAll('[data-i18n-num]').forEach(el => { el.textContent = i18nNumber(dict, Number(el.dataset.i18nNum)); });
+  document.querySelectorAll('[data-i18n-dur]').forEach(el => { el.textContent = i18nDuration(dict, Number(el.dataset.i18nDur), el.dataset.i18nDurStyle); });
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+  try { localStorage.setItem('mtxt-mockups-lang', lang); } catch (e) {}
+}
+Promise.all(['en', 'da'].map(l => fetch('../locales/' + l + '.json').then(r => r.json()).then(d => { LOCALES[l] = d; })))
+  .then(() => {
+    let saved = 'en';
+    try { saved = localStorage.getItem('mtxt-mockups-lang') || 'en'; } catch (e) {}
+    const q = new URLSearchParams(location.search).get('lang');
+    applyLocale(q === 'da' || q === 'en' ? q : saved);
+  })
+  .catch(() => { document.querySelectorAll('[data-lang=da]').forEach(b => { b.disabled = true; b.title = 'Serve the repository over HTTP to load the locale files'; }); });
+document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => applyLocale(b.dataset.lang)));
+
+// Theme inputs show the install's live values, read from tokens.css.
+const cssHex = value => {
+  const probe = document.createElement('span');
+  probe.style.color = value;
+  document.body.append(probe);
+  const rgb = getComputedStyle(probe).color.match(/[\d.]+/g).slice(0, 3);
+  probe.remove();
+  return '#' + rgb.map(v => Math.round(Number(v)).toString(16).padStart(2, '0')).join('');
+};
+document.querySelectorAll('[data-theme-input]').forEach(input => {
+  input.value = cssHex(getComputedStyle(document.documentElement).getPropertyValue(input.dataset.themeInput).trim());
+  input.nextElementSibling.textContent = input.value;
+});
+
+const theme = document.querySelector('#theme');
+const setDark = dark => {
+  document.documentElement.classList.toggle('dark', dark);
+  theme.setAttribute('aria-pressed', String(dark));
+  theme.textContent = dark ? 'Light theme' : 'Dark theme';
+};
+theme.addEventListener('click', () => setDark(!document.documentElement.classList.contains('dark')));
+if (new URLSearchParams(location.search).get('theme') === 'dark') setDark(true);
+
+const sheet = document.querySelector('#mobile-nav');
+let opener;
+document.querySelectorAll('[data-menu]').forEach(button => button.addEventListener('click', () => { opener = button; button.setAttribute('aria-expanded', 'true'); sheet.showModal(); }));
+document.querySelector('#close-menu').addEventListener('click', () => sheet.close());
+sheet.querySelectorAll('a').forEach(a => a.addEventListener('click', () => sheet.close()));
+sheet.addEventListener('close', () => { if (opener) { opener.setAttribute('aria-expanded', 'false'); opener.focus(); } });
+document.querySelectorAll('[role=tablist]').forEach(list => {
+  const tabs = [...list.querySelectorAll('[role=tab]')];
+  const select = (tab, focus) => {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(tab, false));
+    tab.addEventListener('keydown', e => {
+      const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
+      if (step === undefined) return;
+      e.preventDefault();
+      select(tabs[(i + step + tabs.length) % tabs.length], true);
+    });
+  });
+});
+</script>
+</body>
+</html>

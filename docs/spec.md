@@ -8,6 +8,8 @@ One web app that runs in the company's own Cloudflare account, plus a small reco
 
 The product name an employee sees is a setting per install ("Acme Meetings"). mtxt appears only in About and on GitHub.
 
+The interface is written in English and translated. English is the source of every string, in the library and in the recorder; Danish is the first translation. A user gets the interface in the browser's or operating system's language when a translation exists, otherwise in the install's default interface language. Interface language and transcription language are separate settings.
+
 ## Scope: 10 features
 
 | # | Feature | What it means |
@@ -23,7 +25,7 @@ The product name an employee sees is a setting per install ("Acme Meetings"). mt
 | 9 | Private and shared | Each meeting is private, shared with named colleagues, or company-wide. Admin sets the default. Only the owner changes it. Search and MCP respect it. |
 | 10 | Retention, audit, MCP | Delete after N days per install, with a keep flag per meeting. A log of who opened what. MCP server with the same company login, scoped to what the user may see. |
 
-Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins calls; snippets, themes, a plugin marketplace, a premium tier, widgets, per-user LLM settings.
+Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins calls; snippets, user-selectable themes beyond the install's two colours, a plugin marketplace, a premium tier, widgets, per-user LLM settings.
 
 ## Capture routes, in build order
 
@@ -39,9 +41,11 @@ The whole admin surface. If a setting is not here, it does not exist.
 | Setting | Values |
 |---|---|
 | Product name | Free text, shown on the recorder, the login page and the tray |
+| Theme | Accent colour and button colour, two hex values. Defaults are sage #566b45 and #111111. Tints, lines, focus ring and the dark mode are derived. Three pairs are checked in both themes, accent text on the background, button text on the button, accent on a card; a value that puts any pair under 4.5:1 is refused with the ratio shown. A preview row under the fields shows the derived states. The recorder reads the same two values at login |
 | Identity provider | Entra ID or Google: tenant id, client id, secret |
 | Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, local Whisper or Parakeet: key, region |
-| Default language | ISO code, auto-detect allowed |
+| Interface language | Default for the install: en or da. A user's browser or OS language wins when a translation exists |
+| Default language | For transcription. ISO code, auto-detect allowed |
 | Keyterms | One list per install, CSV import |
 | Live transcript | On by default: yes or no. Users can switch it for themselves |
 | Default visibility | private, shared, company |
@@ -78,6 +82,8 @@ Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-
 ## Stack and deployment
 
 - `apps/web`: Next.js, shadcn/ui, Drizzle ORM. Deployed to Cloudflare Workers with OpenNext.
+- Interface strings live in locale files, one set per app (`apps/web` and `apps/recorder` each hold their own), English as the source and Danish as the first translation. No string is hard-coded in a component.
+- The look is defined once in `docs/design/` (README, `tokens.css`, `guidelines.html`, mockups). `apps/web` serves the guidelines at `/design` for signed-in users, rendered from the install's live tokens, so an install with its own accent sees its own page. Every colour in the app derives from the two theme values plus the fixed neutral scale; no component carries a literal colour.
 - Cloudflare bindings in the company's own account: R2 for audio and exports, Queues for transcription and recap jobs, Durable Objects for resumable upload sessions, D1 for the database, AI Gateway in front of the language model used for recaps, Workers AI as one of the speech-to-text adapters.
 - Identity: OIDC against Entra ID or Google Workspace through Auth.js or an equivalent; no local users.
 - MCP: a remote MCP server on Workers with OAuth, using Cloudflare's agents SDK.
@@ -106,7 +112,7 @@ recap_versions   id, recap_id, author_id (null = AI), body_md, created_at   -- o
 decisions        id, recap_id, text, owner_user_id, done     -- lifted from the recap by the AI, editable
 templates        id, name, body_md, is_default                 -- admin edits
 keyterms         id, term, boost                               -- one list per install
-settings         product_name, identity_provider, stt_provider, language, live_transcript_default,
+settings         product_name, theme_accent, theme_primary, identity_provider, stt_provider, language, interface_language, live_transcript_default,
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled
 audit_events     id, user_id, meeting_id, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write), at
 ```

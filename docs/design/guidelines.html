@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>mtxt · Design guidelines</title>
+<link rel="stylesheet" href="./tokens.css">
+<style>
+*{box-sizing:border-box}
+html{font-size:16px;scroll-behavior:smooth}
+body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button,a,input,select,textarea,summary{touch-action:manipulation}
+button,select,summary{cursor:pointer}
+button{font-weight:550}
+a{color:inherit;text-decoration:none}
+a:hover{color:var(--accent-strong)}
+button,a,input,select,textarea{transition:background var(--motion-duration) var(--motion-ease),color var(--motion-duration) var(--motion-ease),border-color var(--motion-duration) var(--motion-ease)}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+button{border:0}
+h1,h2,h3,h4,p,figure{margin:0}
+h1,h2,h3,h4{font-weight:650;line-height:1.2;letter-spacing:-.03em}
+h1{font-size:32px;letter-spacing:-.04em}
+h2{font-size:24px}
+h3{font-size:20px}
+small,.small{font-size:12px;line-height:1.5}
+.muted{color:var(--muted-foreground)}
+.accent-fg{color:var(--accent-strong)}
+.warn{color:var(--destructive)}
+.row{display:flex;align-items:center;gap:12px}
+.between{justify-content:space-between}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.stack{display:grid;gap:16px}
+.icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);font-size:14px;white-space:nowrap}
+.btn:hover{background:var(--secondary);border-color:var(--text-muted)}
+.btn.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary);border-radius:var(--radius-pill)}
+.btn.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn.quiet{background:transparent;border-color:transparent}
+.btn.icon-only{width:40px;padding:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px 9px;font-size:12px;white-space:nowrap;background:var(--card);line-height:1.5}
+.badge .icon{width:14px;height:14px}
+.badge.soft{border-color:var(--accent-line);background:var(--accent-tint);color:var(--accent-foreground)}
+.state{font-size:12px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent-strong);display:inline-block;flex-shrink:0}
+.avatar{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--accent-line-strong);border-radius:50%;background:var(--accent-tint);color:var(--accent-foreground);font-size:11px;font-weight:650;flex-shrink:0}
+.field{display:grid;gap:6px;min-width:0;font-size:14px;align-content:start}
+.field>span:first-child,.field>label:first-child{font-weight:550}
+.field input,.field select,.field textarea,.control{width:100%;min-width:0;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:9px 12px;min-height:40px;font-size:14px;line-height:1.5}
+.field textarea{resize:vertical;min-height:96px}
+.field small{color:var(--muted-foreground)}
+input::placeholder{color:var(--muted-foreground)}
+input[type=checkbox]{accent-color:var(--accent-strong);width:16px;height:16px;flex-shrink:0}
+.pill{padding:7px 14px;min-height:36px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);font-size:14px;white-space:nowrap}
+.pill[aria-pressed=true]{background:var(--accent-tint);border-color:var(--accent-line-control);color:var(--accent-foreground)}
+.pill .count{margin-left:8px;color:var(--muted-foreground)}
+.page{max-width:1344px;margin:0 auto;padding:48px 32px 80px}
+.gallery-head{padding:0 0 32px;border-bottom:1px solid var(--border)}
+.eyebrow{font-size:12px;color:var(--muted-foreground);letter-spacing:.1em;font-weight:550;text-transform:uppercase}
+.gallery-head h1{margin:12px 0;font-size:40px;letter-spacing:-.055em}
+.gallery-head p{margin:12px 0 20px;color:var(--muted-foreground)}
+.gallery-nav{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px}
+.gallery-nav a{text-decoration:underline;text-underline-offset:4px}
+.section-label{margin:48px 0 16px;display:flex;justify-content:space-between;align-items:baseline;gap:16px}
+.section-label h2{font-size:20px}
+.section-label span{color:var(--muted-foreground);font-size:12px}
+.frame-scroll{overflow:auto;padding:2px;scrollbar-width:thin}
+.screen{width:1280px;container-type:inline-size;background:var(--background);border:1px solid var(--border);border-radius:var(--radius-panel);overflow:hidden}
+.caption{font-size:13px;color:var(--muted-foreground);padding:12px 0 0}
+.screen.mobile{width:390px}
+.mobile-grid{display:flex;flex-direction:column;gap:40px}
+.shell{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:748px}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--sidebar-border);display:flex;flex-direction:column;padding:28px 16px 20px;gap:28px}
+.brand{font-size:16px;font-weight:650;letter-spacing:-.03em;line-height:1.3}
+.org{font-size:12px;color:var(--muted-foreground);margin-top:4px}
+.nav-items{display:grid;gap:4px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;font-size:14px;min-height:44px;color:var(--sidebar-foreground);border-radius:var(--radius-control)}
+.nav-item[aria-current=page]{color:var(--sidebar-accent-foreground);background:var(--sidebar-accent);font-weight:550}
+.nav-item .icon{width:18px;height:18px}
+.sidebar-bottom{margin-top:auto;padding-top:24px;border-top:1px solid var(--sidebar-border);font-size:13px}
+.mobilebar{display:none}
+.content{padding:32px;min-width:0}
+.content-top{margin-bottom:32px}
+.subheading{font-size:14px;color:var(--muted-foreground);margin-top:8px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:0 12px;height:40px;width:420px;max-width:100%;color:var(--muted-foreground)}
+.search input{border:0;background:transparent;outline:none;width:100%;min-width:0;font-size:14px}
+.search:focus-within{outline:2px solid var(--ring);outline-offset:2px}
+.library-title{margin:32px 0 24px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}
+.list-head{display:flex;justify-content:space-between;margin-bottom:12px;font-size:12px;color:var(--muted-foreground)}
+.meet-list{border:1px solid var(--border);background:var(--card);border-radius:var(--radius-card);overflow:hidden}
+.meet-row{padding:20px;display:grid;grid-template-columns:minmax(0,1fr) 130px 118px;gap:16px;align-items:center;border-bottom:1px solid var(--line-subtle)}
+.meet-row:last-child{border-bottom:0}
+.meet-row h3{font-size:16px;font-weight:550;letter-spacing:-.015em}
+.meet-row h3 a:hover{text-decoration:underline;text-underline-offset:4px}
+.meet-meta{font-size:12px;color:var(--muted-foreground);display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;line-height:1.6}
+.meet-meta .separator{color:var(--text-muted)}
+.list-foot{margin-top:16px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted-foreground)}
+.empty{display:grid;place-items:center;min-height:340px;text-align:center;padding:40px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card)}
+.empty>div>.icon{width:32px;height:32px;color:var(--accent-strong);margin:0 auto 20px}
+.empty h2{font-size:20px}
+.empty p{margin:12px 0 24px;color:var(--muted-foreground);font-size:14px}
+.login{min-height:760px;display:flex;align-items:center;justify-content:center;position:relative}
+.login-box{width:400px;padding:40px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel)}
+.login-box .brand{font-size:28px;letter-spacing:-.045em}
+.login-box .org{margin:12px 0 32px}
+.login-box .btn{width:100%;margin-top:12px;min-height:44px}
+.provider-mark{font-weight:650;font-size:17px;line-height:1;width:20px}
+.login-footer{position:absolute;bottom:28px;font-size:12px;color:var(--muted-foreground)}
+.back{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted-foreground);margin-bottom:24px}
+.meeting-title h1{font-size:30px}
+.meeting-actions{display:flex;gap:8px;margin:20px 0 24px;flex-wrap:wrap}
+.keep[aria-pressed=true]{background:var(--accent-tint);border-color:var(--accent-line-control);color:var(--accent-foreground)}
+.meeting-actions select{width:auto}
+.audio{display:flex;align-items:center;gap:16px;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--card);padding:12px 16px;margin-bottom:24px}
+.audio .btn{border-radius:50%;width:36px;min-height:36px;padding:8px}
+.audio time{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.seek{accent-color:var(--accent-strong);flex:1;min-width:20px;height:4px}
+.audio select{background:transparent;border:0;font-size:12px}
+.tablist{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:24px}
+.tablist [role=tab]{background:transparent;border-radius:0;padding:10px 14px;min-height:44px;font-size:14px;color:var(--muted-foreground);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tablist [role=tab]:hover{color:var(--foreground)}
+.tablist [role=tab][aria-selected=true]{color:var(--foreground);border-bottom-color:var(--accent-strong)}
+.tablist [role=tab] .count{margin-left:8px;color:var(--text-muted)}
+[role=tabpanel][hidden]{display:none}
+.editor-panel{min-width:0;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--card);overflow:hidden}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line-subtle);min-height:56px}
+.panel-head span{font-size:12px;color:var(--muted-foreground)}
+.transcript{padding:24px 20px;display:grid;gap:24px}
+.content.meeting-page{max-width:904px}
+.segment-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.speaker{font-size:13px;display:inline-flex;align-items:center;gap:8px;background:transparent;padding:0;min-height:32px;text-align:left}
+.speaker .avatar{width:24px;height:24px;font-size:9px}
+.speaker .icon{width:12px;height:12px;color:var(--muted-foreground)}
+.segment-head time{font-size:12px;color:var(--muted-foreground);margin-left:auto;font-variant-numeric:tabular-nums}
+.segment p{font-size:16px;line-height:1.7;letter-spacing:-.01em}
+.segment mark{color:var(--accent-foreground);background:var(--accent);padding:1px 3px;border-radius:3px}
+.playing{border-left:2px solid var(--accent-strong);padding-left:12px;margin-left:-14px}
+.recap-version{font-size:11px;color:var(--muted-foreground);padding:10px 20px;border-bottom:1px solid var(--line-subtle);line-height:1.6}
+.template{font-size:12px;border:1px solid var(--input);border-radius:6px;padding:6px;background:var(--card);max-width:190px}
+.editor-tools{display:flex;align-items:center;gap:4px;padding:8px 16px;border-bottom:1px solid var(--line-subtle)}
+.editor-tools button{font-size:13px;width:28px;min-height:28px;background:transparent;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.editor-tools button .icon{width:16px;height:16px}
+.editor-tools .undo{width:auto;padding:0 8px;font-size:12px;color:var(--muted-foreground)}
+.editor-tools button:hover{background:var(--secondary)}
+.editor-body{padding:24px 20px;font-size:14px}
+.editor-body h3{font-size:22px;margin-bottom:16px;letter-spacing:-.035em}
+.editor-body h4{font-size:15px;margin:24px 0 12px}
+.callout{padding:12px;background:var(--accent-tint-soft);border:1px solid var(--accent-line);border-radius:var(--radius-control);display:flex;align-items:flex-start;gap:8px;font-size:14px;line-height:1.65}
+.callout .icon{margin-top:2px;width:16px;height:16px;color:var(--accent-strong)}
+.decisions{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.decisions li{display:flex;gap:8px;align-items:flex-start}
+.decisions input{margin:4px 0 0}
+.mention{color:var(--accent-foreground);background:var(--accent);padding:1px 4px;border-radius:4px;white-space:nowrap}
+.recap-table{width:100%;border-collapse:collapse;font-size:12px;margin:24px 0}
+.recap-table th,.recap-table td{text-align:left;border:1px solid var(--border);padding:8px}
+.recap-table th{font-weight:550;background:var(--background)}
+.editor-body details{border-top:1px solid var(--line-subtle);padding-top:16px}
+.editor-body details p{margin-top:12px}
+.editor-foot{margin-top:24px;color:var(--muted-foreground);font-size:12px}
+.native-stage{min-height:680px;display:grid;place-items:center;background:var(--accent-tint-soft)}
+.recorder-window{width:360px;height:520px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel);box-shadow:var(--floating-shadow);overflow:hidden;display:flex;flex-direction:column}
+.nativebar{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line-subtle);font-size:10px;color:var(--muted-foreground);flex-shrink:0}
+.traffic{display:flex;gap:6px}
+.traffic span{width:9px;height:9px;border:1px solid var(--text-muted);border-radius:50%;background:var(--secondary)}
+.recorder-body{padding:12px 20px 8px}
+.recorder-brand{font-size:16px;letter-spacing:-.03em;font-weight:650;margin-bottom:8px}
+.recorder-body .field{font-size:12px;gap:4px}
+.recorder-body .field input{font-size:13px;min-height:36px;padding:7px 10px}
+.record-area{display:flex;align-items:center;gap:16px;padding:12px 0}
+.record-button{width:60px;height:60px;border-radius:50%;border:1px solid var(--input);background:var(--primary);color:var(--primary-foreground);display:grid;place-items:center;flex-shrink:0}
+.record-button span{width:17px;height:17px;background:currentColor;border-radius:3px}
+.record-clock{font-variant-numeric:tabular-nums;font-size:24px;font-weight:550;letter-spacing:-.035em;line-height:1.2}
+.record-area small{display:block;margin-top:4px;color:var(--muted-foreground)}
+.meters{display:grid;gap:8px;padding-bottom:12px}
+.meter-row{display:grid;grid-template-columns:18px 84px 1fr;gap:8px;align-items:center;font-size:11px;color:var(--muted-foreground)}
+.meter-row .icon{width:14px;height:14px}
+.meter-row meter{width:100%;height:8px;accent-color:var(--accent-strong)}
+meter::-webkit-meter-bar{background:var(--muted);border:0}
+meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
+.toggle{display:inline-flex;align-items:center;width:32px;min-width:32px;height:20px;border-radius:20px;background:var(--muted);border:1px solid var(--input);padding:2px}
+.toggle:before{content:'';display:block;background:var(--card);border:1px solid var(--border);width:14px;height:14px;border-radius:50%}
+.toggle[aria-pressed=true]{background:var(--accent-strong);border-color:var(--accent-strong)}
+.toggle[aria-pressed=true]:before{margin-left:auto;background:var(--card)}
+.live-setting{border-top:1px solid var(--line-subtle);padding:8px 0;font-size:12px}
+.queue{border-top:1px solid var(--line-subtle);padding-top:8px}
+.queue-heading{font-size:10px;color:var(--muted-foreground);margin-bottom:4px;display:flex;justify-content:space-between}
+.queue-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;min-height:25px}
+.queue-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.queue-status{white-space:nowrap;font-size:10px;display:flex;align-items:center;gap:5px}
+.queue-status .icon{width:12px;height:12px}
+.queue-action{background:transparent;padding:0;font-size:10px;color:inherit;text-decoration:underline;text-underline-offset:3px}
+.recorder-footer{margin-top:auto;padding:10px 20px;border-top:1px solid var(--line-subtle);font-size:11px}
+.recorder-footer .avatar{width:24px;height:24px;font-size:9px}
+.recorder-footer select{font-size:10px;background:transparent;border:0;padding:0;width:148px}
+.teams-stage{height:680px;position:relative;display:grid;place-items:center;overflow:hidden}
+.fake-teams{position:absolute;inset:40px;background:var(--card);border:1px solid var(--border);border-radius:16px;filter:blur(5px);padding:24px;pointer-events:none}
+.teams-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:28px 0;height:400px}
+.teams-person{background:var(--secondary);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-size:14px}
+.teams-person .avatar{width:80px;height:80px;font-size:24px}
+.teams-controls{display:flex;justify-content:center;gap:16px}
+.teams-controls span{width:44px;height:44px;background:var(--secondary);border-radius:50%;display:grid;place-items:center}
+.live-window{position:relative;z-index:1;width:420px;height:200px;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel);box-shadow:var(--floating-shadow);overflow:hidden}
+.live-head{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line-subtle);font-size:12px}
+.live-head .dot{background:var(--destructive)}
+.live-head .btn{padding:4px;min-height:28px;width:28px}
+.live-head .icon{width:16px;height:16px}
+.live-copy{padding:12px 20px;overflow:hidden;font-size:15px;line-height:1.6}
+.live-copy p:first-child{color:var(--muted-foreground);margin-bottom:6px}
+.live-foot{font-size:10px;color:var(--muted-foreground);padding:4px 20px 12px;margin-top:auto}
+.settings-section{border-top:1px solid var(--border);padding:24px 0;display:grid;grid-template-columns:204px minmax(0,1fr);gap:32px}
+.settings-label h2{font-size:16px}
+.settings-label p{font-size:12px;color:var(--muted-foreground);margin-top:8px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.full{grid-column:1/-1}
+.choice{display:flex;align-items:center;gap:8px;font-size:14px}
+.setting-toggle{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.setting-toggle p{font-size:14px}
+.setting-toggle small{color:var(--muted-foreground)}
+.keyterm-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.template-list{display:flex;gap:8px;margin-bottom:12px}
+.dataflow{background:var(--accent-tint-soft);border:1px solid var(--accent-line-strong);border-radius:var(--radius-panel);padding:24px;margin-top:8px;font-size:14px}
+.dataflow h2{font-size:20px;margin-bottom:16px}
+.dataflow ol{margin:0;padding-left:20px;display:grid;gap:8px}
+.dataflow p{margin-top:16px}
+.savebar{border-top:1px solid var(--border);padding-top:24px;margin-top:24px}
+.marketing{font-size:18px;line-height:1.7;padding:32px 64px 24px;background:var(--background)}
+.marketing-nav{display:flex;justify-content:space-between;align-items:center;font-size:14px;border-bottom:1px solid var(--line-subtle);padding-bottom:24px}
+.marketing-logo{font-size:24px;font-weight:650;letter-spacing:-.055em}
+.marketing-hero{padding:64px 0 40px}
+.marketing h1{font-size:56px;line-height:1.06;letter-spacing:-.055em}
+.marketing h1 span{color:var(--accent-strong)}
+.marketing-copy{margin-top:28px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;color:var(--muted-foreground)}
+.screenshot-placeholder{margin:0;border:1px solid var(--accent-line-strong);background:var(--accent-tint);border-radius:var(--radius-panel);height:244px;padding:24px;display:flex;gap:24px;align-items:center}
+.placeholder-sidebar{width:150px;border-right:1px solid var(--accent-line-strong);height:100%;padding:12px 20px 12px 0;display:grid;align-content:start;gap:16px}
+.placeholder-line{height:6px;background:var(--accent-line-control);border-radius:4px}
+.placeholder-content{flex:1;display:grid;gap:16px}
+.placeholder-content>div{border:1px solid var(--accent-line-strong);border-radius:8px;padding:12px;display:flex;justify-content:space-between;font-size:13px;color:var(--accent-foreground)}
+.placeholder-label{font-size:13px;letter-spacing:0;line-height:1.5;color:var(--muted-foreground)}
+.marketing-foot{font-size:12px;display:flex;justify-content:space-between;gap:24px;margin-top:28px;border-top:1px solid var(--line-subtle);padding-top:20px;color:var(--muted-foreground)}
+.sheet{border:1px solid var(--border);padding:24px;background:var(--card);color:var(--foreground);width:320px;max-width:calc(100% - 24px);height:100dvh;max-height:100dvh;margin:0;border-radius:0 16px 16px 0}
+.sheet::backdrop{background:var(--overlay)}
+.sheet .nav-items{margin-top:24px}
+.sheet-top{display:flex;justify-content:space-between;align-items:center}
+.footnote{font-size:12px;color:var(--muted-foreground);margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
+
+@container (max-width:719px){.shell{grid-template-columns:1fr;min-height:820px}
+.sidebar{display:none}
+.mobilebar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;min-height:56px;border-bottom:1px solid var(--border);background:var(--card)}
+.mobilebar .brand{font-size:14px}
+.content{padding:24px 20px}
+.content h1{font-size:24px}
+.content-top{margin-bottom:24px}
+.desktop-action{display:none}
+.library-title{margin-top:24px}
+.library-title .btn{font-size:12px;padding:8px 12px}
+.library-title h1{font-size:24px}
+.search{width:100%;height:44px}
+.filters{gap:6px;margin:20px 0}
+.pill{font-size:12px;min-height:44px;padding:7px 12px}
+.meet-row{grid-template-columns:1fr 1fr;padding:16px;gap:12px}
+.meet-row>div:first-child{grid-column:1/-1}
+.meet-row .state{justify-self:end}
+.meet-row h3{font-size:15px}
+.meet-meta{gap:6px}
+.list-foot{gap:12px}
+.meeting-actions{gap:8px}
+.meeting-actions .btn{font-size:12px;min-height:44px;padding:8px 10px}
+.meeting-actions select{font-size:12px;min-height:44px;max-width:140px}
+.tablist{margin-bottom:20px}
+.tablist [role=tab]{padding:10px 12px}
+.audio{gap:8px;padding:12px}
+.audio .total{display:none}
+.audio time{font-size:11px}
+.audio .btn{width:44px;min-width:44px;min-height:44px}
+.audio select{width:44px;min-height:44px}
+.panel-head{padding:12px 16px}
+.transcript,.editor-body{padding:20px 16px}
+.recap-version{padding:10px 16px}
+.segment p{font-size:16px}
+.back{margin-bottom:20px}
+.btn.icon-only{min-height:44px;width:44px}
+.speaker{min-height:44px}
+.template{max-width:154px;min-height:44px;font-size:11px}
+.editor-tools button{width:44px;min-height:44px}
+.editor-tools .undo{width:auto;min-height:44px}
+.recap-table{font-size:11px}
+.recap-table td,.recap-table th{padding:6px}
+.decisions{font-size:13px}
+.mention{white-space:normal}
+.sheet .nav-item{min-height:44px}
+}
+
+@media(max-width:700px){.page{padding:24px 16px 48px}
+.gallery-head h1{font-size:32px}
+.section-label{align-items:flex-start;flex-direction:column;gap:4px}
+.section-label span{font-size:11px}
+.gallery-nav{gap:8px 16px}
+.mobile-grid{align-items:flex-start}
+.frame-scroll{width:100%}
+}
+.switches{display:flex;flex-wrap:wrap;gap:8px}
+.segmented{display:inline-flex;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:2px;gap:2px}
+.segmented button{min-height:34px;padding:4px 12px;border-radius:calc(var(--radius-control) - 2px);background:transparent;font-size:14px}
+.segmented button[aria-pressed=true]{background:var(--accent-tint);color:var(--accent-foreground)}
+.gallery-links{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px;margin-bottom:16px}
+.gallery-links a{text-decoration:underline;text-underline-offset:4px}
+.color-field{display:flex;align-items:center;gap:12px}
+.field input[type=color]{width:48px;min-width:48px;height:40px;padding:4px;cursor:pointer}
+.hex{font-variant-numeric:tabular-nums;font-size:14px}
+.theme-preview{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px;border:1px solid var(--line-subtle);border-radius:var(--radius-card);background:var(--background)}
+.theme-preview .label{font-size:12px;color:var(--muted-foreground);margin-right:4px}
+.theme-note{font-size:12px;color:var(--muted-foreground)}
+.empty .actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+
+/* Guidelines page */
+.page{max-width:1100px}
+.g-head{padding:0 0 32px;border-bottom:1px solid var(--border)}
+.g-head h1{margin:12px 0;font-size:40px;letter-spacing:-.055em}
+.g-head p{color:var(--muted-foreground);margin:12px 0 20px}
+.g-toc{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px}
+.g-toc a,.g-links a,.g-prose a{text-decoration:underline;text-underline-offset:4px}
+.g-links{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px;margin-bottom:16px}
+.g-section{padding:48px 0;border-bottom:1px solid var(--border)}
+.g-section>h2{font-size:28px;letter-spacing:-.04em;margin-bottom:8px}
+.g-section>.lead{color:var(--muted-foreground);margin-bottom:24px}
+.g-section h3{font-size:16px;letter-spacing:-.015em;margin:32px 0 12px}
+.g-prose{display:grid;gap:12px}
+.g-prose ul,.g-prose ol{margin:0;padding-left:20px;display:grid;gap:8px}
+.principles{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:p}
+.principles li{display:grid;grid-template-columns:40px minmax(0,1fr);gap:16px;padding:16px 20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);counter-increment:p}
+.principles li:before{content:counter(p);font-weight:650;font-size:20px;color:var(--accent-strong);font-variant-numeric:tabular-nums}
+.principles strong{font-weight:650}
+.swatches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.swatch{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;align-items:center;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);font-size:13px;line-height:1.5}
+.chip{display:grid;grid-template-columns:1fr 1fr;height:56px;border-radius:var(--radius-control);overflow:hidden;border:1px solid var(--border)}
+.chip>span{display:block}
+.swatch code{font-size:13px;font-weight:550}
+.swatch .role{display:block;color:var(--muted-foreground)}
+.swatch .hexes{display:block;font-variant-numeric:tabular-nums;color:var(--muted-foreground);font-size:12px}
+.swatch .hexes b{font-weight:550;color:var(--foreground)}
+.swatch .shadcn{display:block;font-size:12px;color:var(--muted-foreground)}
+.try{display:grid;gap:20px;padding:24px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel)}
+.try-inputs{display:grid;grid-template-columns:1fr 1fr auto;gap:16px;align-items:end}
+.contrast{width:100%;border-collapse:collapse;font-size:14px}
+.contrast th,.contrast td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-subtle)}
+.contrast th{font-weight:550;font-size:12px;color:var(--muted-foreground)}
+.contrast td{font-variant-numeric:tabular-nums}
+.contrast .fail{color:var(--destructive);font-weight:550}
+.try-status{font-size:14px;min-height:24px}
+.try-status .refused{color:var(--destructive);font-weight:550}
+.try-status .note{color:var(--muted-foreground)}
+.strip{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:6px}
+.strip>div{display:grid;gap:4px;font-size:11px;color:var(--muted-foreground);line-height:1.3;min-width:0}
+.strip>div>span:first-child{height:40px;border-radius:6px;border:1px solid var(--border);background:var(--swatch)}
+.strip code{font-size:11px;overflow-wrap:anywhere}
+.type-table{width:100%;border-collapse:collapse}
+.type-table td,.type-table th{padding:16px 12px;border-bottom:1px solid var(--line-subtle);vertical-align:baseline;text-align:left}
+.type-table th{font-size:12px;font-weight:550;color:var(--muted-foreground)}
+.type-table td.meta{font-size:12px;color:var(--muted-foreground);white-space:nowrap;font-variant-numeric:tabular-nums}
+.nums{display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:20px}
+.nums>div{padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card)}
+.nums small{display:block;font-size:12px;color:var(--muted-foreground);margin-bottom:8px}
+.space-row{display:grid;grid-template-columns:120px 64px minmax(0,1fr);gap:16px;align-items:center;font-size:13px;padding:4px 0}
+.space-row>span:last-child{display:block;height:12px;background:var(--accent-light);border-radius:2px}
+.shapes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.shape{height:96px;background:var(--card);border:1px solid var(--input);display:grid;place-items:center;font-size:12px;color:var(--muted-foreground);text-align:center;line-height:1.4}
+.heights{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+.heights>div{display:grid;place-items:center;border:1px dashed var(--accent-line-control);border-radius:var(--radius-control);padding:0 16px;font-size:12px;color:var(--muted-foreground)}
+.shadow-sample{height:120px;display:grid;place-items:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-panel);box-shadow:var(--floating-shadow);font-size:13px;color:var(--muted-foreground)}
+.components{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.component{display:grid;grid-template-rows:auto 1fr auto;gap:12px;padding:20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-card);min-width:0}
+.component.wide{grid-column:1/-1}
+.component h3{margin:0;font-size:14px}
+.component .sample{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:20px;background:var(--background);border-radius:var(--radius-control);min-width:0}
+.component .sample.block{display:grid;gap:16px;align-content:start}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;letter-spacing:0}
+.g-section:last-of-type{border-bottom:0}
+.component .rule{font-size:13px;color:var(--muted-foreground)}
+.btn.is-hover{background:var(--secondary);border-color:var(--text-muted)}
+.btn.primary.is-hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn.quiet.is-hover{background:var(--secondary);border-color:transparent}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.field.invalid input{border-color:var(--destructive)}
+.field .error{display:flex;gap:6px;align-items:flex-start;color:var(--destructive)}
+.field .error .icon{width:16px;height:16px;margin-top:2px}
+.empties{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.empties .empty{min-height:260px;padding:24px}
+.empties .empty p{margin:8px 0 16px}
+.dialog-sample{max-width:440px;background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);border-radius:var(--radius-panel)}
+.dialog-sample header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line-subtle)}
+.dialog-sample header h4{font-size:18px}
+.dialog-sample .body{padding:20px}
+.dialog-sample footer{display:flex;justify-content:flex-end;gap:8px;padding:16px 20px;border-top:1px solid var(--line-subtle)}
+.overlay-sample{padding:32px;background:var(--overlay);border-radius:var(--radius-control);width:100%}
+.icons{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.icons>div{display:grid;justify-items:center;gap:8px;padding:16px 8px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-control);font-size:11px;color:var(--muted-foreground)}
+.motion-demo{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.dodont{width:100%;border-collapse:collapse;font-size:14px}
+.dodont th,.dodont td{padding:10px 12px;border-bottom:1px solid var(--line-subtle);text-align:left;vertical-align:top}
+.dodont th{font-size:12px;font-weight:550;color:var(--muted-foreground)}
+pre.code{margin:0;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-control);font-size:13px;overflow:auto;white-space:pre-wrap}
+.rules{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rules li{display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px;padding:10px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-control);font-size:14px}
+.rules li b{color:var(--accent-text);font-variant-numeric:tabular-nums}
+.checklist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.checklist li{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-control)}
+.checklist .icon{color:var(--accent-strong);margin-top:3px}
+.probes{display:none}
+@media(max-width:900px){.swatches,.components,.empties,.nums{grid-template-columns:1fr}.try-inputs{grid-template-columns:1fr}.shapes{grid-template-columns:1fr 1fr}.icons{grid-template-columns:repeat(3,minmax(0,1fr))}.strip{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-meetings" viewBox="0 0 24 24">
+<rect x="3" y="4" width="18" height="17" rx="2"/>
+<path d="M7 2v4m10-4v4M3 10h18m-13 5h2m4 0h2"/>
+</symbol>
+<symbol id="i-shared" viewBox="0 0 24 24">
+<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M15 3.13a4 4 0 0 1 0 7.75"/>
+<circle cx="9" cy="7" r="4"/>
+</symbol>
+<symbol id="i-building" viewBox="0 0 24 24">
+<rect x="4" y="3" width="16" height="18" rx="1"/>
+<path d="M9 21v-4h6v4M8 7h1m6 0h1m-8 4h1m6 0h1"/>
+</symbol>
+<symbol id="i-settings" viewBox="0 0 24 24">
+<path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/>
+<circle cx="12" cy="12" r="6"/>
+<circle cx="12" cy="12" r="2"/>
+</symbol>
+<symbol id="i-search" viewBox="0 0 24 24">
+<circle cx="10.5" cy="10.5" r="6.5"/>
+<path d="m16 16 4.5 4.5"/>
+</symbol>
+<symbol id="i-plus" viewBox="0 0 24 24">
+<path d="M12 5v14M5 12h14"/>
+</symbol>
+<symbol id="i-upload" viewBox="0 0 24 24">
+<path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/>
+</symbol>
+<symbol id="i-lock" viewBox="0 0 24 24">
+<rect x="5" y="10" width="14" height="11" rx="2"/>
+<path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+</symbol>
+<symbol id="i-check" viewBox="0 0 24 24">
+<path d="m5 12 4 4L19 6"/>
+</symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24">
+<path d="m8 10 4 4 4-4"/>
+</symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24">
+<path d="M19 12H5m6-6-6 6 6 6"/>
+</symbol>
+<symbol id="i-pin" viewBox="0 0 24 24">
+<path d="m16 3 5 5-5 2-2 6-3-3-6 6m2-8 6-2z"/>
+</symbol>
+<symbol id="i-download" viewBox="0 0 24 24">
+<path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/>
+</symbol>
+<symbol id="i-play" viewBox="0 0 24 24">
+<path d="m9 5 10 7-10 7z"/>
+</symbol>
+<symbol id="i-pause" viewBox="0 0 24 24">
+<path d="M8 5v14M16 5v14"/>
+</symbol>
+<symbol id="i-edit" viewBox="0 0 24 24">
+<path d="m15 4 5 5M4 20l5-1L21 7l-5-5L4 14z"/>
+</symbol>
+<symbol id="i-info" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="9"/>
+<path d="M12 11v6m0-10v.1"/>
+</symbol>
+<symbol id="i-mic" viewBox="0 0 24 24">
+<rect x="9" y="2" width="6" height="12" rx="3"/>
+<path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/>
+</symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24">
+<rect x="2" y="3" width="20" height="14" rx="2"/>
+<path d="M12 17v5m-5 0h10"/>
+</symbol>
+<symbol id="i-network" viewBox="0 0 24 24">
+<path d="m2 8 3 3m3 3 4 4m-7-7a12 12 0 0 1 14 0M2 7a17 17 0 0 1 20 0M9 15a5 5 0 0 1 6 0M3 3l18 18"/>
+</symbol>
+<symbol id="i-warning" viewBox="0 0 24 24">
+<path d="m12 3 10 18H2zM12 9v5m0 3v.1"/>
+</symbol>
+<symbol id="i-hide" viewBox="0 0 24 24">
+<path d="M3 12h18"/>
+</symbol>
+<symbol id="i-video" viewBox="0 0 24 24">
+<rect x="2" y="5" width="14" height="14" rx="2"/>
+<path d="m16 10 6-4v12l-6-4"/>
+</symbol>
+<symbol id="i-menu" viewBox="0 0 24 24">
+<path d="M4 6h16M4 12h16M4 18h16"/>
+</symbol>
+<symbol id="i-close" viewBox="0 0 24 24">
+<path d="m6 6 12 12M18 6 6 18"/>
+</symbol>
+<symbol id="i-link" viewBox="0 0 24 24">
+<path d="m10 13 4-4m-6 6-2 2a3 3 0 0 0 4 4l4-4a3 3 0 0 0 0-4m2-4 2-2a3 3 0 0 0-4-4l-4 4a3 3 0 0 0 0 4"/>
+</symbol>
+<symbol id="i-heading" viewBox="0 0 24 24">
+<path d="M4 6v12m8-12v12M4 12h8m5-1.5 3-2V18"/>
+</symbol>
+<symbol id="i-list" viewBox="0 0 24 24">
+<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>
+</symbol>
+<symbol id="i-undo" viewBox="0 0 24 24">
+<path d="M9 14 4 9l5-5"/>
+<path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+</symbol>
+</defs>
+</svg>
+<div class="probes" aria-hidden="true"><div id="probe-light" class="light"></div><div id="probe-dark" class="dark"></div></div>
+<main class="page">
+<header class="g-head">
+<div class="row between wrap">
+<span class="eyebrow">mtxt · Design guidelines · 22 October 2026</span>
+<button class="btn" id="theme" type="button" aria-pressed="false">Dark theme</button>
+</div>
+<h1>Design guidelines</h1>
+<p>The reference every screen is checked against. Colours, type, spacing and components on this page are rendered from <a href="tokens.css">tokens.css</a> and the mockup CSS, not drawn. The app serves this page at <code>/design</code> for signed-in users, rendered from the install's own two theme values.</p>
+<nav class="g-links" aria-label="Design documents">
+<a href="mockups/index.html">Screens and states (mockups)</a>
+<a href="README.md">README</a>
+<a href="behaviour.md">Behaviour rules</a>
+<a href="tokens.css">tokens.css</a>
+</nav>
+<nav class="g-toc" aria-label="Sections">
+<a href="#principles">1. Principles</a>
+<a href="#colour">2. Colour</a>
+<a href="#try">3. Try your colours</a>
+<a href="#typography">4. Typography</a>
+<a href="#spacing">5. Spacing and shape</a>
+<a href="#components">6. Components</a>
+<a href="#icons">7. Icons and motion</a>
+<a href="#writing">8. Writing in the interface</a>
+<a href="#behaviour">9. Behaviour rules</a>
+<a href="#checklist">10. Checklist</a>
+</nav>
+</header>
+<section class="g-section" id="principles" aria-labelledby="h-principles">
+<h2 id="h-principles">1. Principles</h2>
+<p class="lead">Five rules that decide the look when nothing else does.</p>
+<ol class="principles">
+<li><div><strong>Calm monochrome surfaces.</strong> The neutral scale carries the page: canvas, cards, borders and text. Panels are separated by 1 px lines, not by colour.</div></li>
+<li><div><strong>One accent, used for selection, focus and small signals, never large fills.</strong> A selected item, the focus ring, a state dot, a keyterm highlight. No green buttons, no tinted page backgrounds.</div></li>
+<li><div><strong>Text carries state; colour only confirms it.</strong> Private, Shared, Company, Transcribing, Ready, Waiting for network: every state is a word first.</div></li>
+<li><div><strong>Behaviour before polish.</strong> A screen is done when the rules in <a href="behaviour.md">behaviour.md</a> hold on the running app. Section 9 lists them.</div></li>
+<li><div><strong>The product name is the install's.</strong> The interface shows the name from settings, for example "<span lang="da">Primux Møder</span>". mtxt appears only in About and on GitHub, never on the login page, in the recorder or in the tray.</div></li>
+</ol>
+</section>
+<section class="g-section" id="colour" aria-labelledby="h-colour">
+<h2 id="h-colour">2. Colour</h2>
+<p class="lead">Every swatch is read live from <a href="tokens.css">tokens.css</a>; the left half is light mode, the right half dark mode, and the values are the resolved hex for each. Components use the variable, never the hex.</p>
+<h3>Neutral scale</h3>
+<p class="lead">Fixed for every install: <code>#fafafa</code>, <code>#f5f5f5</code>, <code>#eee</code>, <code>#e5e5e5</code>, <code>#999</code>, <code>#888</code>, <code>#666</code>, <code>#444</code>, <code>#333</code>, <code>#222</code>, <code>#111</code> and white.</p>
+<div class="swatches">
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--background)"></span><span class="dark" style="background:var(--background)"></span></span>
+<div><code>--background</code><span class="role">Canvas</span><span class="hexes">Light <b data-hex="--background" data-theme="light">…</b> · Dark <b data-hex="--background" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--background</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--foreground)"></span><span class="dark" style="background:var(--foreground)"></span></span>
+<div><code>--foreground</code><span class="role">Body text</span><span class="hexes">Light <b data-hex="--foreground" data-theme="light">…</b> · Dark <b data-hex="--foreground" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--foreground</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--card)"></span><span class="dark" style="background:var(--card)"></span></span>
+<div><code>--card</code><span class="role">Cards, editor panels, menus</span><span class="hexes">Light <b data-hex="--card" data-theme="light">…</b> · Dark <b data-hex="--card" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--card</code>, <code>--popover</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--secondary)"></span><span class="dark" style="background:var(--secondary)"></span></span>
+<div><code>--secondary</code><span class="role">Quiet control fill, hover</span><span class="hexes">Light <b data-hex="--secondary" data-theme="light">…</b> · Dark <b data-hex="--secondary" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--secondary</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--secondary-foreground)"></span><span class="dark" style="background:var(--secondary-foreground)"></span></span>
+<div><code>--secondary-foreground</code><span class="role">Quiet control text</span><span class="hexes">Light <b data-hex="--secondary-foreground" data-theme="light">…</b> · Dark <b data-hex="--secondary-foreground" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--secondary-foreground</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--muted)"></span><span class="dark" style="background:var(--muted)"></span></span>
+<div><code>--muted</code><span class="role">Subtle fill, meter track</span><span class="hexes">Light <b data-hex="--muted" data-theme="light">…</b> · Dark <b data-hex="--muted" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--muted</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--muted-foreground)"></span><span class="dark" style="background:var(--muted-foreground)"></span></span>
+<div><code>--muted-foreground</code><span class="role">Secondary and help text</span><span class="hexes">Light <b data-hex="--muted-foreground" data-theme="light">…</b> · Dark <b data-hex="--muted-foreground" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--muted-foreground</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--border)"></span><span class="dark" style="background:var(--border)"></span></span>
+<div><code>--border</code><span class="role">1 px panel boundaries</span><span class="hexes">Light <b data-hex="--border" data-theme="light">…</b> · Dark <b data-hex="--border" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--border</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--input)"></span><span class="dark" style="background:var(--input)"></span></span>
+<div><code>--input</code><span class="role">Control boundaries</span><span class="hexes">Light <b data-hex="--input" data-theme="light">…</b> · Dark <b data-hex="--input" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--input</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--line-subtle)"></span><span class="dark" style="background:var(--line-subtle)"></span></span>
+<div><code>--line-subtle</code><span class="role">Row dividers inside a panel</span><span class="hexes">Light <b data-hex="--line-subtle" data-theme="light">…</b> · Dark <b data-hex="--line-subtle" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--text-strong)"></span><span class="dark" style="background:var(--text-strong)"></span></span>
+<div><code>--text-strong</code><span class="role">Emphasis inside muted text</span><span class="hexes">Light <b data-hex="--text-strong" data-theme="light">…</b> · Dark <b data-hex="--text-strong" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--text-muted)"></span><span class="dark" style="background:var(--text-muted)"></span></span>
+<div><code>--text-muted</code><span class="role">Decorative or redundant metadata only</span><span class="hexes">Light <b data-hex="--text-muted" data-theme="light">…</b> · Dark <b data-hex="--text-muted" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--sidebar)"></span><span class="dark" style="background:var(--sidebar)"></span></span>
+<div><code>--sidebar</code><span class="role">Navigation surface</span><span class="hexes">Light <b data-hex="--sidebar" data-theme="light">…</b> · Dark <b data-hex="--sidebar" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--sidebar</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--overlay)"></span><span class="dark" style="background:var(--overlay)"></span></span>
+<div><code>--overlay</code><span class="role">Backdrop behind a Dialog or Sheet</span><span class="hexes">Light <b data-hex="--overlay" data-theme="light">…</b> · Dark <b data-hex="--overlay" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+</div>
+<h3>Accent family</h3>
+<p class="lead">Derived from <code>--theme-accent</code> with <code>color-mix()</code> in oklab: towards white for tints and lines, towards <code>#111111</code> for dark-mode tints, towards <code>#888888</code> for the secondary shade.</p>
+<div class="swatches">
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-strong)"></span><span class="dark" style="background:var(--accent-strong)"></span></span>
+<div><code>--accent-strong</code><span class="role">The accent itself, from <code>--theme-accent</code></span><span class="hexes">Light <b data-hex="--accent-strong" data-theme="light">…</b> · Dark <b data-hex="--accent-strong" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-secondary)"></span><span class="dark" style="background:var(--accent-secondary)"></span></span>
+<div><code>--accent-secondary</code><span class="role">Secondary accent marks</span><span class="hexes">Light <b data-hex="--accent-secondary" data-theme="light">…</b> · Dark <b data-hex="--accent-secondary" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-text)"></span><span class="dark" style="background:var(--accent-text)"></span></span>
+<div><code>--accent-text</code><span class="role">Accent text on the background; contrast-checked</span><span class="hexes">Light <b data-hex="--accent-text" data-theme="light">…</b> · Dark <b data-hex="--accent-text" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-light)"></span><span class="dark" style="background:var(--accent-light)"></span></span>
+<div><code>--accent-light</code><span class="role">Second chart series, meters, bars</span><span class="hexes">Light <b data-hex="--accent-light" data-theme="light">…</b> · Dark <b data-hex="--accent-light" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--chart-2</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-tint)"></span><span class="dark" style="background:var(--accent-tint)"></span></span>
+<div><code>--accent-tint</code><span class="role">Selected item, keyterm highlight</span><span class="hexes">Light <b data-hex="--accent-tint" data-theme="light">…</b> · Dark <b data-hex="--accent-tint" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--accent</code>, <code>--sidebar-accent</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-tint-soft)"></span><span class="dark" style="background:var(--accent-tint-soft)"></span></span>
+<div><code>--accent-tint-soft</code><span class="role">Callouts, data-flow panel</span><span class="hexes">Light <b data-hex="--accent-tint-soft" data-theme="light">…</b> · Dark <b data-hex="--accent-tint-soft" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-tint-strong)"></span><span class="dark" style="background:var(--accent-tint-strong)"></span></span>
+<div><code>--accent-tint-strong</code><span class="role">Pressed state on a tint</span><span class="hexes">Light <b data-hex="--accent-tint-strong" data-theme="light">…</b> · Dark <b data-hex="--accent-tint-strong" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-line)"></span><span class="dark" style="background:var(--accent-line)"></span></span>
+<div><code>--accent-line</code><span class="role">Border of a tinted panel</span><span class="hexes">Light <b data-hex="--accent-line" data-theme="light">…</b> · Dark <b data-hex="--accent-line" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-line-strong)"></span><span class="dark" style="background:var(--accent-line-strong)"></span></span>
+<div><code>--accent-line-strong</code><span class="role">Avatar ring, stronger tinted border</span><span class="hexes">Light <b data-hex="--accent-line-strong" data-theme="light">…</b> · Dark <b data-hex="--accent-line-strong" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-line-control)"></span><span class="dark" style="background:var(--accent-line-control)"></span></span>
+<div><code>--accent-line-control</code><span class="role">Border of a selected pill or Keep</span><span class="hexes">Light <b data-hex="--accent-line-control" data-theme="light">…</b> · Dark <b data-hex="--accent-line-control" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-deep)"></span><span class="dark" style="background:var(--accent-deep)"></span></span>
+<div><code>--accent-deep</code><span class="role">Text on a strong tint</span><span class="hexes">Light <b data-hex="--accent-deep" data-theme="light">…</b> · Dark <b data-hex="--accent-deep" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--accent-foreground)"></span><span class="dark" style="background:var(--accent-foreground)"></span></span>
+<div><code>--accent-foreground</code><span class="role">Text on <code>--accent</code>; contrast-checked on card</span><span class="hexes">Light <b data-hex="--accent-foreground" data-theme="light">…</b> · Dark <b data-hex="--accent-foreground" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--accent-foreground</code>, <code>--sidebar-accent-foreground</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--ring)"></span><span class="dark" style="background:var(--ring)"></span></span>
+<div><code>--ring</code><span class="role">2 px focus outline, 2 px offset</span><span class="hexes">Light <b data-hex="--ring" data-theme="light">…</b> · Dark <b data-hex="--ring" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--ring</code>, <code>--sidebar-ring</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--chart-1)"></span><span class="dark" style="background:var(--chart-1)"></span></span>
+<div><code>--chart-1</code><span class="role">First chart series</span><span class="hexes">Light <b data-hex="--chart-1" data-theme="light">…</b> · Dark <b data-hex="--chart-1" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--chart-1</code></span></div>
+</div>
+</div>
+<h3>Primary</h3>
+<p class="lead">Derived from <code>--theme-primary</code>. Dark mode uses 4 percent of the button colour in white, so the main action stays near-white with a hint of its hue.</p>
+<div class="swatches">
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--primary)"></span><span class="dark" style="background:var(--primary)"></span></span>
+<div><code>--primary</code><span class="role">The one main action, from <code>--theme-primary</code></span><span class="hexes">Light <b data-hex="--primary" data-theme="light">…</b> · Dark <b data-hex="--primary" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--primary</code>, <code>--sidebar-primary</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--primary-hover)"></span><span class="dark" style="background:var(--primary-hover)"></span></span>
+<div><code>--primary-hover</code><span class="role">Main action on hover</span><span class="hexes">Light <b data-hex="--primary-hover" data-theme="light">…</b> · Dark <b data-hex="--primary-hover" data-theme="dark">…</b></span><span class="shadcn">shadcn: mtxt only</span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--primary-foreground)"></span><span class="dark" style="background:var(--primary-foreground)"></span></span>
+<div><code>--primary-foreground</code><span class="role">Text on the main action; contrast-checked</span><span class="hexes">Light <b data-hex="--primary-foreground" data-theme="light">…</b> · Dark <b data-hex="--primary-foreground" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--primary-foreground</code></span></div>
+</div>
+</div>
+<h3>Warning</h3>
+<p class="lead">One hue, fixed: <code>#ad5437</code> in light mode and <code>#d4876a</code> in dark mode, where filled buttons get <code>#111111</code> text. Always with a word and an icon.</p>
+<div class="swatches">
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--destructive)"></span><span class="dark" style="background:var(--destructive)"></span></span>
+<div><code>--destructive</code><span class="role">Warning text and destructive action</span><span class="hexes">Light <b data-hex="--destructive" data-theme="light">…</b> · Dark <b data-hex="--destructive" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--destructive</code></span></div>
+</div>
+<div class="swatch">
+<span class="chip" aria-hidden="true"><span class="light" style="background:var(--destructive-foreground)"></span><span class="dark" style="background:var(--destructive-foreground)"></span></span>
+<div><code>--destructive-foreground</code><span class="role">Text on a filled destructive button</span><span class="hexes">Light <b data-hex="--destructive-foreground" data-theme="light">…</b> · Dark <b data-hex="--destructive-foreground" data-theme="dark">…</b></span><span class="shadcn">shadcn: <code>--destructive-foreground</code></span></div>
+</div>
+</div>
+</section>
+<section class="g-section" id="try" aria-labelledby="h-try">
+<h2 id="h-try">3. Try your colours</h2>
+<p class="lead">This panel is the Theme setting from <a href="../spec.md">the spec</a>. It starts from the values the page already has, from tokens.css or set by the install, and sets <code>--theme-accent</code> and <code>--theme-primary</code> on the page, so every swatch and sample here follows. A value that fails 4.5:1 is refused, as it is in the app. A link can preset values: <code>?accent=%234a6382&amp;primary=%23111111</code>.</p>
+<div class="try">
+<div class="try-inputs">
+<div class="field">
+<label for="try-accent">Accent colour</label>
+<span class="color-field"><input type="color" id="try-accent"><span class="hex" id="try-accent-hex">…</span></span>
+</div>
+<div class="field">
+<label for="try-primary">Button colour</label>
+<span class="color-field"><input type="color" id="try-primary"><span class="hex" id="try-primary-hex">…</span></span>
+</div>
+<button type="button" class="btn" id="try-reset">Reset to defaults</button>
+</div>
+<p class="try-status" id="try-status" role="status" aria-live="polite"></p>
+<table class="contrast">
+<caption class="small muted" style="text-align:left;margin-bottom:8px">Contrast of the last value tried, in both themes. 4.5:1 is the floor.</caption>
+<thead><tr><th scope="col">Pair</th><th scope="col">Light</th><th scope="col">Dark</th></tr></thead>
+<tbody id="try-contrast">
+<tr data-fg="--accent-text" data-bg="--background"><th scope="row">Accent text on background</th><td data-theme="light">…</td><td data-theme="dark">…</td></tr>
+<tr data-fg="--primary-foreground" data-bg="--primary"><th scope="row">Primary foreground on primary</th><td data-theme="light">…</td><td data-theme="dark">…</td></tr>
+<tr data-fg="--accent-foreground" data-bg="--card"><th scope="row">Accent on card</th><td data-theme="light">…</td><td data-theme="dark">…</td></tr>
+</tbody>
+</table>
+<div class="g-prose"><h3 style="margin:0">Derived tints and lines</h3></div>
+<div class="strip light" style="background:var(--background);color:var(--foreground);padding:12px;border-radius:var(--radius-card);border:1px solid var(--border)">
+<div><span style="--swatch:var(--accent-strong)"></span><code>strong</code><span data-hex="--accent-strong" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-secondary)"></span><code>secondary</code><span data-hex="--accent-secondary" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-text)"></span><code>text</code><span data-hex="--accent-text" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-light)"></span><code>light</code><span data-hex="--accent-light" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-tint)"></span><code>tint</code><span data-hex="--accent-tint" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-tint-soft)"></span><code>tint-soft</code><span data-hex="--accent-tint-soft" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-tint-strong)"></span><code>tint-strong</code><span data-hex="--accent-tint-strong" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-line)"></span><code>line</code><span data-hex="--accent-line" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-line-strong)"></span><code>line-strong</code><span data-hex="--accent-line-strong" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-line-control)"></span><code>line-control</code><span data-hex="--accent-line-control" data-theme="light">…</span></div>
+<div><span style="--swatch:var(--accent-deep)"></span><code>deep</code><span data-hex="--accent-deep" data-theme="light">…</span></div>
+</div>
+<div class="strip dark" style="background:var(--background);color:var(--foreground);padding:12px;border-radius:var(--radius-card);border:1px solid var(--border)">
+<div><span style="--swatch:var(--accent-strong)"></span><code>strong</code><span data-hex="--accent-strong" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-secondary)"></span><code>secondary</code><span data-hex="--accent-secondary" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-text)"></span><code>text</code><span data-hex="--accent-text" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-light)"></span><code>light</code><span data-hex="--accent-light" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-tint)"></span><code>tint</code><span data-hex="--accent-tint" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-tint-soft)"></span><code>tint-soft</code><span data-hex="--accent-tint-soft" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-tint-strong)"></span><code>tint-strong</code><span data-hex="--accent-tint-strong" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-line)"></span><code>line</code><span data-hex="--accent-line" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-line-strong)"></span><code>line-strong</code><span data-hex="--accent-line-strong" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-line-control)"></span><code>line-control</code><span data-hex="--accent-line-control" data-theme="dark">…</span></div>
+<div><span style="--swatch:var(--accent-deep)"></span><code>deep</code><span data-hex="--accent-deep" data-theme="dark">…</span></div>
+</div>
+<div class="theme-preview">
+<span class="label">Preview</span>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+<button type="button" class="pill" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
+<button type="button" class="toggle" aria-pressed="true" data-i18n-attr="aria-label:recorder.live" aria-label="Live transcript"></button>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span>
+<span class="badge soft"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span>
+<span class="mention">@Anne Holm</span>
+<a href="#try" class="accent-fg" style="text-decoration:underline;text-underline-offset:4px"><span data-i18n="library.showMore">Show more meetings</span></a>
+</div>
+</div>
+</section>
+<section class="g-section" id="typography" aria-labelledby="h-typography">
+<h2 id="h-typography">4. Typography</h2>
+<p class="lead">Mona Sans is the only face, variable weight: 400 body, 550 controls, 650 headings. The app root is 16 px; browser zoom enlarges everything.</p>
+<table class="type-table">
+<thead><tr><th scope="col">Role</th><th scope="col">Sample</th><th scope="col">Size · line · tracking · weight</th></tr></thead>
+<tbody>
+<tr><td class="meta">Caption / metadata</td><td style="font-size:12px;line-height:1.5;letter-spacing:0;font-weight:400">22 Oct 2026 · 42 min · 4 speakers</td><td class="meta">12 px · 1.5 · 0 · 400</td></tr>
+<tr><td class="meta">Control / secondary label</td><td style="font-size:14px;line-height:1.5;letter-spacing:0;font-weight:550">Upload audio</td><td class="meta">14 px · 1.5 · 0 · 550</td></tr>
+<tr><td class="meta">App body / transcript</td><td style="font-size:16px;line-height:1.65;letter-spacing:-0.01em;font-weight:400">We reached 240 units yesterday. The new shift still needs a test before the plan changes.</td><td class="meta">16 px · 1.65 · -0.01em · 400</td></tr>
+<tr><td class="meta">Marketing body</td><td style="font-size:18px;line-height:1.7;letter-spacing:-0.01em;font-weight:400">A small recorder on each computer captures the microphone and system audio.</td><td class="meta">18 px · 1.7 · -0.01em · 400</td></tr>
+<tr><td class="meta">Panel heading</td><td style="font-size:20px;line-height:1.3;letter-spacing:-0.03em;font-weight:650">Recap template</td><td class="meta">20 px · 1.3 · -0.03em · 650</td></tr>
+<tr><td class="meta">Mobile page heading</td><td style="font-size:24px;line-height:1.2;letter-spacing:-0.03em;font-weight:650">My meetings</td><td class="meta">24 px · 1.2 · -0.03em · 650</td></tr>
+<tr><td class="meta">Desktop page heading</td><td style="font-size:32px;line-height:1.15;letter-spacing:-0.04em;font-weight:650">My meetings</td><td class="meta">32 px · 1.15 · -0.04em · 650</td></tr>
+<tr><td class="meta">Marketing display</td><td style="font-size:56px;line-height:1.06;letter-spacing:-0.055em;font-weight:650">Good meetings deserve a better memory.</td><td class="meta">56 px · 1.06 · -0.055em · 650</td></tr>
+</tbody>
+</table>
+<h3>Tabular numerals</h3>
+<p class="lead">Timestamps, dates, durations and meters use <code>font-variant-numeric: tabular-nums</code> so columns do not jitter.</p>
+<div class="nums">
+<div><small>Proportional</small>00:18<br>11:11<br>42:06</div>
+<div style="font-variant-numeric:tabular-nums"><small>Tabular</small>00:18<br>11:11<br>42:06</div>
+</div>
+</section>
+<section class="g-section" id="spacing" aria-labelledby="h-spacing">
+<h2 id="h-spacing">5. Spacing and shape</h2>
+<p class="lead">Everything sits on a 4 px grid. One reading width per page, set on the page container; no block sets its own prose width.</p>
+<h3>Space tokens</h3>
+<div class="space-row"><code>--space-1</code><span class="small muted">4 px</span><span style="width:var(--space-1)"></span></div>
+<div class="space-row"><code>--space-2</code><span class="small muted">8 px</span><span style="width:var(--space-2)"></span></div>
+<div class="space-row"><code>--space-3</code><span class="small muted">12 px</span><span style="width:var(--space-3)"></span></div>
+<div class="space-row"><code>--space-4</code><span class="small muted">16 px</span><span style="width:var(--space-4)"></span></div>
+<div class="space-row"><code>--space-5</code><span class="small muted">20 px</span><span style="width:var(--space-5)"></span></div>
+<div class="space-row"><code>--space-6</code><span class="small muted">24 px</span><span style="width:var(--space-6)"></span></div>
+<div class="space-row"><code>--space-8</code><span class="small muted">32 px</span><span style="width:var(--space-8)"></span></div>
+<div class="space-row"><code>--space-10</code><span class="small muted">40 px</span><span style="width:var(--space-10)"></span></div>
+<div class="space-row"><code>--space-12</code><span class="small muted">48 px</span><span style="width:var(--space-12)"></span></div>
+<div class="space-row"><code>--space-16</code><span class="small muted">64 px</span><span style="width:var(--space-16)"></span></div>
+<h3>Radius</h3>
+<div class="shapes">
+<div class="shape" style="border-radius:var(--radius-control)"><span><code>--radius-control</code><br>0.6rem · inputs, secondary buttons</span></div>
+<div class="shape" style="border-radius:var(--radius-card)"><span><code>--radius-card</code><br>0.75rem · lists, cards</span></div>
+<div class="shape" style="border-radius:var(--radius-panel)"><span><code>--radius-panel</code><br>1rem · editor, login, native windows</span></div>
+<div class="shape" style="border-radius:var(--radius-pill)"><span><code>--radius-pill</code><br>2rem · pills, badges, primary</span></div>
+</div>
+<h3>Control heights</h3>
+<div class="heights">
+<div style="height:40px">40 px · desktop control</div>
+<div style="height:44px">44 px · touch target, phone</div>
+<div style="height:36px">36 px · filter pill, desktop</div>
+<div style="height:28px">28 px · editor toolbar</div>
+</div>
+<h3>Floating shadow</h3>
+<p class="lead"><code>--floating-shadow</code> is for native floating windows only: the recorder and the live transcript. Web panels use a 1 px border.</p>
+<div class="shadow-sample">Floating window</div>
+</section>
+<section class="g-section" id="components" aria-labelledby="h-components">
+<h2 id="h-components">6. Components</h2>
+<p class="lead">Real samples with the mockup CSS. In the app each is the shadcn/ui component named in the <a href="README.md">README</a> inventory, styled by the same tokens.</p>
+<div class="components">
+<div class="component wide">
+<h3>Buttons</h3>
+<div class="sample"><button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+<button type="button" class="btn primary is-hover"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+<button type="button" class="btn primary" disabled><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
+<button type="button" class="btn is-hover"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
+<button type="button" class="btn" disabled><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
+<button type="button" class="btn quiet"><span data-i18n="library.empty.noMatch.reset">Reset filters</span></button>
+<button type="button" class="btn quiet is-hover"><span data-i18n="library.empty.noMatch.reset">Reset filters</span></button></div>
+<p class="rule">Primary, secondary and quiet, each at rest, hovered and disabled. One primary per screen; a loading button keeps its label.</p>
+</div>
+<div class="component">
+<h3>Filter pills</h3>
+<div class="sample"><button type="button" class="pill" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
+<button type="button" class="pill" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
+<button type="button" class="pill" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="6">6</span></button></div>
+<p class="rule">Independent filters use <code>aria-pressed</code>; pressed is the accent tint with a count.</p>
+</div>
+<div class="component">
+<h3>Badges</h3>
+<div class="sample"><span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg><span data-i18n="visibility.private">Private</span></span>
+<span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="visibility.shared">Shared</span></span>
+<span class="badge"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="visibility.company">Company</span></span>
+<span class="state muted"><span class="dot"></span><span data-i18n="status.transcribing">Transcribing</span></span>
+<span class="state accent-fg"><span class="dot"></span><span data-i18n="status.ready">Ready</span></span></div>
+<p class="rule">Visibility is a word with an icon; processing state is a word with a dot. Colour never stands alone.</p>
+</div>
+<div class="component">
+<h3>Input</h3>
+<div class="sample block"><label class="field">
+<span data-i18n="settings.productName.field">Name</span>
+<input type="text" value="Primux Møder" lang="da" aria-describedby="g-help-1">
+<small data-i18n="settings.productName.help" id="g-help-1">The name on the login page, in the recorder and in the menu bar.</small>
+</label>
+<label class="field invalid">
+<span data-i18n="settings.productName.field">Name</span>
+<input type="text" value="" aria-invalid="true" aria-describedby="g-err-1">
+<small class="error" id="g-err-1"><svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg><span data-i18n="settings.productName.required">Enter a product name. It appears on the login page and in the recorder.</span></small>
+</label></div>
+<p class="rule">A persistent label above, help text below, the error at the field in the warning colour with an icon. What was typed stays.</p>
+</div>
+<div class="component">
+<h3>Select</h3>
+<div class="sample block"><label class="field">
+<span data-i18n="settings.defaults.visibility">Visibility for new meetings</span>
+<select>
+<option data-i18n="visibility.private">Private</option>
+<option data-i18n="settings.defaults.visibilityShared">Shared with chosen colleagues</option>
+<option data-i18n="settings.defaults.visibilityCompany">Whole company</option>
+</select>
+<small data-i18n="settings.defaults.visibilityHelp">Only the meeting owner can change visibility.</small>
+</label></div>
+<p class="rule">Native select styled as an input. Option labels go through the locale files.</p>
+</div>
+<div class="component">
+<h3>Toggle</h3>
+<div class="sample block"><div class="setting-toggle">
+<div><p data-i18n="settings.mcp.server">MCP server</p><small data-i18n="settings.mcp.serverHelp">Permitted meetings only. Reads and changes are logged.</small></div>
+<button class="toggle" type="button" aria-pressed="true" data-i18n-attr="aria-label:settings.mcp.server" aria-label="MCP server"></button>
+</div>
+<div class="setting-toggle">
+<div><p data-i18n="settings.defaults.liveDefault">Live transcript by default</p><small data-i18n="settings.defaults.liveDefaultHelp">Off. The local text is only a preview.</small></div>
+<button class="toggle" type="button" aria-pressed="false" data-i18n-attr="aria-label:settings.defaults.liveDefault" aria-label="Live transcript by default"></button>
+</div></div>
+<p class="rule">A button with <code>aria-pressed</code> and a visible text label beside it. On is the accent fill.</p>
+</div>
+<div class="component">
+<h3>Avatar</h3>
+<div class="sample"><span class="avatar" aria-hidden="true">ML</span>
+<span class="avatar" aria-hidden="true">JS</span>
+<button type="button" class="speaker" data-i18n-attr="aria-label:transcript.speaker.rename" data-i18n-args='{"name":"Anne Holm"}' aria-label="Anne Holm, rename or link to a colleague"><span class="avatar" aria-hidden="true">AH</span>Anne Holm</button></div>
+<p class="rule">Initials on the accent tint. A speaker label is a button that renames or links a colleague.</p>
+</div>
+<div class="component">
+<h3>Tabs</h3>
+<div class="sample block"><div style="width:100%">
+<div class="tablist" role="tablist" data-i18n-attr="aria-label:meeting.tabs.label" aria-label="Meeting content">
+<button type="button" role="tab" id="g-tab-recap" aria-selected="true" aria-controls="g-panel-recap"><span data-i18n="meeting.tabs.recap">Recap</span></button>
+<button type="button" role="tab" id="g-tab-transcript" aria-selected="false" aria-controls="g-panel-transcript" tabindex="-1"><span data-i18n="meeting.tabs.transcript">Transcript</span><span class="count" data-i18n-dur="2526">42:06</span></button>
+</div>
+<div id="g-panel-recap" role="tabpanel" aria-labelledby="g-tab-recap" tabindex="0" class="small">The recap panel. Arrow keys move between tabs; Home and End jump.</div>
+<div id="g-panel-transcript" role="tabpanel" aria-labelledby="g-tab-transcript" tabindex="0" class="small" hidden>The transcript panel. Tab moves into the panel.</div>
+</div></div>
+<p class="rule">Exclusive panels with the full keyboard tab pattern. The selected tab has the accent underline.</p>
+</div>
+<div class="component">
+<h3>Callout</h3>
+<div class="sample"><div class="callout" style="width:100%"><svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg><p>Capacity goes up only after Thursday's test passes.</p></div></div>
+<p class="rule">A recap note block: soft tint, accent line, info icon. Warning callouts use the warning icon and a word, not a red fill.</p>
+</div>
+<div class="component">
+<h3>Table</h3>
+<div class="sample block"><table class="recap-table" style="margin:0">
+<thead><tr><th scope="col">Task</th><th scope="col">Owner</th><th scope="col">Due</th></tr></thead>
+<tbody><tr><td>Shift test</td><td>Søren</td><td>22 Oct</td></tr><tr><td>Update the week plan</td><td>Anne</td><td>23 Oct</td></tr></tbody>
+</table></div>
+<p class="rule">Semantic column headers. A wide table scrolls inside itself, never the page.</p>
+</div>
+<div class="component wide">
+<h3>Empty states</h3>
+<div class="sample block"><div class="empties">
+<div class="empty"><div><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><h2 data-i18n="library.empty.first.title">No meetings yet</h2><p data-i18n="library.empty.first.body">Record a meeting with the desktop recorder or upload an audio file. It stays private until you share it.</p><div class="actions"><button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="library.empty.first.download">Download the recorder</span></button><button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.empty.first.upload">Upload a file</span></button></div></div></div>
+<div class="empty"><div><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><h2 data-i18n="library.empty.noMatch.title">No meetings match</h2><p data-i18n="library.empty.noMatch.body">No meeting matches the search and filters.</p><button type="button" class="btn"><span data-i18n="library.empty.noMatch.reset">Reset filters</span></button></div></div>
+<div class="empty"><div><span class="warn"><svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg></span><h2 data-i18n="library.empty.failed.title">Could not load meetings</h2><p data-i18n="library.empty.failed.body">The library did not load. Check the connection and try again.</p><button type="button" class="btn"><span data-i18n="library.empty.failed.retry">Try again</span></button></div></div>
+</div></div>
+<p class="rule">Behaviour rule 8: first use, no matches and a failed fetch each look different. A failure never looks like an empty account.</p>
+</div>
+<div class="component wide">
+<h3>Dialog</h3>
+<div class="sample block"><div class="overlay-sample"><div class="dialog-sample" role="dialog" aria-modal="false" aria-labelledby="g-dialog-title">
+<header><h4 data-i18n="speaker.rename.title" id="g-dialog-title">Rename speaker</h4><button type="button" class="btn quiet icon-only" data-i18n-attr="aria-label:common.close" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></header>
+<div class="body"><label class="field"><span data-i18n="speaker.rename.field">Name</span><input type="text" value="Søren Bak"><small data-i18n="speaker.rename.help">The new name applies to every line from this speaker in this meeting.</small></label></div>
+<footer><button type="button" class="btn"><span data-i18n="common.cancel">Cancel</span></button><button type="button" class="btn primary"><span data-i18n="common.save">Save</span></button></footer>
+</div></div></div>
+<p class="rule">A title that names the action, a close button, Escape to close, focus on the first field, focus back on the opener when it closes. The primary button is on the right; a destructive confirmation names what goes, for example "Delete the meeting, 2 recordings and the recap permanently".</p>
+</div>
+</div>
+</section>
+<section class="g-section" id="icons" aria-labelledby="h-icons">
+<h2 id="h-icons">7. Icons and motion</h2>
+<p class="lead">Lucide at 20 px with a 1.5 px stroke, 16 px for small metadata. Icons inherit the text colour. The mockups carry a small inline symbol set in the same style, with no remote dependency.</p>
+<div class="icons">
+<div><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><code>meetings</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><code>shared</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><code>building</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><code>settings</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><code>search</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><code>plus</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><code>upload</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-lock"></use></svg><code>lock</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><code>check</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg><code>chevron</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg><code>arrow</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg><code>pin</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg><code>download</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg><code>play</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg><code>pause</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg><code>edit</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg><code>info</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg><code>mic</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg><code>monitor</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg><code>network</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg><code>warning</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-hide"></use></svg><code>hide</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-video"></use></svg><code>video</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg><code>menu</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg><code>close</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-link"></use></svg><code>link</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-heading"></use></svg><code>heading</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg><code>list</code></div>
+<div><svg class="icon" aria-hidden="true"><use href="#i-undo"></use></svg><code>undo</code></div>
+</div>
+<h3>Motion</h3>
+<div class="g-prose">
+<p>State changes use <code>--motion-duration</code> (150 ms) with <code>ease-out</code> for background, colour and border. Hover the buttons below. Layout, list updates, transcript scrolling and audio activity are not animated.</p>
+<p>Under <code>prefers-reduced-motion: reduce</code>, tokens.css sets the duration to 0 and removes every transition and animation. Nothing waits for an animation to finish.</p>
+</div>
+<div class="motion-demo" style="margin-top:16px">
+<button type="button" class="btn"><span data-i18n="library.uploadAudio">Upload audio</span></button>
+<button type="button" class="btn primary"><span data-i18n="library.newMeeting">New meeting</span></button>
+<button type="button" class="pill" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
+</div>
+</section>
+<section class="g-section" id="writing" aria-labelledby="h-writing">
+<h2 id="h-writing">8. Writing in the interface</h2>
+<p class="lead">English is the source of every string; Danish is the first translation. The rules below hold in both.</p>
+<div class="g-prose">
+<ul>
+<li>Sentence case everywhere: "New meeting", not "New Meeting".</li>
+<li>No exclamation marks.</li>
+<li>Buttons are verbs: "Upload audio", "Rename speaker", "Export", "Try again".</li>
+<li>State words are short and fixed: "Saving", "Saved", "Not saved"; "Transcribing", "Ready"; "Waiting for network".</li>
+<li>An error says what happened and the next step: "Could not load meetings" with "Try again"; "The server rejected the file · Contact your admin".</li>
+<li>A thing has one name on every screen: a meeting is a meeting, never a session or a recording.</li>
+</ul>
+</div>
+<h3>Examples</h3>
+<table class="dodont">
+<thead><tr><th scope="col">Write</th><th scope="col">Not</th></tr></thead>
+<tbody>
+<tr><td>Upload audio</td><td>Audio Upload</td></tr>
+<tr><td>Not saved</td><td>Oops! Something went wrong</td></tr>
+<tr><td>Could not load meetings · Try again</td><td>Error 503</td></tr>
+<tr><td>Delete the meeting, 2 recordings and the recap permanently</td><td>Are you sure?</td></tr>
+</tbody>
+</table>
+<h3>Translation</h3>
+<div class="g-prose">
+<p>Strings live in locale files, one set per app, with flat keys namespaced by screen or component: <code>nav.myMeetings</code>, <code>library.search.placeholder</code>, <code>meeting.tabs.recap</code>, <code>recorder.queue.pendingNetwork</code>. The first two are <a href="locales/en.json">locales/en.json</a> and <a href="locales/da.json">locales/da.json</a>.</p>
+<p>Never build a sentence from pieces. Counts and names go in as arguments, in ICU message syntax, so each language can order and inflect them:</p>
+</div>
+<pre class="code">"library.showing": "Showing {shown} of {total, plural, one {# meeting} other {# meetings}}"
+"library.showing": "Viser {shown} af {total, plural, one {# møde} other {# møder}}"</pre>
+<div class="g-prose" style="margin-top:12px">
+<p>Dates, times, durations and lists go through the locale: "22 Oct 2026" and "22. okt. 2026", "09:00" and "09.00", "42 min" and "42 min.", "Mette, Jonas and Søren" and "Mette, Jonas og Søren".</p>
+<p>Names, meeting titles, transcript text, recap content and keyterms are data, not interface. They are never translated, and they carry their own <code>lang</code> attribute.</p>
+</div>
+</section>
+<section class="g-section" id="behaviour" aria-labelledby="h-behaviour">
+<h2 id="h-behaviour">9. Behaviour rules</h2>
+<p class="lead">The 13 rules from <a href="behaviour.md">behaviour.md</a>, one line each. The file holds the checks.</p>
+<ol class="rules">
+<li><b>1</b><span>Autosave, never a Save button as the safety net. The editor says Saving, Saved or Not saved.</span></li>
+<li><b>2</b><span>Small changes show at once and roll back with a reason when the server refuses.</span></li>
+<li><b>3</b><span>Archive is not delete. Delete names its consequence; retention is announced a week ahead.</span></li>
+<li><b>4</b><span>Two people do not overwrite each other. A stale window says Changed elsewhere · Reload.</span></li>
+<li><b>5</b><span>A link keeps the view: filters, search, page and transcript position live in the URL.</span></li>
+<li><b>6</b><span>Lists have an end and a count. Loading, failure, count and end of list are visible states.</span></li>
+<li><b>7</b><span>One way of working across screens. Search, filters, rows and errors are built once.</span></li>
+<li><b>8</b><span>Empty is three different states: first use, no matches, failed fetch.</span></li>
+<li><b>9</b><span>An error says what to do, at the field and with the next step.</span></li>
+<li><b>10</b><span>One thing per screen asks for attention: one primary button.</span></li>
+<li><b>11</b><span>Keyboard and focus. Real controls, a visible ring, dialogs that trap and return focus.</span></li>
+<li><b>12</b><span>Motion is short and optional: 150 ms, none under reduced motion.</span></li>
+<li><b>13</b><span>Real data breaks pretty layouts. Test 4-hour meetings, 14 speakers, 120-character titles.</span></li>
+</ol>
+<h3>Definition of done for a screen</h3>
+<div class="g-prose"><ul>
+<li>Which of rules 1 to 13 apply, and the check that was run for each.</li>
+<li>A screenshot at 1280 px and at 390 px on the real build.</li>
+<li>A keyboard-only walk through the screen's main task.</li>
+<li>The three empty states wherever a list is involved.</li>
+</ul></div>
+</section>
+<section class="g-section" id="checklist" aria-labelledby="h-checklist">
+<h2 id="h-checklist">10. Checklist</h2>
+<p class="lead">A screen is accepted when every line holds.</p>
+<ul class="checklist">
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>Tokens only: no literal colour in a component; every colour is a variable from tokens.css.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>Both themes look right, light and dark.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>Screenshots at 1280 px and at 390 px.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>A keyboard-only walk through the main task, with a visible focus ring all the way.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>Usable at 200 percent browser zoom.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>The three empty states where a list is involved.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>Every string comes from the locale files, in English and Danish; no string in a component.</span></li>
+<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>The behaviour rules that apply are named, and each was checked on the running app.</span></li>
+</ul>
+</section>
+<footer class="footnote">Mona Sans is bundled locally under the SIL Open Font License 1.1; see <a href="fonts/LICENSE-mona-sans.txt">fonts/LICENSE-mona-sans.txt</a>. Nothing on this page loads from the network.</footer>
+</main>
+<script>
+const root = document.documentElement;
+// The reset target only. On load the panel starts from the live values on :root.
+const DEFAULTS = { accent: '#566b45', primary: '#111111' };
+const probes = { light: document.querySelector('#probe-light'), dark: document.querySelector('#probe-dark') };
+
+// Computed colours to hex by arithmetic, not through a canvas, so alpha is not premultiplied
+// and a translucent token such as --overlay keeps its own alpha. Covers rgb(), rgba(), color(srgb ...), oklab() and oklch().
+const channel = (v, scale) => v === 'none' ? 0 : v.endsWith('%') ? parseFloat(v) / 100 * scale : parseFloat(v);
+const encode = v => v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055;
+const fromOklab = (L, a, b) => {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s].map(encode);
+};
+const toHex = css => {
+  const match = css.trim().match(/^([a-z]+)\((.*)\)$/i);
+  if (!match) return css;
+  const parts = match[2].replace(/,/g, ' ').replace('/', ' / ').split(/\s+/).filter(Boolean);
+  const slash = parts.indexOf('/');
+  const ch = slash < 0 ? parts : parts.slice(0, slash);
+  let alpha = slash < 0 ? 1 : channel(parts[slash + 1], 1);
+  let rgb;
+  if (match[1] === 'rgb' || match[1] === 'rgba') { rgb = ch.slice(0, 3).map(v => channel(v, 255) / 255); if (ch[3] !== undefined) alpha = channel(ch[3], 1); }
+  else if (match[1] === 'color' && ch[0] === 'srgb') rgb = ch.slice(1, 4).map(v => channel(v, 1));
+  else if (match[1] === 'oklab') rgb = fromOklab(channel(ch[0], 1), channel(ch[1], 0.4), channel(ch[2], 0.4));
+  else if (match[1] === 'oklch') { const c = channel(ch[1], 0.4), hue = channel(ch[2], 1) * Math.PI / 180; rgb = fromOklab(channel(ch[0], 1), c * Math.cos(hue), c * Math.sin(hue)); }
+  else return css;
+  const bytes = rgb.map(v => Math.round(Math.min(1, Math.max(0, v)) * 255));
+  if (alpha < 1) bytes.push(Math.round(alpha * 255));
+  return '#' + bytes.map(v => v.toString(16).padStart(2, '0')).join('');
+};
+const resolve = (theme, name) => { probes[theme].style.backgroundColor = 'var(' + name + ')'; return toHex(getComputedStyle(probes[theme]).backgroundColor); };
+const live = name => { probes.light.style.backgroundColor = getComputedStyle(root).getPropertyValue(name).trim(); return toHex(getComputedStyle(probes.light).backgroundColor).slice(0, 7); };
+const lum = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+const show = r => (Math.floor(r * 10) / 10).toFixed(1) + ':1';
+const code = text => { const c = document.createElement('code'); c.textContent = text; return c; };
+const span = (className, ...content) => { const s = document.createElement('span'); s.className = className; s.append(...content); return s; };
+const status = document.querySelector('#try-status');
+let current = { accent: live('--theme-accent'), primary: live('--theme-primary') };
+const setInputs = v => {
+  for (const k of ['accent', 'primary']) { document.querySelector('#try-' + k).value = v[k]; document.querySelector('#try-' + k + '-hex').textContent = v[k]; }
+};
+const paintHexes = () => document.querySelectorAll('[data-hex]').forEach(el => { el.textContent = resolve(el.dataset.theme, el.dataset.hex); });
+const measure = () => {
+  const failures = [];
+  document.querySelectorAll('#try-contrast tr').forEach(tr => {
+    tr.querySelectorAll('td').forEach(td => {
+      const r = ratio(resolve(td.dataset.theme, tr.dataset.fg), resolve(td.dataset.theme, tr.dataset.bg));
+      td.textContent = show(r) + (r < 4.5 ? ' · fails' : '');
+      td.className = r < 4.5 ? 'fail' : '';
+      if (r < 4.5) failures.push({ r, pair: tr.querySelector('th').textContent.toLowerCase(), theme: td.dataset.theme });
+    });
+  });
+  return failures.sort((a, b) => a.r - b.r);
+};
+const showApplied = failures => {
+  if (failures.length) {
+    const f = failures[0];
+    status.replaceChildren(span('refused', 'Live values fail: contrast ' + show(f.r) + ', needs 4.5:1'), span('note', ' (' + f.pair + ', ' + f.theme + ' mode). Accent ', code(current.accent), ', button colour ', code(current.primary), '.'));
+  } else {
+    status.replaceChildren('Applied: accent ', code(current.accent), ', button colour ', code(current.primary), '. Every pair passes 4.5:1.');
+  }
+};
+const apply = next => {
+  root.style.setProperty('--theme-accent', next.accent);
+  root.style.setProperty('--theme-primary', next.primary);
+  const failures = measure();
+  if (failures.length) {
+    const f = failures[0];
+    const tried = next.accent !== current.accent ? next.accent : next.primary;
+    root.style.setProperty('--theme-accent', current.accent);
+    root.style.setProperty('--theme-primary', current.primary);
+    measure();
+    status.replaceChildren(span('refused', 'Refused: contrast ' + show(f.r) + ', needs 4.5:1'), span('note', ' (' + f.pair + ', ' + f.theme + ' mode). ', code(tried), ' was not applied; the page keeps ', code(tried === next.accent ? current.accent : current.primary), '.'));
+  } else {
+    current = { ...next };
+    showApplied([]);
+  }
+  setInputs(current);
+  paintHexes();
+};
+// Live picking: the input event gets the same check and rollback as change.
+for (const type of ['input', 'change']) {
+  document.querySelector('#try-accent').addEventListener(type, e => apply({ ...current, accent: e.target.value }));
+  document.querySelector('#try-primary').addEventListener(type, e => apply({ ...current, primary: e.target.value }));
+}
+document.querySelector('#try-reset').addEventListener('click', () => { current = { ...DEFAULTS }; apply({ ...DEFAULTS }); });
+
+const theme = document.querySelector('#theme');
+const setDark = dark => {
+  root.classList.toggle('dark', dark);
+  theme.setAttribute('aria-pressed', String(dark));
+  theme.textContent = dark ? 'Light theme' : 'Dark theme';
+};
+theme.addEventListener('click', () => setDark(!root.classList.contains('dark')));
+
+const params = new URLSearchParams(location.search);
+if (params.get('theme') === 'dark') setDark(true);
+const hexParam = name => { const v = params.get(name); return v && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null; };
+// A preset link applies its values over the live ones; without one the panel shows the live values.
+const init = () => {
+  if (hexParam('accent') || hexParam('primary')) apply({ accent: hexParam('accent') || current.accent, primary: hexParam('primary') || current.primary });
+  else { setInputs(current); showApplied(measure()); paintHexes(); }
+};
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(init); else init();
+
+document.querySelectorAll('[role=tablist]').forEach(list => {
+  const tabs = [...list.querySelectorAll('[role=tab]')];
+  const select = (tab, focus) => {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(tab, false));
+    tab.addEventListener('keydown', e => {
+      const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
+      if (step === undefined) return;
+      e.preventDefault();
+      select(tabs[(i + step + tabs.length) % tabs.length], true);
+    });
+  });
+});
+</script>
+</body>
+</html>

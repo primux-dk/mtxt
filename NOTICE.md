@@ -1,6 +1,8 @@
 # Third-party code and models
 
-None is bundled in this repository yet.
+Bundled:
+
+- **Mona Sans** (GitHub, SIL Open Font License 1.1): the product typeface, in `docs/design/fonts/`, copied unchanged. Licence: `docs/design/fonts/LICENSE-mona-sans.txt`.
 
 Planned, to be recorded here when they land:
 

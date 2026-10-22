@@ -9,6 +9,7 @@ Read `README.md` and `docs/spec.md` first. Kristian's source-available company m
 - **No Tiptap Pro.** The recap editor is `@tiptap/core` plus open extensions, rebuilt from the documented design. Tiptap's Notion-like template and Pro extensions are not allowed; they need a paid plan and a Pro licence.
 - **Meetings only.** No dictation, no hotkeys, no text insertion. Settled 2026-10-22; do not reopen it in code.
 - **The settings page is the whole admin surface.** If a setting is not in `docs/spec.md`, it does not exist. Add to the spec first, then to the code.
+- **Behaviour before polish.** `docs/design/behaviour.md` applies Kristian's 13 design traps to mtxt (autosave, optimistic updates with rollback, archive vs delete, URL state, three empty states, errors with a next step, keyboard and focus, reduced motion, hard fixture data). A screen's packet is done when its rules hold on the running app, with the checks listed there. `docs/design/README.md` and `tokens.css` hold the look.
 - **Private means private.** No code path lets an admin read a private meeting's segments or recap. Admin sees metadata and the audit log.
 
 ## Layout, once the build starts
