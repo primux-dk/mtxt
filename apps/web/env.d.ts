@@ -15,4 +15,7 @@ interface CloudflareEnv {
   OIDC_CLIENT_SECRET?: string;
   /** "1" turns on the e2e test sign-in, in an e2e build on localhost only. */
   AUTH_TEST_MODE?: string;
+  /** Test runs only (AUTH_TEST_MODE=1, localhost): the fake providers. See lib/stt/test-hooks.ts. */
+  ASSEMBLYAI_BASE_URL?: string;
+  WORKERS_AI_FAKE_URL?: string;
 }

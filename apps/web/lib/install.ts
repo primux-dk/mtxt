@@ -6,6 +6,7 @@ import {
   bootstrapIdentity,
   cloudflareAdapters,
   DEFAULT_SETTINGS,
+  ensureWebhookSecret,
   readSettings,
   refoldTemplateKeys,
   seal,
@@ -54,6 +55,21 @@ async function bootstrap(settings: Settings): Promise<boolean> {
 }
 
 /**
+ * The webhook secret the speech-to-text provider sends back
+ * (settings.webhook_secret) is made on the first request that finds none,
+ * sealed. The transcribe job makes it too, if it gets there first.
+ */
+async function bootstrapWebhookSecret(settings: Settings): Promise<boolean> {
+  if (settings.webhookSecret) return false;
+  const env = await getEnv();
+  const key = env.SETTINGS_KEY;
+  if (!key) return false;
+  const { db, installId } = await getAdapters();
+  await ensureWebhookSecret(db, installId, (plain) => seal(plain, 'settings.webhook_secret', key));
+  return true;
+}
+
+/**
  * Template keys from migration 0002 are folded on the first request a Worker
  * isolate serves (lib: refoldTemplateKeys, idempotent). Once per isolate, so
  * later requests pay nothing.
@@ -91,7 +107,8 @@ export const getInstallSettings = cache(async (): Promise<Settings> => {
   try {
     const settings = await readSettings(db, installId);
     await Promise.all([refoldOnce(db, installId), foldTitlesOnce(db, installId)]);
-    return (await bootstrap(settings)) ? await readSettings(db, installId) : settings;
+    const changed = [await bootstrap(settings), await bootstrapWebhookSecret(settings)];
+    return changed.some(Boolean) ? await readSettings(db, installId) : settings;
   } catch (error) {
     // Most likely a fresh checkout: the local database has no tables yet.
     const reason = error instanceof Error ? (error.cause ?? error).toString() : String(error);

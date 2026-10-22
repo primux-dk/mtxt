@@ -1,0 +1,1221 @@
+{
+  "id": "fixture-transcript",
+  "status": "completed",
+  "language_code": "da",
+  "speech_model_used": "universal-3-pro",
+  "audio_duration": 72,
+  "text": "Så er vi samlet. Lad os begynde med kapaciteten på linje 2. Jonas, hvor står vi med testen? Vi nåede de 240 enheder i går. Vi mangler stadig at teste det nye skift, før vi ændrer planen. Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi sætte det i drift fra mandag. Godt. Så aftaler vi, at Søren melder tilbage fredag. Anne, vil du samle tallene i ugeplanen? Ja. Jeg opdaterer planen, så alle kan se kapaciteten på Ærø inden fredag klokken tolv.",
+  "words": [
+    {
+      "text": "Så",
+      "start": 0,
+      "end": 946,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "er",
+      "start": 966,
+      "end": 1912,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "vi",
+      "start": 1932,
+      "end": 2878,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "samlet.",
+      "start": 2898,
+      "end": 3844,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Lad",
+      "start": 3864,
+      "end": 4810,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "os",
+      "start": 4830,
+      "end": 5776,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "begynde",
+      "start": 5796,
+      "end": 6742,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "med",
+      "start": 6762,
+      "end": 7708,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "kapaciteten",
+      "start": 7728,
+      "end": 8674,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "på",
+      "start": 8694,
+      "end": 9640,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "linje",
+      "start": 9660,
+      "end": 10606,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "2.",
+      "start": 10626,
+      "end": 11572,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Jonas,",
+      "start": 11592,
+      "end": 12538,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "hvor",
+      "start": 12558,
+      "end": 13504,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "står",
+      "start": 13524,
+      "end": 14470,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "vi",
+      "start": 14490,
+      "end": 15436,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "med",
+      "start": 15456,
+      "end": 16402,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "testen?",
+      "start": 16422,
+      "end": 17368,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Vi",
+      "start": 18000,
+      "end": 18885,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "nåede",
+      "start": 18905,
+      "end": 19790,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "de",
+      "start": 19810,
+      "end": 20695,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "240",
+      "start": 20715,
+      "end": 21600,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "enheder",
+      "start": 21620,
+      "end": 22505,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "i",
+      "start": 22525,
+      "end": 23410,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "går.",
+      "start": 23430,
+      "end": 24315,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "Vi",
+      "start": 24335,
+      "end": 25220,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "mangler",
+      "start": 25240,
+      "end": 26125,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "stadig",
+      "start": 26145,
+      "end": 27030,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "at",
+      "start": 27050,
+      "end": 27935,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "teste",
+      "start": 27955,
+      "end": 28840,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "det",
+      "start": 28860,
+      "end": 29745,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "nye",
+      "start": 29765,
+      "end": 30650,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "skift,",
+      "start": 30670,
+      "end": 31555,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "før",
+      "start": 31575,
+      "end": 32460,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "vi",
+      "start": 32480,
+      "end": 33365,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "ændrer",
+      "start": 33385,
+      "end": 34270,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "planen.",
+      "start": 34290,
+      "end": 35175,
+      "confidence": 0.93,
+      "speaker": "B"
+    },
+    {
+      "text": "Jeg",
+      "start": 36000,
+      "end": 36786,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "tager",
+      "start": 36806,
+      "end": 37592,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "testen",
+      "start": 37612,
+      "end": 38398,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "torsdag.",
+      "start": 38418,
+      "end": 39204,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "Hvis",
+      "start": 39224,
+      "end": 40010,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "kvaliteten",
+      "start": 40030,
+      "end": 40816,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "holder,",
+      "start": 40836,
+      "end": 41622,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "kan",
+      "start": 41642,
+      "end": 42428,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "vi",
+      "start": 42448,
+      "end": 43234,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "sætte",
+      "start": 43254,
+      "end": 44040,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "det",
+      "start": 44060,
+      "end": 44846,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "i",
+      "start": 44866,
+      "end": 45652,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "drift",
+      "start": 45672,
+      "end": 46458,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "fra",
+      "start": 46478,
+      "end": 47264,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "mandag.",
+      "start": 47284,
+      "end": 48070,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "Godt.",
+      "start": 49000,
+      "end": 49811,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Så",
+      "start": 49831,
+      "end": 50642,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "aftaler",
+      "start": 50662,
+      "end": 51473,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "vi,",
+      "start": 51493,
+      "end": 52304,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "at",
+      "start": 52324,
+      "end": 53135,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Søren",
+      "start": 53155,
+      "end": 53966,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "melder",
+      "start": 53986,
+      "end": 54797,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "tilbage",
+      "start": 54817,
+      "end": 55628,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "fredag.",
+      "start": 55648,
+      "end": 56459,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Anne,",
+      "start": 56479,
+      "end": 57290,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "vil",
+      "start": 57310,
+      "end": 58121,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "du",
+      "start": 58141,
+      "end": 58952,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "samle",
+      "start": 58972,
+      "end": 59783,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "tallene",
+      "start": 59803,
+      "end": 60614,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "i",
+      "start": 60634,
+      "end": 61445,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "ugeplanen?",
+      "start": 61465,
+      "end": 62276,
+      "confidence": 0.93,
+      "speaker": "A"
+    },
+    {
+      "text": "Ja.",
+      "start": 63000,
+      "end": 63566,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "Jeg",
+      "start": 63586,
+      "end": 64152,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "opdaterer",
+      "start": 64172,
+      "end": 64738,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "planen,",
+      "start": 64758,
+      "end": 65324,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "så",
+      "start": 65344,
+      "end": 65910,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "alle",
+      "start": 65930,
+      "end": 66496,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "kan",
+      "start": 66516,
+      "end": 67082,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "se",
+      "start": 67102,
+      "end": 67668,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "kapaciteten",
+      "start": 67688,
+      "end": 68254,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "på",
+      "start": 68274,
+      "end": 68840,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "Ærø",
+      "start": 68860,
+      "end": 69426,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "inden",
+      "start": 69446,
+      "end": 70012,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "fredag",
+      "start": 70032,
+      "end": 70598,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "klokken",
+      "start": 70618,
+      "end": 71184,
+      "confidence": 0.93,
+      "speaker": "C"
+    },
+    {
+      "text": "tolv.",
+      "start": 71204,
+      "end": 71770,
+      "confidence": 0.93,
+      "speaker": "C"
+    }
+  ],
+  "utterances": [
+    {
+      "speaker": "A",
+      "start": 0,
+      "end": 17400,
+      "text": "Så er vi samlet. Lad os begynde med kapaciteten på linje 2. Jonas, hvor står vi med testen?",
+      "confidence": 0.92,
+      "words": [
+        {
+          "text": "Så",
+          "start": 0,
+          "end": 946,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "er",
+          "start": 966,
+          "end": 1912,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "vi",
+          "start": 1932,
+          "end": 2878,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "samlet.",
+          "start": 2898,
+          "end": 3844,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "Lad",
+          "start": 3864,
+          "end": 4810,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "os",
+          "start": 4830,
+          "end": 5776,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "begynde",
+          "start": 5796,
+          "end": 6742,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "med",
+          "start": 6762,
+          "end": 7708,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "kapaciteten",
+          "start": 7728,
+          "end": 8674,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "på",
+          "start": 8694,
+          "end": 9640,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "linje",
+          "start": 9660,
+          "end": 10606,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "2.",
+          "start": 10626,
+          "end": 11572,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "Jonas,",
+          "start": 11592,
+          "end": 12538,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "hvor",
+          "start": 12558,
+          "end": 13504,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "står",
+          "start": 13524,
+          "end": 14470,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "vi",
+          "start": 14490,
+          "end": 15436,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "med",
+          "start": 15456,
+          "end": 16402,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "testen?",
+          "start": 16422,
+          "end": 17368,
+          "confidence": 0.93,
+          "speaker": "A"
+        }
+      ]
+    },
+    {
+      "speaker": "B",
+      "start": 18000,
+      "end": 35200,
+      "text": "Vi nåede de 240 enheder i går. Vi mangler stadig at teste det nye skift, før vi ændrer planen.",
+      "confidence": 0.92,
+      "words": [
+        {
+          "text": "Vi",
+          "start": 18000,
+          "end": 18885,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "nåede",
+          "start": 18905,
+          "end": 19790,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "de",
+          "start": 19810,
+          "end": 20695,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "240",
+          "start": 20715,
+          "end": 21600,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "enheder",
+          "start": 21620,
+          "end": 22505,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "i",
+          "start": 22525,
+          "end": 23410,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "går.",
+          "start": 23430,
+          "end": 24315,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "Vi",
+          "start": 24335,
+          "end": 25220,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "mangler",
+          "start": 25240,
+          "end": 26125,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "stadig",
+          "start": 26145,
+          "end": 27030,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "at",
+          "start": 27050,
+          "end": 27935,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "teste",
+          "start": 27955,
+          "end": 28840,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "det",
+          "start": 28860,
+          "end": 29745,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "nye",
+          "start": 29765,
+          "end": 30650,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "skift,",
+          "start": 30670,
+          "end": 31555,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "før",
+          "start": 31575,
+          "end": 32460,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "vi",
+          "start": 32480,
+          "end": 33365,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "ændrer",
+          "start": 33385,
+          "end": 34270,
+          "confidence": 0.93,
+          "speaker": "B"
+        },
+        {
+          "text": "planen.",
+          "start": 34290,
+          "end": 35175,
+          "confidence": 0.93,
+          "speaker": "B"
+        }
+      ]
+    },
+    {
+      "speaker": "C",
+      "start": 36000,
+      "end": 48100,
+      "text": "Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi sætte det i drift fra mandag.",
+      "confidence": 0.92,
+      "words": [
+        {
+          "text": "Jeg",
+          "start": 36000,
+          "end": 36786,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "tager",
+          "start": 36806,
+          "end": 37592,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "testen",
+          "start": 37612,
+          "end": 38398,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "torsdag.",
+          "start": 38418,
+          "end": 39204,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "Hvis",
+          "start": 39224,
+          "end": 40010,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "kvaliteten",
+          "start": 40030,
+          "end": 40816,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "holder,",
+          "start": 40836,
+          "end": 41622,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "kan",
+          "start": 41642,
+          "end": 42428,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "vi",
+          "start": 42448,
+          "end": 43234,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "sætte",
+          "start": 43254,
+          "end": 44040,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "det",
+          "start": 44060,
+          "end": 44846,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "i",
+          "start": 44866,
+          "end": 45652,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "drift",
+          "start": 45672,
+          "end": 46458,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "fra",
+          "start": 46478,
+          "end": 47264,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "mandag.",
+          "start": 47284,
+          "end": 48070,
+          "confidence": 0.93,
+          "speaker": "C"
+        }
+      ]
+    },
+    {
+      "speaker": "A",
+      "start": 49000,
+      "end": 62300,
+      "text": "Godt. Så aftaler vi, at Søren melder tilbage fredag. Anne, vil du samle tallene i ugeplanen?",
+      "confidence": 0.92,
+      "words": [
+        {
+          "text": "Godt.",
+          "start": 49000,
+          "end": 49811,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "Så",
+          "start": 49831,
+          "end": 50642,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "aftaler",
+          "start": 50662,
+          "end": 51473,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "vi,",
+          "start": 51493,
+          "end": 52304,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "at",
+          "start": 52324,
+          "end": 53135,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "Søren",
+          "start": 53155,
+          "end": 53966,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "melder",
+          "start": 53986,
+          "end": 54797,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "tilbage",
+          "start": 54817,
+          "end": 55628,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "fredag.",
+          "start": 55648,
+          "end": 56459,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "Anne,",
+          "start": 56479,
+          "end": 57290,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "vil",
+          "start": 57310,
+          "end": 58121,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "du",
+          "start": 58141,
+          "end": 58952,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "samle",
+          "start": 58972,
+          "end": 59783,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "tallene",
+          "start": 59803,
+          "end": 60614,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "i",
+          "start": 60634,
+          "end": 61445,
+          "confidence": 0.93,
+          "speaker": "A"
+        },
+        {
+          "text": "ugeplanen?",
+          "start": 61465,
+          "end": 62276,
+          "confidence": 0.93,
+          "speaker": "A"
+        }
+      ]
+    },
+    {
+      "speaker": "C",
+      "start": 63000,
+      "end": 71800,
+      "text": "Ja. Jeg opdaterer planen, så alle kan se kapaciteten på Ærø inden fredag klokken tolv.",
+      "confidence": 0.92,
+      "words": [
+        {
+          "text": "Ja.",
+          "start": 63000,
+          "end": 63566,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "Jeg",
+          "start": 63586,
+          "end": 64152,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "opdaterer",
+          "start": 64172,
+          "end": 64738,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "planen,",
+          "start": 64758,
+          "end": 65324,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "så",
+          "start": 65344,
+          "end": 65910,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "alle",
+          "start": 65930,
+          "end": 66496,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "kan",
+          "start": 66516,
+          "end": 67082,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "se",
+          "start": 67102,
+          "end": 67668,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "kapaciteten",
+          "start": 67688,
+          "end": 68254,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "på",
+          "start": 68274,
+          "end": 68840,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "Ærø",
+          "start": 68860,
+          "end": 69426,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "inden",
+          "start": 69446,
+          "end": 70012,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "fredag",
+          "start": 70032,
+          "end": 70598,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "klokken",
+          "start": 70618,
+          "end": 71184,
+          "confidence": 0.93,
+          "speaker": "C"
+        },
+        {
+          "text": "tolv.",
+          "start": 71204,
+          "end": 71770,
+          "confidence": 0.93,
+          "speaker": "C"
+        }
+      ]
+    }
+  ],
+  "speaker_labels": true,
+  "error": null
+}

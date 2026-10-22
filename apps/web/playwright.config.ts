@@ -43,7 +43,7 @@ export default defineConfig({
       'pnpm db:migrate --persist-to .wrangler/e2e',
       // The dev users and a 30-meeting demo library (packet 3).
       'pnpm db:seed --demo=30 --persist-to .wrangler/e2e',
-      `wrangler dev --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e`,
+      `wrangler dev --local --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e`,
     ]
       .filter(Boolean)
       .join(' && '),
