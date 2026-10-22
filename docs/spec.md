@@ -82,7 +82,9 @@ Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-
 - Identity: OIDC against Entra ID or Google Workspace through Auth.js or an equivalent; no local users.
 - MCP: a remote MCP server on Workers with OAuth, using Cloudflare's agents SDK.
 - Every install is single-company, in that company's own account. Primux deploys and holds no data. A Docker edition (S3-compatible storage, database-backed queue, SQLite or Postgres) is possible through `packages/adapters` but is not part of v0.1.
-- Open before the first commit: which Cloudflare plan is needed for EU processing of audio, beyond R2's EU jurisdiction; which speech-to-text providers AI Gateway proxies.
+- Domains: `mtxt.co` is the marketing site, `app.mtxt.co` is the author's own install. A customer's install runs on a hostname in the customer's own zone (for example `meetings.customer.com`), in the customer's own account.
+- EU data, checked 2026-10-22 against Cloudflare's data-localization docs: audio at rest is pinned with R2 jurisdictional restrictions (EU), upload sessions with Durable Object jurisdiction `eu`, both available without an Enterprise plan. D1 has no jurisdiction setting today. Where Worker code runs is best effort (the nearest data centre to the request) unless the customer has the Data Localization Suite, an Enterprise-only add-on. Workers AI and AI Gateway are not covered by Regional Services. State this plainly in the admin's data-flow page; do not promise EU-only processing.
+- AI Gateway, checked 2026-10-22: proxies ElevenLabs, Deepgram, Workers AI, OpenAI, Azure OpenAI, Anthropic, Google, Mistral and others. AssemblyAI is not a supported provider, so that adapter calls AssemblyAI directly; the gateway fronts the recap model and the providers it supports.
 
 ## Data model
 
