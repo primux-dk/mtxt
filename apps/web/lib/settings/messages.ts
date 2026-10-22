@@ -21,11 +21,12 @@ export function fieldMessage(t: T, error: FieldError | TemplateError): string {
     case 'email':
       return t(`errors.${error.code}`, { value: error.value });
     case 'termTooLong':
-      return t('errors.termTooLong', { line: error.line, max: error.max });
+      return t('errors.termTooLong', { record: error.record, max: error.max });
     case 'badBoost':
-      return t('errors.badBoost', { line: error.line, value: error.value, max: error.max });
+      return t('errors.badBoost', { record: error.record, value: error.value, max: error.max });
     case 'tooManyFields':
-      return t('errors.tooManyFields', { line: error.line });
+    case 'unterminatedQuote':
+      return t(`errors.${error.code}`, { record: error.record });
     case 'range':
       return t('errors.range', { min: error.min, max: error.max });
     case 'keepSelf':

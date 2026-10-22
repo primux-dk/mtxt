@@ -241,7 +241,7 @@
       "tenantHelp": "Katalogets lejer-id fra appregistreringen.",
       "domain": "Workspace-domæne",
       "domainHelp": "Kun bekræftede konti i dette domæne kan logge ind.",
-      "redirect": "Registrér denne omdirigerings-URI hos udbyderen: {url}"
+      "secretHelpRedirect": "Hemmeligheder vises aldrig i klartekst. Registrér denne omdirigerings-URI hos udbyderen: {url}"
     },
     "stt": {
       "heading": "Transskription",
@@ -275,9 +275,8 @@
       "heading": "Virksomhedens ord",
       "help": "Produktnavne, navne og fagord.",
       "field": "Nøgleord",
-      "fieldHelp": "Ét ord eller udtryk pr. linje.",
+      "fieldHelp": "Ét ord eller udtryk pr. linje. Tilføj en vægt efter et komma for at fremhæve et ord: Primux,2.",
       "import": "Importér CSV",
-      "boostHelp": "Tilføj en vægt efter et komma for at fremhæve et ord: Primux,2.",
       "imported": "{count, plural, one {# ord} other {# ord}} tilføjet fra {file}. Gem indstillingerne for at beholde dem.",
       "importNone": "{file} havde ingen nye ord.",
       "importFailed": "{file} kunne ikke importeres. {reason}"
@@ -374,13 +373,13 @@
       "invalid": "Vælg en af mulighederne.",
       "hex": "Skriv farven som # og seks hexcifre, for eksempel #566b45.",
       "contrast": "Afvist: {pair} har {ratio}:1 i {mode} tema, under 4,5:1. Vælg en farve med mere kontrast.",
-      "tenantFormat": "Skriv lejer-id’et (et GUID) eller katalogets domæne, for eksempel contoso.onmicrosoft.com.",
+      "tenantFormat": "Skriv lejer-id’et, et GUID som 00000000-0000-4000-8000-000000000001. common, organizations og consumers afvises.",
       "domainFormat": "Skriv Workspace-domænet, for eksempel example.com.",
       "secretRequired": "Skriv hemmeligheden til denne udbyder. Den gemmes krypteret.",
       "regionFormat": "Skriv Azure-regionens navn med små bogstaver, for eksempel westeurope.",
-      "termTooLong": "Linje {line}: et nøgleord må højst have {max} tegn.",
-      "badBoost": "Linje {line}: vægten {value} skal være et tal over 0 og højst {max}.",
-      "tooManyFields": "Linje {line}: skriv ord eller ord,vægt. Sæt et ord med komma i anførselstegn.",
+      "termTooLong": "Post {record}: et nøgleord må højst have {max} tegn.",
+      "badBoost": "Post {record}: vægten {value} skal være et tal over 0 og højst {max}.",
+      "tooManyFields": "Post {record}: skriv ord eller ord,vægt. Sæt et ord med komma i anførselstegn.",
       "tooMany": "Brug højst {max} nøgleord.",
       "atLeastOneSource": "Vælg mindst én optagekilde.",
       "range": "Skriv et helt antal dage fra {min} til {max}.",
@@ -388,7 +387,8 @@
       "atLeastOneAdmin": "Tilføj mindst én administratoradresse.",
       "keepSelf": "Behold din egen adresse, {email}, på listen. En anden administrator kan fjerne den.",
       "duplicate": "Der findes allerede en skabelon med navnet {name}. Vælg et andet navn.",
-      "saveFailed": "Indstillingerne kunne ikke gemmes, og intet blev ændret. Prøv igen."
+      "saveFailed": "Indstillingerne kunne ikke gemmes, og intet blev ændret. Prøv igen.",
+      "unterminatedQuote": "Post {record}: et anførselstegn åbnes og lukkes aldrig. Intet blev importeret."
     },
     "saved": "Indstillingerne er gemt."
   },
@@ -396,7 +396,8 @@
     "signOut": "Log ud",
     "notConfigured": {
       "title": "Ingen identitetsudbyder er sat op",
-      "body": "Sæt disse Worker-hemmeligheder med wrangler secret put, eller i apps/web/.dev.vars ved lokal udvikling, og genindlæs siden:"
+      "body": "Sæt disse Worker-hemmeligheder med wrangler secret put, eller i apps/web/.dev.vars ved lokal udvikling, og genindlæs siden:",
+      "tenantGuid": "OIDC_TENANT_ID skal være lejerens GUID. common, organizations og consumers afvises."
     },
     "broken": {
       "title": "Login er ikke sat rigtigt op",
@@ -405,7 +406,8 @@
     "error": {
       "accessDenied": "Kontoen kan ikke logge ind her. Brug din arbejdskonto, eller bed en administrator om at tjekke virksomhedslogin.",
       "configuration": "Identitetsudbyderen godtog ikke login. Bed en administrator om at tjekke virksomhedslogin i indstillingerne.",
-      "default": "Login blev ikke gennemført. Prøv igen."
+      "default": "Login blev ikke gennemført. Prøv igen.",
+      "accountConflict": "Adressen hører til en anden konto i denne installation. Intet blev ændret. Kontakt din administrator."
     },
     "forbidden": {
       "title": "Kun for administratorer",

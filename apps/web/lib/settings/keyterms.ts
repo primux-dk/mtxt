@@ -15,75 +15,123 @@ export interface Keyterm {
 }
 
 export type KeytermError =
-  | { code: 'termTooLong'; line: number; max: number }
-  | { code: 'badBoost'; line: number; value: string; max: number }
-  | { code: 'tooManyFields'; line: number }
+  | { code: 'termTooLong'; record: number; max: number }
+  | { code: 'badBoost'; record: number; value: string; max: number }
+  | { code: 'tooManyFields'; record: number }
+  | { code: 'unterminatedQuote'; record: number }
   | { code: 'tooMany'; max: number };
 
-/** Splits one CSV line on `separator`, honouring double quotes. */
-function splitLine(line: string, separator: string): string[] {
-  const fields: string[] = [];
+/** Semicolons when the text has one outside quotes (a comma may then be a decimal comma), else commas. */
+function detectSeparator(text: string): string {
+  let quoted = false;
+  for (const c of text) {
+    if (c === '"') quoted = !quoted;
+    else if (c === ';' && !quoted) return ';';
+  }
+  return ',';
+}
+
+interface CsvRecord {
+  /** 1-based; blank lines count, so a one-line-per-term text numbers records like lines. */
+  record: number;
+  fields: string[];
+}
+
+/**
+ * Splits text into records per RFC 4180: a field in double quotes may hold
+ * the separator and line breaks, `""` is a quote, and records end at CRLF, LF
+ * or CR. An opening quote with no closing one is an error naming its record.
+ */
+function parseRecords(
+  text: string,
+  separator: string,
+): { records: CsvRecord[]; unterminated?: number } {
+  const records: CsvRecord[] = [];
+  let fields: string[] = [];
   let field = '';
   let quoted = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
+  let wasQuoted = false;
+  let record = 1;
+  let start = 1;
+  const endField = () => {
+    fields.push(wasQuoted ? field : field.trim());
+    field = '';
+    wasQuoted = false;
+  };
+  const endRecord = () => {
+    endField();
+    if (fields.some((f) => f !== '')) records.push({ record: start, fields });
+    fields = [];
+  };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
     if (quoted) {
-      if (c === '"' && line[i + 1] === '"') {
+      if (c === '"' && text[i + 1] === '"') {
         field += '"';
         i++;
       } else if (c === '"') quoted = false;
-      else field += c;
-    } else if (c === '"' && field.trim() === '') {
+      else {
+        if (c === '\n' || (c === '\r' && text[i + 1] !== '\n')) record++;
+        field += c;
+      }
+    } else if (c === '"' && field.trim() === '' && !wasQuoted) {
       quoted = true;
+      wasQuoted = true;
       field = '';
     } else if (c === separator) {
-      fields.push(field);
-      field = '';
-    } else field += c;
+      endField();
+    } else if (c === '\r' || c === '\n') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      endRecord();
+      record++;
+      start = record;
+    } else if (!wasQuoted) {
+      field += c;
+    } else if (c.trim()) {
+      // Text after a closing quote: keep it, as spreadsheets do.
+      field += c;
+    }
   }
-  fields.push(field);
-  return fields.map((f) => f.trim());
-}
-
-/** Semicolons when any line has one outside quotes (a comma may then be a decimal comma), else commas. */
-function detectSeparator(lines: string[]): string {
-  return lines.some((line) => line.replace(/"(?:[^"]|"")*"/g, '').includes(';')) ? ';' : ',';
+  if (quoted) return { records, unterminated: start };
+  endRecord();
+  return { records };
 }
 
 const HEADER = /^(term|keyterm|keyterms|nøgleord)$/i;
 
 /**
- * Parses keyterm lines. Blank lines are skipped, a `term` or `term,boost`
- * header row is skipped, and a term repeated with other casing keeps its
- * first spelling. Errors carry the 1-based line number.
+ * Parses keyterms: `term` or `term,boost` per record. Blank records are
+ * skipped, a header record is skipped, and a term repeated with other casing
+ * keeps its first spelling. Any error imports nothing: `terms` is empty and
+ * the first error names its record.
  */
 export function parseKeyterms(text: string): { terms: Keyterm[]; errors: KeytermError[] } {
-  const lines = text.replace(/^﻿/, '').split(/\r\n|\n|\r/);
-  const separator = detectSeparator(lines);
+  const body = text.replace(/^\uFEFF/, '');
+  const separator = detectSeparator(body);
+  const { records, unterminated } = parseRecords(body, separator);
+  if (unterminated)
+    return { terms: [], errors: [{ code: 'unterminatedQuote', record: unterminated }] };
+
   const terms: Keyterm[] = [];
   const errors: KeytermError[] = [];
   const seen = new Set<string>();
-
-  lines.forEach((raw, index) => {
-    const line = index + 1;
-    if (!raw.trim()) return;
-    const fields = splitLine(raw, separator);
+  records.forEach(({ record, fields }, index) => {
     const [term = '', boostText = '', ...rest] = fields;
-    if (!term) return;
-    if (index === lines.findIndex((l) => l.trim()) && HEADER.test(term)) return;
-    if (rest.some((f) => f !== '')) {
-      errors.push({ code: 'tooManyFields', line });
+    if (index === 0 && HEADER.test(term)) return;
+    if (fields.length > 2 && rest.some((f) => f !== '')) {
+      errors.push({ code: 'tooManyFields', record });
       return;
     }
+    if (!term) return;
     if (term.length > MAX_TERM_LENGTH) {
-      errors.push({ code: 'termTooLong', line, max: MAX_TERM_LENGTH });
+      errors.push({ code: 'termTooLong', record, max: MAX_TERM_LENGTH });
       return;
     }
     let boost: number | null = null;
     if (boostText) {
       const value = Number(separator === ';' ? boostText.replace(',', '.') : boostText);
       if (!Number.isFinite(value) || value <= 0 || value > MAX_BOOST) {
-        errors.push({ code: 'badBoost', line, value: boostText, max: MAX_BOOST });
+        errors.push({ code: 'badBoost', record, value: boostText, max: MAX_BOOST });
         return;
       }
       boost = value;
@@ -95,7 +143,7 @@ export function parseKeyterms(text: string): { terms: Keyterm[]; errors: Keyterm
   });
 
   if (terms.length > MAX_TERMS) errors.push({ code: 'tooMany', max: MAX_TERMS });
-  return { terms, errors };
+  return errors.length ? { terms: [], errors } : { terms, errors };
 }
 
 const quote = (value: string) => (/[",;]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);

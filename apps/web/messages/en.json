@@ -241,7 +241,7 @@
       "tenantHelp": "The directory (tenant) ID from the app registration.",
       "domain": "Workspace domain",
       "domainHelp": "Only verified accounts in this domain can sign in.",
-      "redirect": "Register this redirect URI with the provider: {url}"
+      "secretHelpRedirect": "Secrets are never shown in clear text. Register this redirect URI with the provider: {url}"
     },
     "stt": {
       "heading": "Transcription",
@@ -275,9 +275,8 @@
       "heading": "Company words",
       "help": "Product names, people and jargon.",
       "field": "Keyterms",
-      "fieldHelp": "One word or phrase per line.",
+      "fieldHelp": "One word or phrase per line. Add a weight after a comma to boost a term: Primux,2.",
       "import": "Import CSV",
-      "boostHelp": "Add a weight after a comma to boost a term: Primux,2.",
       "imported": "Added {count, plural, one {# term} other {# terms}} from {file}. Save settings to keep them.",
       "importNone": "{file} had no new terms.",
       "importFailed": "Could not import {file}. {reason}"
@@ -374,13 +373,13 @@
       "invalid": "Choose one of the options.",
       "hex": "Enter a colour as # and six hex digits, for example #566b45.",
       "contrast": "Refused: {pair} is {ratio}:1 in {mode} mode, under 4.5:1. Pick a colour with more contrast.",
-      "tenantFormat": "Enter the tenant ID (a GUID) or the directory domain, for example contoso.onmicrosoft.com.",
+      "tenantFormat": "Enter the tenant ID, a GUID such as 00000000-0000-4000-8000-000000000001. common, organizations and consumers are refused.",
       "domainFormat": "Enter the Workspace domain, for example example.com.",
       "secretRequired": "Enter the secret for this provider. It is stored encrypted.",
       "regionFormat": "Enter the Azure region name in lower case, for example westeurope.",
-      "termTooLong": "Line {line}: a keyterm can have at most {max} characters.",
-      "badBoost": "Line {line}: the weight {value} must be a number above 0 and at most {max}.",
-      "tooManyFields": "Line {line}: write term or term,weight. Put a term that has a comma in double quotes.",
+      "termTooLong": "Record {record}: a keyterm can have at most {max} characters.",
+      "badBoost": "Record {record}: the weight {value} must be a number above 0 and at most {max}.",
+      "tooManyFields": "Record {record}: write term or term,weight. Put a term that has a comma in double quotes.",
       "tooMany": "Use at most {max} keyterms.",
       "atLeastOneSource": "Choose at least one recording source.",
       "range": "Enter a whole number of days from {min} to {max}.",
@@ -388,7 +387,8 @@
       "atLeastOneAdmin": "Add at least one admin address.",
       "keepSelf": "Keep your own address, {email}, in the list. Another admin can remove it.",
       "duplicate": "A template called {name} exists already. Choose another name.",
-      "saveFailed": "The settings could not be saved, and nothing was changed. Try again."
+      "saveFailed": "The settings could not be saved, and nothing was changed. Try again.",
+      "unterminatedQuote": "Record {record}: a double quote opens and never closes. Nothing was imported."
     },
     "saved": "Settings saved."
   },
@@ -396,7 +396,8 @@
     "signOut": "Sign out",
     "notConfigured": {
       "title": "No identity provider configured",
-      "body": "Set these Worker secrets with wrangler secret put, or in apps/web/.dev.vars for local development, then reload this page:"
+      "body": "Set these Worker secrets with wrangler secret put, or in apps/web/.dev.vars for local development, then reload this page:",
+      "tenantGuid": "OIDC_TENANT_ID must be the tenant's GUID. common, organizations and consumers are refused."
     },
     "broken": {
       "title": "Sign-in is not set up correctly",
@@ -405,7 +406,8 @@
     "error": {
       "accessDenied": "This account cannot sign in here. Use your work account, or ask an admin to check Company login.",
       "configuration": "The identity provider did not accept the sign-in. Ask an admin to check Company login in settings.",
-      "default": "Sign-in did not finish. Try again."
+      "default": "Sign-in did not finish. Try again.",
+      "accountConflict": "This address belongs to another account in this install. Nothing was changed. Contact your admin."
     },
     "forbidden": {
       "title": "Admins only",

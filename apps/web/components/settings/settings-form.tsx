@@ -173,10 +173,10 @@ export function SettingsForm({
         error.code === 'tooMany'
           ? t('errors.tooMany', { max: error.max })
           : error.code === 'badBoost'
-            ? t('errors.badBoost', { line: error.line, value: error.value, max: error.max })
+            ? t('errors.badBoost', { record: error.record, value: error.value, max: error.max })
             : error.code === 'termTooLong'
-              ? t('errors.termTooLong', { line: error.line, max: error.max })
-              : t('errors.tooManyFields', { line: error.line });
+              ? t('errors.termTooLong', { record: error.record, max: error.max })
+              : t(`errors.${error.code}`, { record: error.record });
       setImportNote({ ok: false, text: t('keyterms.importFailed', { file: file.name, reason }) });
       return;
     }
@@ -362,10 +362,9 @@ export function SettingsForm({
                 />
               }
               help={
-                <>
-                  {t('login.secretHelp')}
-                  {idp && <> {t('login.redirect', { url: redirectUris[idp] })}</>}
-                </>
+                idp
+                  ? t('login.secretHelpRedirect', { url: redirectUris[idp] })
+                  : t('login.secretHelp')
               }
               error={errors.oidcClientSecret}
               className="col-span-full"
@@ -508,7 +507,7 @@ export function SettingsForm({
             <Field
               id="keyterms"
               label={t('keyterms.field')}
-              help={`${t('keyterms.fieldHelp')} ${t('keyterms.boostHelp')}`}
+              help={t('keyterms.fieldHelp')}
               error={errors.keyterms}
             >
               <textarea

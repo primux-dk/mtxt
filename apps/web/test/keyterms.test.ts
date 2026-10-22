@@ -37,15 +37,40 @@ describe('parseKeyterms', () => {
 
   it('reports a bad weight and an extra column with the line number', () => {
     expect(parseKeyterms('Primux\nlinje 2,abc').errors).toEqual([
-      { code: 'badBoost', line: 2, value: 'abc', max: 10 },
+      { code: 'badBoost', record: 2, value: 'abc', max: 10 },
     ]);
-    expect(parseKeyterms('a,1\nb,0').errors[0]).toMatchObject({ code: 'badBoost', line: 2 });
-    expect(parseKeyterms('a,1,x').errors).toEqual([{ code: 'tooManyFields', line: 1 }]);
+    expect(parseKeyterms('a,1\nb,0').errors[0]).toMatchObject({ code: 'badBoost', record: 2 });
+    expect(parseKeyterms('a,1,x').errors).toEqual([{ code: 'tooManyFields', record: 1 }]);
+  });
+
+  it('reads quoted fields that span lines, doubled quotes and CRLF', () => {
+    expect(parseKeyterms('"Acme\r\nNordic",2\r\n"Say ""hi""",1\r\nugeplan')).toEqual({
+      terms: [
+        { term: 'Acme\r\nNordic', boost: 2 },
+        { term: 'Say "hi"', boost: 1 },
+        { term: 'ugeplan', boost: null },
+      ],
+      errors: [],
+    });
+  });
+
+  it('refuses an unterminated quote by record and imports nothing', () => {
+    expect(parseKeyterms('Primux\nlinje 2\n"Acme, Inc.,2\nugeplan')).toEqual({
+      terms: [],
+      errors: [{ code: 'unterminatedQuote', record: 3 }],
+    });
+  });
+
+  it('refuses a record with three fields and imports nothing', () => {
+    expect(parseKeyterms('Primux\n"two\nlines",1\na,1,x')).toEqual({
+      terms: [],
+      errors: [{ code: 'tooManyFields', record: 4 }],
+    });
   });
 
   it('reports a term over 100 characters and a list over 1000 terms', () => {
     expect(parseKeyterms('x'.repeat(101)).errors).toEqual([
-      { code: 'termTooLong', line: 1, max: 100 },
+      { code: 'termTooLong', record: 1, max: 100 },
     ]);
     const many = Array.from({ length: 1001 }, (_, i) => `term ${i}`).join('\n');
     expect(parseKeyterms(many).errors).toEqual([{ code: 'tooMany', max: 1000 }]);

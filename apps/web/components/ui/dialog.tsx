@@ -46,7 +46,12 @@ function DialogContent({
       >
         {children}
         <DialogPrimitive.Close asChild>
-          <Button variant="quiet" size="icon" className="absolute top-3 right-3" aria-label={closeLabel}>
+          <Button
+            variant="quiet"
+            size="icon"
+            className="absolute top-3 right-3"
+            aria-label={closeLabel}
+          >
             <XIcon aria-hidden="true" />
           </Button>
         </DialogPrimitive.Close>
@@ -68,11 +73,21 @@ function DialogDescription({
   className,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return <DialogPrimitive.Description className={cn('text-muted-foreground', className)} {...props} />;
+  return (
+    <DialogPrimitive.Description className={cn('text-muted-foreground', className)} {...props} />
+  );
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return <div className={cn('flex flex-wrap justify-end gap-2', className)} {...props} />;
 }
 
-export { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger };
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+  DialogTrigger,
+};
