@@ -244,7 +244,7 @@ test.describe('recordings API', () => {
       duplex: 'half',
     } as RequestInit);
     expect(response.status).toBe(413);
-    expect((await response.json()).error.code).toBe('too_large');
+    expect(((await response.json()) as { error: { code: string } }).error.code).toBe('too_large');
     const after = await (
       await request.get(`/api/v1/recordings/${rec.id}`, { headers: owner })
     ).json();
