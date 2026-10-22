@@ -4,6 +4,7 @@
  */
 export const DEFAULT_SETTINGS = {
   productName: 'mtxt install',
+  companyName: null,
   themeAccent: '#566b45',
   themePrimary: '#111111',
   identityProvider: null,
@@ -15,4 +16,5 @@ export const DEFAULT_SETTINGS = {
   retentionAudioDays: 30,
   retentionTranscriptDays: 365,
   mcpEnabled: false,
+  recordingSources: ['desktop', 'upload', 'browser'],
 } as const;

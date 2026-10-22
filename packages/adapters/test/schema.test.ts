@@ -97,6 +97,65 @@ describe('schema', () => {
     expect(rows[0]).toEqual({ installId: 'test', ...DEFAULT_SETTINGS });
   });
 
+  it('indexes every foreign key by the referencing column first', () => {
+    for (const table of tables) {
+      const config = getTableConfig(table);
+      const leading = new Set<string>(
+        config.indexes.map((i) => (i.config.columns[0] as { name: string }).name),
+      );
+      for (const pk of config.primaryKeys) leading.add(pk.columns[0]!.name);
+      for (const fk of config.foreignKeys) {
+        const column = fk.reference().columns[0]!.name;
+        expect(leading, `${config.name}.${column}`).toContain(column);
+      }
+    }
+  });
+
+  describe('constraints', () => {
+    const insertUserAndMeeting = () => {
+      db.exec(
+        `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('u1', 't', 's', 'a@example.com', 'A')`,
+      );
+      db.exec(
+        `INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'M', 0)`,
+      );
+    };
+    const recording = (id: string, isPrimary: 0 | 1, source = 'upload') =>
+      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path)
+       VALUES ('${id}', 't', 'm1', 'u1', '${source}', ${isPrimary}, 1, 'h', 1, 'p')`;
+
+    it('allows one primary recording per meeting, any number of others', () => {
+      insertUserAndMeeting();
+      db.exec(recording('r1', 1));
+      db.exec(recording('r2', 0));
+      db.exec(recording('r3', 0));
+      expect(() => db.exec(recording('r4', 1))).toThrow(/UNIQUE constraint failed/);
+    });
+
+    it('allows one transcript per recording', () => {
+      insertUserAndMeeting();
+      db.exec(recording('r1', 1));
+      const transcript = (id: string) =>
+        `INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('${id}', 't', 'r1', 'p', 'm', 'da', '{}')`;
+      db.exec(transcript('t1'));
+      expect(() => db.exec(transcript('t2'))).toThrow(/UNIQUE constraint failed/);
+    });
+
+    it('rejects enum values outside the list', () => {
+      insertUserAndMeeting();
+      expect(() => db.exec(recording('r1', 0, 'zoom'))).toThrow(/CHECK constraint failed/);
+      expect(() => db.exec(`UPDATE meetings SET visibility = 'public' WHERE id = 'm1'`)).toThrow(
+        /CHECK constraint failed/,
+      );
+      db.exec(seedSql('t'));
+      expect(() =>
+        db.exec(`UPDATE settings SET interface_language = 'de' WHERE install_id = 't'`),
+      ).toThrow(/CHECK constraint failed/);
+      // Nullable enum columns stay nullable.
+      db.exec(`UPDATE settings SET identity_provider = NULL WHERE install_id = 't'`);
+    });
+  });
+
   it('refuses an install id that could break the seed SQL', () => {
     expect(() => seedSql("x'); DROP TABLE settings; --")).toThrow();
   });

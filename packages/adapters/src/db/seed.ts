@@ -14,6 +14,7 @@ export function seedSql(installId: string): string {
   const columns: [string, string | number | boolean | null][] = [
     ['install_id', installId],
     ['product_name', s.productName],
+    ['company_name', s.companyName],
     ['theme_accent', s.themeAccent],
     ['theme_primary', s.themePrimary],
     ['identity_provider', s.identityProvider],
@@ -25,6 +26,7 @@ export function seedSql(installId: string): string {
     ['retention_audio_days', s.retentionAudioDays],
     ['retention_transcript_days', s.retentionTranscriptDays],
     ['mcp_enabled', s.mcpEnabled],
+    ['recording_sources', JSON.stringify(s.recordingSources)],
   ];
   const values = columns.map(([, v]) =>
     v === null ? 'NULL' : typeof v === 'string' ? quote(v) : Number(v),

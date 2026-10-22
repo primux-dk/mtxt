@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "dd42f27b-ff44-4c82-af93-d7abf3e4dc63",
+  "id": "9d868c96-1143-453e-961d-4d53533cc2f3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "audit_events": {
@@ -52,11 +52,10 @@
         }
       },
       "indexes": {
-        "audit_events_install_at": {
-          "name": "audit_events_install_at",
+        "audit_events_user": {
+          "name": "audit_events_user",
           "columns": [
-            "install_id",
-            "at"
+            "user_id"
           ],
           "isUnique": false
         },
@@ -64,6 +63,14 @@
           "name": "audit_events_meeting",
           "columns": [
             "meeting_id"
+          ],
+          "isUnique": false
+        },
+        "audit_events_install_at": {
+          "name": "audit_events_install_at",
+          "columns": [
+            "install_id",
+            "at"
           ],
           "isUnique": false
         }
@@ -98,7 +105,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "audit_events_action_check": {
+          "name": "audit_events_action_check",
+          "value": "\"action\" IN ('opened', 'exported', 'shared', 'visibility_changed', 'deleted', 'mcp_read', 'mcp_write')"
+        }
+      }
     },
     "decisions": {
       "name": "decisions",
@@ -152,6 +164,13 @@
           "name": "decisions_recap",
           "columns": [
             "recap_id"
+          ],
+          "isUnique": false
+        },
+        "decisions_owner": {
+          "name": "decisions_owner",
+          "columns": [
+            "owner_user_id"
           ],
           "isUnique": false
         }
@@ -263,6 +282,13 @@
       "indexes": {
         "meeting_shares_user": {
           "name": "meeting_shares_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "meeting_shares_install_user": {
+          "name": "meeting_shares_install_user",
           "columns": [
             "install_id",
             "user_id"
@@ -387,6 +413,20 @@
         }
       },
       "indexes": {
+        "meetings_owner": {
+          "name": "meetings_owner",
+          "columns": [
+            "owner_id"
+          ],
+          "isUnique": false
+        },
+        "meetings_template": {
+          "name": "meetings_template",
+          "columns": [
+            "template_id"
+          ],
+          "isUnique": false
+        },
         "meetings_install_owner": {
           "name": "meetings_install_owner",
           "columns": [
@@ -442,7 +482,12 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "meetings_visibility_check": {
+          "name": "meetings_visibility_check",
+          "value": "\"visibility\" IN ('private', 'shared', 'company')"
+        }
+      }
     },
     "recap_versions": {
       "name": "recap_versions",
@@ -497,6 +542,13 @@
           "columns": [
             "recap_id",
             "created_at"
+          ],
+          "isUnique": false
+        },
+        "recap_versions_author": {
+          "name": "recap_versions_author",
+          "columns": [
+            "author_id"
           ],
           "isUnique": false
         }
@@ -594,6 +646,20 @@
             "meeting_id"
           ],
           "isUnique": true
+        },
+        "recaps_template": {
+          "name": "recaps_template",
+          "columns": [
+            "template_id"
+          ],
+          "isUnique": false
+        },
+        "recaps_current_version": {
+          "name": "recaps_current_version",
+          "columns": [
+            "current_version_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -739,6 +805,13 @@
           ],
           "isUnique": false
         },
+        "recordings_uploaded_by": {
+          "name": "recordings_uploaded_by",
+          "columns": [
+            "uploaded_by"
+          ],
+          "isUnique": false
+        },
         "recordings_install_delete_audio": {
           "name": "recordings_install_delete_audio",
           "columns": [
@@ -746,6 +819,14 @@
             "delete_audio_at"
           ],
           "isUnique": false
+        },
+        "recordings_one_primary": {
+          "name": "recordings_one_primary",
+          "columns": [
+            "meeting_id"
+          ],
+          "isUnique": true,
+          "where": "\"is_primary\" = 1"
         }
       },
       "foreignKeys": {
@@ -778,7 +859,16 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "recordings_source_check": {
+          "name": "recordings_source_check",
+          "value": "\"source\" IN ('desktop', 'browser', 'upload', 'teams', 'meet', 'device')"
+        },
+        "recordings_status_check": {
+          "name": "recordings_status_check",
+          "value": "\"status\" IN ('uploading', 'confirmed', 'transcribing', 'transcribed', 'failed')"
+        }
+      }
     },
     "segments": {
       "name": "segments",
@@ -841,6 +931,13 @@
             "start_ms"
           ],
           "isUnique": false
+        },
+        "segments_speaker": {
+          "name": "segments_speaker",
+          "columns": [
+            "speaker_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -890,6 +987,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "company_name": {
+          "name": "company_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "theme_accent": {
@@ -977,13 +1081,38 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
+        },
+        "recording_sources": {
+          "name": "recording_sources",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[\"desktop\",\"upload\",\"browser\"]'"
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraints": {
+        "settings_identity_provider_check": {
+          "name": "settings_identity_provider_check",
+          "value": "\"identity_provider\" IN ('entra', 'google')"
+        },
+        "settings_stt_provider_check": {
+          "name": "settings_stt_provider_check",
+          "value": "\"stt_provider\" IN ('assemblyai', 'azure', 'elevenlabs', 'workers-ai-whisper', 'local-whisper', 'local-parakeet')"
+        },
+        "settings_default_visibility_check": {
+          "name": "settings_default_visibility_check",
+          "value": "\"default_visibility\" IN ('private', 'shared', 'company')"
+        },
+        "settings_interface_language_check": {
+          "name": "settings_interface_language_check",
+          "value": "\"interface_language\" IN ('en', 'da')"
+        }
+      }
     },
     "speakers": {
       "name": "speakers",
@@ -1029,6 +1158,13 @@
           "name": "speakers_meeting",
           "columns": [
             "meeting_id"
+          ],
+          "isUnique": false
+        },
+        "speakers_user": {
+          "name": "speakers_user",
+          "columns": [
+            "user_id"
           ],
           "isUnique": false
         }
@@ -1186,7 +1322,7 @@
           "columns": [
             "recording_id"
           ],
-          "isUnique": false
+          "isUnique": true
         }
       },
       "foreignKeys": {
