@@ -1,0 +1,374 @@
+/**
+ * The database schema, one per install. Columns follow docs/spec.md "Data model".
+ *
+ * Written on drizzle-orm/sqlite-core, which D1 and SQLite share. Postgres (a later
+ * Docker edition) needs its own pg-core copy of these tables; the column names and
+ * types stay the same so queries in apps/web do not change.
+ *
+ * Every row carries `install_id`. v1 runs one company per install and no code
+ * assumes otherwise; the column is there so a row can never be read into the
+ * wrong install by mistake.
+ *
+ * Ids are text (UUIDs from crypto.randomUUID()). Times are integer milliseconds.
+ */
+import { sql } from 'drizzle-orm';
+import {
+  type AnySQLiteColumn,
+  check,
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+
+export const VISIBILITIES = ['private', 'shared', 'company'] as const;
+export const RECORDING_SOURCES = [
+  'desktop',
+  'browser',
+  'upload',
+  'teams',
+  'meet',
+  'device',
+] as const;
+export const RECORDING_STATUSES = [
+  'uploading',
+  'confirmed',
+  'transcribing',
+  'transcribed',
+  'failed',
+] as const;
+export const AUDIT_ACTIONS = [
+  'opened',
+  'exported',
+  'shared',
+  'visibility_changed',
+  'deleted',
+  'mcp_read',
+  'mcp_write',
+] as const;
+export const IDENTITY_PROVIDERS = ['entra', 'google'] as const;
+export const STT_PROVIDERS = [
+  'assemblyai',
+  'azure',
+  'elevenlabs',
+  'workers-ai-whisper',
+  'local-whisper',
+  'local-parakeet',
+] as const;
+export const INTERFACE_LANGUAGES = ['en', 'da'] as const;
+/** The settings page's "Recording sources": where a meeting may come from. */
+export const CAPTURE_SOURCES = ['desktop', 'upload', 'browser', 'teams', 'meet'] as const;
+
+const id = () =>
+  text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID());
+const installId = () => text('install_id').notNull();
+const timestamp = (name: string) => integer(name, { mode: 'timestamp_ms' });
+const createdAt = (name = 'created_at') =>
+  timestamp(name)
+    .notNull()
+    .default(sql`(cast(unixepoch('subsec') * 1000 as integer))`);
+const bool = (name: string) => integer(name, { mode: 'boolean' });
+
+/** A CHECK that holds an enum column to its values. NULL passes, so nullable columns stay nullable. */
+const inValues = (table: string, column: string, values: readonly string[]) =>
+  check(
+    `${table}_${column}_check`,
+    sql.raw(`"${column}" IN (${values.map((v) => `'${v}'`).join(', ')})`),
+  );
+
+export const users = sqliteTable(
+  'users',
+  {
+    id: id(),
+    installId: installId(),
+    oidcSubject: text('oidc_subject').notNull(),
+    email: text('email').notNull(),
+    name: text('name').notNull(),
+    isAdmin: bool('is_admin').notNull().default(false),
+  },
+  (t) => [uniqueIndex('users_install_subject').on(t.installId, t.oidcSubject)],
+);
+
+export const templates = sqliteTable(
+  'templates',
+  {
+    id: id(),
+    installId: installId(),
+    name: text('name').notNull(),
+    bodyMd: text('body_md').notNull(),
+    isDefault: bool('is_default').notNull().default(false),
+  },
+  (t) => [index('templates_install').on(t.installId)],
+);
+
+export const meetings = sqliteTable(
+  'meetings',
+  {
+    id: id(),
+    installId: installId(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id),
+    title: text('title').notNull(),
+    startedAt: timestamp('started_at').notNull(),
+    visibility: text('visibility', { enum: VISIBILITIES }).notNull().default('private'),
+    keep: bool('keep').notNull().default(false),
+    templateId: text('template_id').references(() => templates.id),
+    /** Archive is not delete (behaviour.md rule 3): hidden from library views, restorable. */
+    archivedAt: timestamp('archived_at'),
+    deletedAt: timestamp('deleted_at'),
+  },
+  (t) => [
+    index('meetings_owner').on(t.ownerId),
+    index('meetings_template').on(t.templateId),
+    index('meetings_install_owner').on(t.installId, t.ownerId),
+    index('meetings_install_visibility').on(t.installId, t.visibility),
+    index('meetings_install_started').on(t.installId, t.startedAt),
+    inValues('meetings', 'visibility', VISIBILITIES),
+  ],
+);
+
+/** Rows exist only for `shared` visibility. */
+export const meetingShares = sqliteTable(
+  'meeting_shares',
+  {
+    installId: installId(),
+    meetingId: text('meeting_id')
+      .notNull()
+      .references(() => meetings.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.meetingId, t.userId] }),
+    index('meeting_shares_user').on(t.userId),
+    index('meeting_shares_install_user').on(t.installId, t.userId),
+  ],
+);
+
+export const recordings = sqliteTable(
+  'recordings',
+  {
+    id: id(),
+    installId: installId(),
+    meetingId: text('meeting_id')
+      .notNull()
+      .references(() => meetings.id, { onDelete: 'cascade' }),
+    uploadedBy: text('uploaded_by')
+      .notNull()
+      .references(() => users.id),
+    source: text('source', { enum: RECORDING_SOURCES }).notNull(),
+    isPrimary: bool('is_primary').notNull().default(false),
+    durationS: integer('duration_s').notNull(),
+    sha256: text('sha256').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    storagePath: text('storage_path').notNull(),
+    status: text('status', { enum: RECORDING_STATUSES }).notNull().default('uploading'),
+    deleteAudioAt: timestamp('delete_audio_at'),
+  },
+  (t) => [
+    index('recordings_meeting').on(t.meetingId),
+    index('recordings_uploaded_by').on(t.uploadedBy),
+    index('recordings_install_delete_audio').on(t.installId, t.deleteAudioAt),
+    /** One primary recording per meeting. */
+    uniqueIndex('recordings_one_primary')
+      .on(t.meetingId)
+      .where(sql`"is_primary" = 1`),
+    inValues('recordings', 'source', RECORDING_SOURCES),
+    inValues('recordings', 'status', RECORDING_STATUSES),
+  ],
+);
+
+export const transcripts = sqliteTable(
+  'transcripts',
+  {
+    id: id(),
+    installId: installId(),
+    recordingId: text('recording_id')
+      .notNull()
+      .references(() => recordings.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    language: text('language').notNull(),
+    rawJson: text('raw_json', { mode: 'json' }).notNull(),
+    createdAt: createdAt(),
+  },
+  /** One server transcript per recording; the live preview is never stored. */
+  (t) => [uniqueIndex('transcripts_recording').on(t.recordingId)],
+);
+
+/** A label can link to a directory user; externals stay plain labels. */
+export const speakers = sqliteTable(
+  'speakers',
+  {
+    id: id(),
+    installId: installId(),
+    meetingId: text('meeting_id')
+      .notNull()
+      .references(() => meetings.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    userId: text('user_id').references(() => users.id),
+  },
+  (t) => [index('speakers_meeting').on(t.meetingId), index('speakers_user').on(t.userId)],
+);
+
+export const segments = sqliteTable(
+  'segments',
+  {
+    id: id(),
+    installId: installId(),
+    transcriptId: text('transcript_id')
+      .notNull()
+      .references(() => transcripts.id, { onDelete: 'cascade' }),
+    speakerId: text('speaker_id').references(() => speakers.id),
+    startMs: integer('start_ms').notNull(),
+    endMs: integer('end_ms').notNull(),
+    text: text('text').notNull(),
+  },
+  (t) => [
+    index('segments_transcript_start').on(t.transcriptId, t.startMs),
+    index('segments_speaker').on(t.speakerId),
+  ],
+);
+
+export const recaps = sqliteTable(
+  'recaps',
+  {
+    id: id(),
+    installId: installId(),
+    meetingId: text('meeting_id')
+      .notNull()
+      .references(() => meetings.id, { onDelete: 'cascade' }),
+    templateId: text('template_id').references(() => templates.id),
+    bodyMd: text('body_md').notNull().default(''),
+    currentVersionId: text('current_version_id').references(
+      (): AnySQLiteColumn => recapVersions.id,
+    ),
+    docxPath: text('docx_path'),
+  },
+  (t) => [
+    uniqueIndex('recaps_meeting').on(t.meetingId),
+    index('recaps_template').on(t.templateId),
+    index('recaps_current_version').on(t.currentVersionId),
+  ],
+);
+
+/** One per save. `author_id` null means the AI draft (version 1). */
+export const recapVersions = sqliteTable(
+  'recap_versions',
+  {
+    id: id(),
+    installId: installId(),
+    recapId: text('recap_id')
+      .notNull()
+      .references((): AnySQLiteColumn => recaps.id, { onDelete: 'cascade' }),
+    authorId: text('author_id').references(() => users.id),
+    bodyMd: text('body_md').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('recap_versions_recap_created').on(t.recapId, t.createdAt),
+    index('recap_versions_author').on(t.authorId),
+  ],
+);
+
+/** Lifted from the recap by the AI, editable. */
+export const decisions = sqliteTable(
+  'decisions',
+  {
+    id: id(),
+    installId: installId(),
+    recapId: text('recap_id')
+      .notNull()
+      .references(() => recaps.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    ownerUserId: text('owner_user_id').references(() => users.id),
+    done: bool('done').notNull().default(false),
+  },
+  (t) => [index('decisions_recap').on(t.recapId), index('decisions_owner').on(t.ownerUserId)],
+);
+
+/** One list per install. */
+export const keyterms = sqliteTable(
+  'keyterms',
+  {
+    id: id(),
+    installId: installId(),
+    term: text('term').notNull(),
+    boost: real('boost'),
+  },
+  (t) => [uniqueIndex('keyterms_install_term').on(t.installId, t.term)],
+);
+
+/**
+ * One row per install: the whole admin surface (docs/spec.md "Settings page").
+ * Credentials for the identity and speech-to-text providers are Worker secrets,
+ * not columns.
+ */
+export const settings = sqliteTable(
+  'settings',
+  {
+    installId: text('install_id').primaryKey(),
+    productName: text('product_name').notNull(),
+    /** Shown under the product name in the sidebar and in the login footer. */
+    companyName: text('company_name'),
+    themeAccent: text('theme_accent').notNull().default('#566b45'),
+    themePrimary: text('theme_primary').notNull().default('#111111'),
+    identityProvider: text('identity_provider', { enum: IDENTITY_PROVIDERS }),
+    sttProvider: text('stt_provider', { enum: STT_PROVIDERS }),
+    /** Default transcription language: an ISO code, or `auto`. */
+    language: text('language').notNull().default('auto'),
+    interfaceLanguage: text('interface_language', { enum: INTERFACE_LANGUAGES })
+      .notNull()
+      .default('en'),
+    liveTranscriptDefault: bool('live_transcript_default').notNull().default(false),
+    defaultVisibility: text('default_visibility', { enum: VISIBILITIES })
+      .notNull()
+      .default('private'),
+    retentionAudioDays: integer('retention_audio_days').notNull().default(30),
+    retentionTranscriptDays: integer('retention_transcript_days').notNull().default(365),
+    mcpEnabled: bool('mcp_enabled').notNull().default(false),
+    /** JSON array of CAPTURE_SOURCES the install accepts. */
+    recordingSources: text('recording_sources', { mode: 'json' })
+      .$type<readonly (typeof CAPTURE_SOURCES)[number][]>()
+      .notNull()
+      .default(sql`'["desktop","upload","browser"]'`),
+  },
+  () => [
+    inValues('settings', 'identity_provider', IDENTITY_PROVIDERS),
+    inValues('settings', 'stt_provider', STT_PROVIDERS),
+    inValues('settings', 'default_visibility', VISIBILITIES),
+    inValues('settings', 'interface_language', INTERFACE_LANGUAGES),
+  ],
+);
+
+export const auditEvents = sqliteTable(
+  'audit_events',
+  {
+    id: id(),
+    installId: installId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    meetingId: text('meeting_id').references(() => meetings.id, { onDelete: 'set null' }),
+    action: text('action', { enum: AUDIT_ACTIONS }).notNull(),
+    at: createdAt('at'),
+  },
+  (t) => [
+    index('audit_events_user').on(t.userId),
+    index('audit_events_meeting').on(t.meetingId),
+    index('audit_events_install_at').on(t.installId, t.at),
+    inValues('audit_events', 'action', AUDIT_ACTIONS),
+  ],
+);
+
+export type Settings = typeof settings.$inferSelect;
+export type NewSettings = typeof settings.$inferInsert;
+export type Visibility = (typeof VISIBILITIES)[number];
+export type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];

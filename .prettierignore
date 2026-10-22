@@ -1,0 +1,13 @@
+pnpm-lock.yaml
+docs/
+*.md
+packages/contract/src/types.ts
+packages/adapters/migrations/
+apps/web/.next/
+apps/web/.open-next/
+apps/web/.wrangler/
+apps/web/cloudflare-env.d.ts
+apps/web/e2e/__screenshots__/
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/components/ui/

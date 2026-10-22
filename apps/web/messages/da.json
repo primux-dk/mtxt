@@ -1,0 +1,303 @@
+{
+  "locale": {
+    "intl": "da-DK",
+    "name": "Dansk"
+  },
+  "format": {
+    "durationMinutes": "{minutes} min.",
+    "others": "{count, plural, one {# anden} other {# andre}}",
+    "rate": "{rate}×"
+  },
+  "common": {
+    "save": "Gem",
+    "cancel": "Annuller",
+    "close": "Luk"
+  },
+  "language": {
+    "da": "Dansk",
+    "en": "Engelsk",
+    "option": "{code} · {name}"
+  },
+  "nav": {
+    "main": {
+      "label": "Hovednavigation"
+    },
+    "mobile": {
+      "label": "Mobilnavigation",
+      "description": "Gå til en anden del af biblioteket."
+    },
+    "open": "Åbn navigation",
+    "close": "Luk navigation",
+    "myMeetings": "Mine møder",
+    "sharedWithMe": "Delt med mig",
+    "wholeCompany": "Hele virksomheden",
+    "settings": "Indstillinger",
+    "signedOut": "Ikke logget ind"
+  },
+  "login": {
+    "signInWith": "Log ind med {provider}",
+    "footer": "En installation hos {company}"
+  },
+  "visibility": {
+    "private": "Privat",
+    "shared": "Delt",
+    "company": "Virksomhed"
+  },
+  "status": {
+    "ready": "Klar",
+    "transcribing": "Transskriberer"
+  },
+  "library": {
+    "search": {
+      "placeholder": "Søg i møder og transskriptioner",
+      "label": "Søg i de møder, du har adgang til"
+    },
+    "uploadAudio": "Overfør lyd",
+    "newMeeting": "Nyt møde",
+    "mine": {
+      "subheading": "Møder, du har optaget eller overført."
+    },
+    "filters": {
+      "label": "Filtre"
+    },
+    "filter": {
+      "all": "Alle",
+      "thisWeek": "Denne uge",
+      "private": "Private",
+      "shared": "Delte"
+    },
+    "count": "{count, plural, one {# møde} other {# møder}}",
+    "sort": {
+      "newest": "Nyeste først"
+    },
+    "showing": "Viser {shown} af {total, plural, one {# møde} other {# møder}}",
+    "showMore": "Vis flere møder",
+    "empty": {
+      "first": {
+        "title": "Ingen møder endnu",
+        "body": "Optag et møde med desktopoptageren, eller overfør en lydfil. Det er privat, indtil du deler det.",
+        "download": "Hent optageren",
+        "upload": "Overfør en fil"
+      },
+      "noMatch": {
+        "title": "Ingen møder passer til søgningen",
+        "body": "Ingen møder passer til søgningen og filtrene.",
+        "reset": "Nulstil filtre"
+      },
+      "failed": {
+        "title": "Kunne ikke hente møder",
+        "body": "Biblioteket blev ikke hentet. Tjek forbindelsen, og prøv igen.",
+        "retry": "Prøv igen"
+      }
+    },
+    "shared": {
+      "subheading": "Møder, som kolleger har delt med dig."
+    },
+    "company": {
+      "subheading": "Møder, der er delt med hele virksomheden."
+    }
+  },
+  "meeting": {
+    "back": "Alle møder",
+    "speakers": "{count, plural, one {# taler} other {# talere}}",
+    "visibility": {
+      "label": "Synlighed. Kun ejeren kan ændre den."
+    },
+    "keep": {
+      "text": "Behold",
+      "label": "Behold mødet uden automatisk sletning"
+    },
+    "export": "Eksportér",
+    "player": {
+      "label": "Lydafspiller",
+      "play": "Afspil optagelse",
+      "position": "Placering i optagelsen, sekunder",
+      "rate": "Afspilningshastighed"
+    },
+    "tabs": {
+      "label": "Mødeindhold",
+      "recap": "Referat",
+      "transcript": "Transskription"
+    }
+  },
+  "transcript": {
+    "head": "{language} · {count, plural, one {# taler} other {# talere}} · Klik på en taler for at omdøbe",
+    "headShort": "{language} · {count, plural, one {# taler} other {# talere}}",
+    "speaker": {
+      "rename": "{name}, omdøb eller tilknyt kollega",
+      "unnamed": "Taler {number}"
+    },
+    "position": "Viser {position} af {duration}"
+  },
+  "speaker": {
+    "rename": {
+      "title": "Omdøb taler",
+      "field": "Navn",
+      "help": "Det nye navn gælder alle linjer fra denne taler i dette møde."
+    }
+  },
+  "recap": {
+    "template": {
+      "heading": "Referatskabelon",
+      "label": "Vælg referatskabelon"
+    },
+    "versions": "AI-udkast v1, redigeret af {name} v{version}",
+    "status": {
+      "saving": "Gemmer",
+      "saved": "Gemt",
+      "notSaved": "Ikke gemt"
+    },
+    "toolbar": {
+      "label": "Referatformatering",
+      "heading": "Anvend overskrift",
+      "bold": "Slå fed skrift til eller fra",
+      "italic": "Slå kursiv til eller fra",
+      "bulletList": "Slå punktopstilling til eller fra",
+      "link": "Tilføj link",
+      "undo": "Fortryd"
+    },
+    "decision": {
+      "markDone": "Markér som færdig: {task}"
+    },
+    "editorHint": "Skriv / for blokke. Brug @ til kolleger."
+  },
+  "recorder": {
+    "meetingTitle": "Mødetitel",
+    "stop": "Stop optagelse",
+    "capturing": "Optager mikrofon og systemlyd",
+    "mic": {
+      "text": "Mikrofon",
+      "level": "Mikrofonniveau"
+    },
+    "system": {
+      "text": "Systemlyd",
+      "level": "Systemlydniveau"
+    },
+    "live": "Live transskription",
+    "queue": {
+      "heading": "Seneste optagelser",
+      "count": "{count, plural, one {# fil} other {# filer}}",
+      "uploading": "Overfører {done}/{total}",
+      "confirmed": "Bekræftet",
+      "pendingNetwork": "Venter på netværk · Prøver igen",
+      "warn24h": "Advarsel: ikke overført i 24 timer · Prøv nu"
+    },
+    "model": {
+      "label": "Lokal model",
+      "downloaded": "{model} · Hentet",
+      "download": "{model} · Hent model"
+    }
+  },
+  "live": {
+    "label": "Live",
+    "pause": "Sæt teksten på pause",
+    "hide": "Skjul teksten",
+    "foot": "Lokal forhåndsvisning · Optagelsen fortsætter, når du skjuler teksten."
+  },
+  "settings": {
+    "title": "Indstillinger",
+    "subheading": "Virksomhedens opsætning. Kun for administratorer.",
+    "adminBadge": "Administrator",
+    "productName": {
+      "heading": "Produktnavn",
+      "help": "Navnet på loginsiden, i optageren og i menulinjen.",
+      "field": "Navn",
+      "required": "Skriv et produktnavn. Det vises på loginsiden og i optageren."
+    },
+    "theme": {
+      "heading": "Tema",
+      "help": "To farver. Resten følger af dem.",
+      "accent": "Accentfarve",
+      "accentHelp": "Valg, fokus og små signaler.",
+      "primary": "Knapfarve",
+      "primaryHelp": "Den ene hovedhandling på hver skærm.",
+      "note": "Toner, linjer, fokusringen og mørkt tema afledes af de to værdier. Accenttekst på baggrunden, knaptekst på knappen og accenttekst på et kort skal hver have mindst 4,5:1 i kontrast i begge temaer. Optageren læser de samme værdier, når brugeren logger ind.",
+      "preview": "Forhåndsvisning"
+    },
+    "login": {
+      "heading": "Virksomhedslogin",
+      "help": "Ingen lokale konti eller adgangskoder.",
+      "provider": "Identitetsudbyder",
+      "tenantId": "Lejer-id",
+      "clientId": "Klient-id",
+      "clientSecret": "Klienthemmelighed",
+      "secretHelp": "Hemmeligheder vises aldrig i klartekst."
+    },
+    "stt": {
+      "heading": "Transskription",
+      "help": "Én udbyder for hele installationen.",
+      "provider": "Udbyder af tale til tekst",
+      "local": "Lokal {model}",
+      "apiKey": "API-nøgle",
+      "region": "Region",
+      "regionEu": "EU",
+      "regionDefault": "Udbyderens standard",
+      "regionHelp": "Azure viser sine tilgængelige regioner.",
+      "language": "Standardsprog for transskription",
+      "autoDetect": "Find sproget automatisk"
+    },
+    "interfaceLanguage": {
+      "heading": "Sprog i brugerfladen",
+      "help": "Standarden for denne installation.",
+      "field": "Standardsprog for brugerfladen",
+      "note": "Brugerens browser- eller systemsprog bruges, hvis der findes en oversættelse."
+    },
+    "keyterms": {
+      "heading": "Virksomhedens ord",
+      "help": "Produktnavne, navne og fagord.",
+      "field": "Nøgleord",
+      "fieldHelp": "Ét ord eller udtryk pr. linje.",
+      "import": "Importér CSV"
+    },
+    "defaults": {
+      "heading": "Standarder",
+      "help": "Brugerne kan selv slå live transskription til.",
+      "liveDefault": "Live transskription som standard",
+      "liveDefaultHelp": "Fra. Den lokale tekst er kun en forhåndsvisning.",
+      "visibility": "Synlighed for nye møder",
+      "visibilityShared": "Delt med valgte kolleger",
+      "visibilityCompany": "Hele virksomheden",
+      "visibilityHelp": "Kun mødeejeren kan ændre synligheden."
+    },
+    "sources": {
+      "heading": "Optagekilder",
+      "help": "Teams og Meet gælder kun møder, virksomheden selv har arrangeret.",
+      "desktop": "Desktopoptager",
+      "upload": "Overførsel af lydfil",
+      "browser": "Browseroptager",
+      "onedrive": "OneDrive · Teams-optagelser",
+      "drive": "Google Drive · Meet-optagelser"
+    },
+    "templates": {
+      "heading": "Referatskabeloner",
+      "help": "Flere skabeloner. Medarbejderen vælger én til hvert møde.",
+      "name": "Skabelonnavn",
+      "body": "Indhold i Markdown",
+      "add": "Tilføj skabelon"
+    },
+    "retention": {
+      "heading": "Opbevaring",
+      "help": "Automatisk sletning kører hver nat. Behold-flaget undtager hele mødet.",
+      "audio": "Lyd, antal dage",
+      "text": "Transskription og referat, antal dage"
+    },
+    "mcp": {
+      "heading": "MCP",
+      "help": "AI-værktøjer bruger medarbejderens eget virksomhedslogin.",
+      "server": "MCP-server",
+      "serverHelp": "Kun tilladte møder. Læsning og ændringer logges."
+    },
+    "dataflow": {
+      "heading": "Dataflow",
+      "step1": "Optageren sender lyd til virksomhedens egen Cloudflare-konto. Lyd i R2 lagres med EU-jurisdiktion, og uploadsessioner i Durable Objects bruger jurisdiktionen eu. Begge dele er tilgængelige uden Enterprise.",
+      "step2": "{provider} modtager lyd og nøgleord direkte og sender tekst og talere tilbage.",
+      "step3": "Den valgte sprogmodel skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
+      "step4": "Lyd slettes efter {audioDays, plural, one {# dag} other {# dage}}. Transskriptioner og referater slettes efter {textDays, plural, one {# dag} other {# dage}}. Behold forhindrer begge sletninger.",
+      "promise": "Det er ikke garanteret, at al behandling sker i EU.",
+      "caveats": "D1 har ingen indstilling for jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
+      "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen."
+    },
+    "footer": "Ændringer gælder for denne installation.",
+    "save": "Gem indstillinger"
+  }
+}

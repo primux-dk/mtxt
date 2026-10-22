@@ -1,0 +1,30 @@
+{
+  "caniuse-lite": {
+    "license": "CC-BY-4.0",
+    "reason": "build-time data table under Next, CC-BY-4.0 permits redistribution with attribution"
+  },
+  "glob": {
+    "license": "BlueOak-1.0.0",
+    "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  },
+  "jackspeak": {
+    "license": "BlueOak-1.0.0",
+    "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  },
+  "lru-cache": {
+    "license": "BlueOak-1.0.0",
+    "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  },
+  "minimatch": {
+    "license": "BlueOak-1.0.0",
+    "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  },
+  "minipass": {
+    "license": "BlueOak-1.0.0",
+    "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  },
+  "path-scurry": {
+    "license": "BlueOak-1.0.0",
+    "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  }
+}

@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local secrets. Never commit .dev.vars.
+# Nothing is needed in packet 1. Later packets add, for example:
+# OIDC_CLIENT_SECRET=
+# STT_API_KEY=

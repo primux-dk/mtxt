@@ -11,3 +11,13 @@
 *.wav
 *.ogg
 *.mp4
+node_modules/
+.next/
+.open-next/
+.wrangler/
+.dev.vars
+*.tsbuildinfo
+next-env.d.ts
+test-results/
+playwright-report/
+coverage/

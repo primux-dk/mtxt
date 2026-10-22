@@ -1,0 +1,303 @@
+{
+  "locale": {
+    "intl": "en-GB",
+    "name": "English"
+  },
+  "format": {
+    "durationMinutes": "{minutes} min",
+    "others": "{count, plural, one {# other} other {# others}}",
+    "rate": "{rate}×"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "language": {
+    "da": "Danish",
+    "en": "English",
+    "option": "{code} · {name}"
+  },
+  "nav": {
+    "main": {
+      "label": "Main navigation"
+    },
+    "mobile": {
+      "label": "Mobile navigation",
+      "description": "Go to another part of the library."
+    },
+    "open": "Open navigation",
+    "close": "Close navigation",
+    "myMeetings": "My meetings",
+    "sharedWithMe": "Shared with me",
+    "wholeCompany": "Whole company",
+    "settings": "Settings",
+    "signedOut": "Not signed in"
+  },
+  "login": {
+    "signInWith": "Sign in with {provider}",
+    "footer": "An installation for {company}"
+  },
+  "visibility": {
+    "private": "Private",
+    "shared": "Shared",
+    "company": "Company"
+  },
+  "status": {
+    "ready": "Ready",
+    "transcribing": "Transcribing"
+  },
+  "library": {
+    "search": {
+      "placeholder": "Search meetings and transcripts",
+      "label": "Search the meetings you can see"
+    },
+    "uploadAudio": "Upload audio",
+    "newMeeting": "New meeting",
+    "mine": {
+      "subheading": "Meetings you recorded or uploaded."
+    },
+    "filters": {
+      "label": "Filters"
+    },
+    "filter": {
+      "all": "All",
+      "thisWeek": "This week",
+      "private": "Private",
+      "shared": "Shared"
+    },
+    "count": "{count, plural, one {# meeting} other {# meetings}}",
+    "sort": {
+      "newest": "Newest first"
+    },
+    "showing": "Showing {shown} of {total, plural, one {# meeting} other {# meetings}}",
+    "showMore": "Show more meetings",
+    "empty": {
+      "first": {
+        "title": "No meetings yet",
+        "body": "Record a meeting with the desktop recorder or upload an audio file. It stays private until you share it.",
+        "download": "Download the recorder",
+        "upload": "Upload a file"
+      },
+      "noMatch": {
+        "title": "No meetings match",
+        "body": "No meeting matches the search and filters.",
+        "reset": "Reset filters"
+      },
+      "failed": {
+        "title": "Could not load meetings",
+        "body": "The library did not load. Check the connection and try again.",
+        "retry": "Try again"
+      }
+    },
+    "shared": {
+      "subheading": "Meetings colleagues shared with you."
+    },
+    "company": {
+      "subheading": "Meetings shared with the whole company."
+    }
+  },
+  "meeting": {
+    "back": "All meetings",
+    "speakers": "{count, plural, one {# speaker} other {# speakers}}",
+    "visibility": {
+      "label": "Visibility, only the owner can change it"
+    },
+    "keep": {
+      "text": "Keep",
+      "label": "Keep this meeting from automatic deletion"
+    },
+    "export": "Export",
+    "player": {
+      "label": "Audio player",
+      "play": "Play recording",
+      "position": "Position in the recording, seconds",
+      "rate": "Playback speed"
+    },
+    "tabs": {
+      "label": "Meeting content",
+      "recap": "Recap",
+      "transcript": "Transcript"
+    }
+  },
+  "transcript": {
+    "head": "{language} · {count, plural, one {# speaker} other {# speakers}} · Click a speaker to rename",
+    "headShort": "{language} · {count, plural, one {# speaker} other {# speakers}}",
+    "speaker": {
+      "rename": "{name}, rename or link to a colleague",
+      "unnamed": "Speaker {number}"
+    },
+    "position": "Showing {position} of {duration}"
+  },
+  "speaker": {
+    "rename": {
+      "title": "Rename speaker",
+      "field": "Name",
+      "help": "The new name applies to every line from this speaker in this meeting."
+    }
+  },
+  "recap": {
+    "template": {
+      "heading": "Recap template",
+      "label": "Choose recap template"
+    },
+    "versions": "AI draft v1, edited by {name} v{version}",
+    "status": {
+      "saving": "Saving",
+      "saved": "Saved",
+      "notSaved": "Not saved"
+    },
+    "toolbar": {
+      "label": "Recap formatting",
+      "heading": "Apply heading",
+      "bold": "Toggle bold",
+      "italic": "Toggle italic",
+      "bulletList": "Toggle bulleted list",
+      "link": "Add link",
+      "undo": "Undo"
+    },
+    "decision": {
+      "markDone": "Mark as done: {task}"
+    },
+    "editorHint": "Type / for blocks. Use @ for colleagues."
+  },
+  "recorder": {
+    "meetingTitle": "Meeting title",
+    "stop": "Stop recording",
+    "capturing": "Recording microphone and system audio",
+    "mic": {
+      "text": "Microphone",
+      "level": "Microphone level"
+    },
+    "system": {
+      "text": "System audio",
+      "level": "System audio level"
+    },
+    "live": "Live transcript",
+    "queue": {
+      "heading": "Recent recordings",
+      "count": "{count, plural, one {# file} other {# files}}",
+      "uploading": "Uploading {done}/{total}",
+      "confirmed": "Confirmed",
+      "pendingNetwork": "Waiting for network · Retrying",
+      "warn24h": "Warning: not uploaded for 24 hours · Try now"
+    },
+    "model": {
+      "label": "Local model",
+      "downloaded": "{model} · Downloaded",
+      "download": "{model} · Download model"
+    }
+  },
+  "live": {
+    "label": "Live",
+    "pause": "Pause live text",
+    "hide": "Hide live text",
+    "foot": "Local preview · Recording continues when you hide the text."
+  },
+  "settings": {
+    "title": "Settings",
+    "subheading": "The company's setup. Admins only.",
+    "adminBadge": "Admin",
+    "productName": {
+      "heading": "Product name",
+      "help": "The name on the login page, in the recorder and in the menu bar.",
+      "field": "Name",
+      "required": "Enter a product name. It appears on the login page and in the recorder."
+    },
+    "theme": {
+      "heading": "Theme",
+      "help": "Two colours. Everything else follows from them.",
+      "accent": "Accent colour",
+      "accentHelp": "Selection, focus and small signals.",
+      "primary": "Button colour",
+      "primaryHelp": "The one main action on each screen.",
+      "note": "Tints, lines, the focus ring and dark mode are derived from these two values. Accent text on the background, button text on the button, and accent on a card must each reach 4.5:1 in both themes. The recorder reads the same values at login.",
+      "preview": "Preview"
+    },
+    "login": {
+      "heading": "Company login",
+      "help": "No local accounts or passwords.",
+      "provider": "Identity provider",
+      "tenantId": "Tenant ID",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "secretHelp": "Secrets are never shown in clear text."
+    },
+    "stt": {
+      "heading": "Transcription",
+      "help": "One provider for the whole install.",
+      "provider": "Speech-to-text provider",
+      "local": "Local {model}",
+      "apiKey": "API key",
+      "region": "Region",
+      "regionEu": "EU",
+      "regionDefault": "Provider default",
+      "regionHelp": "Azure lists its available regions.",
+      "language": "Default transcription language",
+      "autoDetect": "Detect automatically"
+    },
+    "interfaceLanguage": {
+      "heading": "Interface language",
+      "help": "The default for this install.",
+      "field": "Default interface language",
+      "note": "A user's browser or operating system language wins when a translation exists."
+    },
+    "keyterms": {
+      "heading": "Company words",
+      "help": "Product names, people and jargon.",
+      "field": "Keyterms",
+      "fieldHelp": "One word or phrase per line.",
+      "import": "Import CSV"
+    },
+    "defaults": {
+      "heading": "Defaults",
+      "help": "Users can switch the live transcript on for themselves.",
+      "liveDefault": "Live transcript by default",
+      "liveDefaultHelp": "Off. The local text is only a preview.",
+      "visibility": "Visibility for new meetings",
+      "visibilityShared": "Shared with chosen colleagues",
+      "visibilityCompany": "Whole company",
+      "visibilityHelp": "Only the meeting owner can change visibility."
+    },
+    "sources": {
+      "heading": "Recording sources",
+      "help": "Teams and Meet cover only meetings the company organised.",
+      "desktop": "Desktop recorder",
+      "upload": "Audio file upload",
+      "browser": "Browser recorder",
+      "onedrive": "OneDrive · Teams recordings",
+      "drive": "Google Drive · Meet recordings"
+    },
+    "templates": {
+      "heading": "Recap templates",
+      "help": "Several templates. The employee picks one per meeting.",
+      "name": "Template name",
+      "body": "Content in Markdown",
+      "add": "Add template"
+    },
+    "retention": {
+      "heading": "Retention",
+      "help": "Automatic deletion runs every night. The keep flag exempts the whole meeting.",
+      "audio": "Audio, days",
+      "text": "Transcripts and recaps, days"
+    },
+    "mcp": {
+      "heading": "MCP",
+      "help": "AI tools use the employee's own company login.",
+      "server": "MCP server",
+      "serverHelp": "Permitted meetings only. Reads and changes are logged."
+    },
+    "dataflow": {
+      "heading": "Data flow",
+      "step1": "The recorder sends audio to the company's own Cloudflare account. R2 audio storage uses EU jurisdiction; Durable Objects upload sessions use jurisdiction eu. Both are available without Enterprise.",
+      "step2": "{provider} receives audio and keyterms directly and returns text and speakers.",
+      "step3": "The configured language model writes the recap from the transcript, with requests passing through AI Gateway. Meeting data is stored in D1.",
+      "step4": "Audio is deleted after {audioDays, plural, one {# day} other {# days}}. Transcripts and recaps are deleted after {textDays, plural, one {# day} other {# days}}. Keep prevents both deletions.",
+      "promise": "Processing is not guaranteed to stay in the EU.",
+      "caveats": "D1 has no jurisdiction setting. Worker placement is best effort, normally at the data centre nearest the request; regional restrictions require the Enterprise-only Data Localization Suite. Workers AI and AI Gateway are not covered by Regional Services.",
+      "local": "A local live transcript stays on the computer and is discarded when the meeting ends. After the server confirms a recording, the recorder keeps the audio locally for 7 days. Without a confirmation it keeps the file and retries."
+    },
+    "footer": "Changes apply to this installation.",
+    "save": "Save settings"
+  }
+}

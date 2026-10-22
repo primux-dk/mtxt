@@ -4,7 +4,7 @@ Meeting transcription a company hosts itself. A small recorder on each employee'
 
 Meetings only. No dictation.
 
-**Status: specified, not built.** The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). The first install is the author's own. Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
+**Status: specified; the v0.1 build has started.** The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). The first install is the author's own. Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -24,6 +24,25 @@ Meetings only. No dictation.
 - Library: Next.js with shadcn/ui, deployed to Cloudflare Workers in the company's own account: R2 for audio, Queues for jobs, Durable Objects for upload sessions, D1 for data, AI Gateway in front of the language model. Storage, queue and database sit behind adapters so a Docker edition stays possible. The recap editor is Tiptap core with the open React UI components.
 - Recorder: Tauri 2 and Rust, our own code under `apps/recorder` in this repo. The library is `apps/web`; the contract between them is `packages/contract`.
 - Speech-to-text and language models are adapters. The app holds no opinion about the provider.
+
+## Run it
+
+Prerequisites: Node 22 and pnpm 12 (`corepack enable` picks the version in `package.json`). No Cloudflare account is needed to run locally; wrangler emulates D1, R2, Queues and Durable Objects on disk under `apps/web/.wrangler`.
+
+```sh
+pnpm install
+pnpm db:migrate      # apply packages/adapters/migrations to the local D1
+pnpm db:seed         # write the default settings row (idempotent)
+pnpm dev             # next dev on http://localhost:3000, with the local bindings
+```
+
+- `pnpm preview` builds the Worker with OpenNext and serves it with `wrangler dev` on http://localhost:8787: the same code that deploys.
+- `pnpm test` runs the unit tests (Vitest). `pnpm test:e2e` builds the Worker, starts `wrangler dev` and runs the Playwright test; it needs Chromium for Playwright 1.63 (`pnpm --filter @mtxt/web exec playwright install chromium`).
+- `pnpm typecheck`, `pnpm lint`, `pnpm check:licenses` and `pnpm check:generated` are what CI runs.
+- After a schema change in `packages/adapters/src/db/schema.ts`, run `pnpm generate` and commit the new migration. After editing `packages/contract/openapi.yaml`, the same command regenerates the contract types.
+- `/design` serves the design guidelines rendered with the install's own theme values.
+
+Layout: `apps/web` is the library (Next.js on Cloudflare Workers), `packages/contract` the recorder-to-server contract, `packages/adapters` storage, queue and database behind interfaces. The web app reaches Cloudflare only through `@mtxt/adapters`.
 
 ## Licence
 

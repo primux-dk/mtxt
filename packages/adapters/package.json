@@ -1,0 +1,31 @@
+{
+  "name": "@mtxt/adapters",
+  "version": "0.0.0",
+  "private": true,
+  "license": "SEE LICENSE IN ../../LICENSE.md",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cloudflare": "./src/cloudflare/index.ts",
+    "./db/schema": "./src/db/schema.ts",
+    "./db/seed": "./src/db/seed.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261021.1",
+    "@mtxt/contract": "workspace:*",
+    "@types/node": "^22.20.5",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
