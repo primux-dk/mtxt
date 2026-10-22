@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import {
   CHUNK_SIZE_BYTES,
+  ERROR_CODES,
   RECORDING_SOURCES,
   RECORDING_STATUSES,
   type CreateRecordingRequest,
@@ -71,5 +72,25 @@ describe('contract', () => {
     // @ts-expect-error neither is not allowed
     const neither: CreateRecordingRequest = { ...details };
     expect([existing, created, both, neither]).toHaveLength(4);
+  });
+
+  it('takes sha256 and size_bytes together or not at all', () => {
+    const recording = {
+      duration_s: 0,
+      source: 'browser',
+      content_type: 'audio/webm',
+      meeting_id: 'm1',
+    } as const;
+    const streaming: CreateRecordingRequest = recording;
+    const whole: CreateRecordingRequest = { ...recording, sha256: 'a'.repeat(64), size_bytes: 1 };
+    // @ts-expect-error a hash without a size is not allowed
+    const half: CreateRecordingRequest = { ...recording, sha256: 'a'.repeat(64) };
+    expect([streaming, whole, half]).toHaveLength(3);
+  });
+
+  it('lists every error code it documents', async () => {
+    const spec = parse(await readFile(specUrl, 'utf8'));
+    const documented = spec.components.schemas.ErrorBody.properties.code.description;
+    for (const code of ERROR_CODES) expect(documented).toContain(`\`${code}\``);
   });
 });

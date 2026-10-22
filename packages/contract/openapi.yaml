@@ -42,8 +42,16 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No meeting with this `meeting_id` that the caller may see.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '413':
-          description: The file is larger than the install accepts.
+          description: The file is larger than the install accepts (2 GB in v0.1, `too_large`).
           content:
             application/json:
               schema:
@@ -61,6 +69,11 @@ paths:
     put:
       operationId: uploadChunk
       summary: Upload one chunk. Sending the same chunk again replaces it.
+      description: |
+        Every chunk but the last is exactly `chunk_size_bytes`. Chunks may arrive
+        in any order and more than once. When the size is not known yet (a
+        recording still in progress), a chunk smaller than `chunk_size_bytes` is
+        taken as the last one; complete checks it.
       parameters:
         - name: Content-Length
           in: header
@@ -86,10 +99,18 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: The recording is no longer accepting chunks (already confirmed or failed).
+          description: The recording is no longer accepting chunks (already confirmed or failed, `not_uploading`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`).
           content:
             application/json:
               schema:
@@ -100,6 +121,20 @@ paths:
     post:
       operationId: completeRecording
       summary: Ask the server to verify the whole file against the announced SHA-256.
+      description: |
+        Idempotent. Calling it again on a confirmed recording returns the
+        recording with its `confirmed_at`; the status may have moved on to
+        `transcribing`. The recorder treats `confirmed_at` as the confirmation.
+      requestBody:
+        required: false
+        description: |
+          Required when `sha256` and `size_bytes` were left out of the create
+          request, because the audio was still being recorded. When both
+          requests carry them, they must match.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteRecordingRequest'
       responses:
         '200':
           description: The server holds the whole file and the hash matches. The recording is confirmed.
@@ -107,8 +142,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Recording'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -118,7 +157,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/MissingChunks'
         '422':
-          description: All chunks arrived but the hash does not match. The recorder keeps its file and starts again.
+          description: |
+            All chunks arrived but the file does not match (`hash_mismatch` or
+            `size_mismatch`), or the session expired after 7 days
+            (`session_expired`). The recording is `failed` and the server has
+            deleted what it held. The recorder keeps its file and starts again
+            with a new create request.
           content:
             application/json:
               schema:
@@ -166,6 +210,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: The caller may see the meeting but does not own it. Only the owner uploads (`forbidden`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     NotFound:
       description: No recording with this id that the caller may see.
       content:
@@ -200,16 +250,22 @@ components:
           format: date-time
     RecordingDetails:
       type: object
-      required: [duration_s, sha256, size_bytes, source, content_type]
+      description: |
+        `sha256` and `size_bytes` come together or not at all. A recorder that
+        has the whole file sends them here. One that uploads while it records
+        (the browser recorder) leaves both out and sends them with complete.
+      required: [duration_s, source, content_type]
       properties:
         duration_s:
           type: integer
           minimum: 0
+          description: Seconds. 0 when not known yet; complete can set it.
         sha256:
           $ref: '#/components/schemas/Sha256'
         size_bytes:
           type: integer
           minimum: 1
+          maximum: 2147483648
         source:
           $ref: '#/components/schemas/RecordingSource'
         content_type:
@@ -253,8 +309,9 @@ components:
           type: integer
           description: Size of every chunk but the last. 8 MB (8388608) in v0.1.
         chunk_count:
-          type: integer
+          type: [integer, 'null']
           minimum: 1
+          description: Null while the size is not known.
         status:
           $ref: '#/components/schemas/RecordingStatus'
     ChunkReceipt:
@@ -266,9 +323,29 @@ components:
         size_bytes:
           type: integer
         chunks_received:
-          type: integer
+          $ref: '#/components/schemas/ChunkNumbers'
         chunk_count:
+          type: [integer, 'null']
+          description: Null while the size is not known.
+    ChunkNumbers:
+      type: array
+      description: Chunk numbers the server holds, ascending.
+      items:
+        type: integer
+        minimum: 1
+    CompleteRecordingRequest:
+      type: object
+      required: [sha256, size_bytes]
+      properties:
+        sha256:
+          $ref: '#/components/schemas/Sha256'
+        size_bytes:
           type: integer
+          minimum: 1
+          maximum: 2147483648
+        duration_s:
+          type: integer
+          minimum: 0
     MissingChunks:
       type: object
       required: [error, missing]
@@ -282,7 +359,19 @@ components:
             minimum: 1
     Recording:
       type: object
-      required: [id, meeting_id, status, sha256, size_bytes, duration_s, source, created_at]
+      required:
+        [
+          id,
+          meeting_id,
+          status,
+          sha256,
+          size_bytes,
+          duration_s,
+          source,
+          created_at,
+          chunk_count,
+          chunks_received,
+        ]
       properties:
         id:
           type: string
@@ -291,9 +380,19 @@ components:
         status:
           $ref: '#/components/schemas/RecordingStatus'
         sha256:
-          $ref: '#/components/schemas/Sha256'
+          oneOf:
+            - $ref: '#/components/schemas/Sha256'
+            - type: 'null'
+          description: Null until known, when the create request left it out.
         size_bytes:
-          type: integer
+          type: [integer, 'null']
+          description: Null until known, when the create request left it out.
+        chunk_count:
+          type: [integer, 'null']
+          description: Null while the size is not known.
+        chunks_received:
+          $ref: '#/components/schemas/ChunkNumbers'
+          description: While `uploading`, the chunks the server holds, so a recorder can resume. Empty in every other status.
         duration_s:
           type: integer
         source:
@@ -316,7 +415,11 @@ components:
       properties:
         code:
           type: string
-          description: Stable machine-readable code, for example `hash_mismatch`.
+          description: |
+            Stable machine-readable code. v0.1 uses `unauthorized`,
+            `forbidden`, `not_found`, `invalid_request`, `too_large`,
+            `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
+            `hash_mismatch`, `size_mismatch` and `session_expired`.
         message:
           type: string
           description: English text for logs. The recorder shows its own localised message per code.
