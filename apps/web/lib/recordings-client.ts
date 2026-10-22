@@ -47,7 +47,8 @@ async function call<T>(path: string, init: RequestInit): Promise<T> {
   const body = (await response.json().catch(() => null)) as
     (ApiError & { missing?: number[] }) | null;
   const code = body?.error?.code ?? `http_${response.status}`;
-  if (response.status >= 500 || response.status === 429) {
+  // Busy (another chunk is being written) and server trouble are worth a retry.
+  if (response.status >= 500 || response.status === 429 || code === 'busy') {
     throw new UploadError('network', code, response.status);
   }
   const kind: UploadErrorKind =
@@ -220,10 +221,12 @@ export async function uploadFile(
   if (saved) {
     try {
       const recording = await withRetry(() => recordingsApi.get(saved!.recording_id), { onRetry });
-      if (recording.status !== 'uploading' && recording.confirmed_at) {
+      // confirmed_at set is success, whatever the status moved on to.
+      if (recording.confirmed_at) {
         savedUploads.clear(file);
         return { meetingId: recording.meeting_id, recordingId: recording.id };
       }
+      // A failed upload is never resumed: start a new one from the same file.
       if (recording.status === 'uploading') received = new Set(recording.chunks_received);
       else saved = undefined;
     } catch (error) {
@@ -319,16 +322,26 @@ export class StreamingUpload {
     } = {},
   ) {}
 
-  /** Creates the recording on the server. Retries quietly; recording does not wait for it. */
-  start() {
+  /**
+   * Creates the recording on the server. Retries quietly; recording does not
+   * wait for it. With `meetingId`, a new recording for the same meeting: the
+   * way to start over after a terminal failure.
+   */
+  start(meetingId?: string) {
+    const details = { duration_s: 0, source: 'browser' as const, content_type: this.contentType };
     this.created = withRetry(
       () =>
-        recordingsApi.create({
-          meeting: { title: this.meeting.title, started_at: this.meeting.startedAt.toISOString() },
-          duration_s: 0,
-          source: 'browser',
-          content_type: this.contentType,
-        }),
+        recordingsApi.create(
+          meetingId
+            ? { ...details, meeting_id: meetingId }
+            : {
+                ...details,
+                meeting: {
+                  title: this.meeting.title,
+                  started_at: this.meeting.startedAt.toISOString(),
+                },
+              },
+        ),
       { attempts: 8, onRetry: this.events.onRetry },
     );
     this.created.catch((error) => (this.failure = error));
@@ -393,10 +406,19 @@ export class StreamingUpload {
       )
         this.start();
     }
-    const { id, meeting_id } = await this.created;
+    let { id, meeting_id } = await this.created;
     const total = chunkCount(this.size);
     const whole = this.whole();
-    const have = new Set((await withRetry(() => recordingsApi.get(id))).chunks_received);
+    const server = await withRetry(() => recordingsApi.get(id));
+    // Confirmed already (a response was lost on the way): done.
+    if (server.confirmed_at) return this.release(meeting_id);
+    let have = new Set(server.chunks_received);
+    if (server.status === 'failed') {
+      // Terminal: never resumed. A new recording on the same meeting, from the kept audio.
+      this.start(meeting_id);
+      ({ id, meeting_id } = await this.created!);
+      have = new Set();
+    }
     for (let n = 1; n <= total; n++) {
       if (have.has(n)) continue;
       await withRetry(() => recordingsApi.putChunk(id, n, chunkOf(whole, n)), {
@@ -409,9 +431,13 @@ export class StreamingUpload {
     await withRetry(() =>
       recordingsApi.complete(id, { sha256, size_bytes: this.size, duration_s: durationS }),
     );
+    return this.release(meeting_id);
+  }
+
+  /** Confirmed: the server holds it, the tab can let go of the audio. */
+  private release(meetingId: string) {
     this.confirmed = true;
-    // Confirmed: the server holds it, the tab can let go.
     this.pieces.length = 0;
-    return { meetingId: meeting_id };
+    return { meetingId };
   }
 }

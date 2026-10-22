@@ -349,7 +349,15 @@
       },
       "disabled": "Optagelse i browseren er slået fra for denne installation. Kontakt din administrator.",
       "tryAgain": "Prøv igen",
-      "uploadInstead": "Upload en fil i stedet"
+      "uploadInstead": "Upload en fil i stedet",
+      "leave": {
+        "title": "Forlad uden at uploade?",
+        "body": "Optagelsen bliver på denne side, til den er bekræftet. Kom tilbage til Nyt møde for at sende den.",
+        "stay": "Bliv",
+        "leave": "Forlad"
+      },
+      "openMeeting": "Åbn mødet",
+      "another": "Optag et nyt"
     }
   },
   "live": {

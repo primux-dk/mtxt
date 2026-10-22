@@ -91,6 +91,40 @@ test('Keep is optimistic and rolls back to the server state', async ({ page, req
   await expect(keep).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('Keep clicked twice while the first request waits shows the server value', async ({
+  page,
+  request,
+}) => {
+  const id = await meetingWithAudio(request, 'Keep race');
+  await page.goto(`/meetings/${id}`);
+  const keep = page.getByRole('button', { name: 'Keep this meeting from automatic deletion' });
+  // Hold the first action request, fail every later one.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  let calls = 0;
+  await page.route('**/meetings/**', async (route) => {
+    if (route.request().method() !== 'POST' || !route.request().headers()['next-action']) {
+      return route.continue();
+    }
+    calls++;
+    if (calls === 1) {
+      await held;
+      return route.continue();
+    }
+    return route.abort('connectionreset');
+  });
+  // The review's case: two clicks while the first waits; the first succeeds, the second fails.
+  await keep.click(); // wants true; request 1 is held
+  await keep.click(); // wants false; sent once request 1 returns
+  release();
+  await expect(page.getByText('Keep was not saved. It is back as it was.')).toBeVisible();
+  expect(calls).toBe(2);
+  await expect(keep).toHaveAttribute('aria-pressed', 'true');
+  await page.unrouteAll();
+  await page.reload();
+  await expect(keep).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('?t= opens the transcript tab with the player at that second', async ({ page, request }) => {
   const id = await meetingWithAudio(request, 'Seek me');
   await page.goto(`/meetings/${id}?t=2`);
@@ -103,6 +137,13 @@ test('?t= opens the transcript tab with the player at that second', async ({ pag
     page.getByRole('slider', { name: 'Position in the recording, seconds' }),
   ).toHaveValue('2');
   await expect(page.getByRole('heading', { name: 'Transcribing' })).toBeVisible();
+
+  // Out of range or not a whole number: ignored, and the page still works.
+  for (const t of ['9'.repeat(400), '86401', '-5', '1.5']) {
+    await page.goto(`/meetings/${id}?t=${t}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Seek me');
+    await expect(page.getByTestId('player-time')).toHaveText('00:00');
+  }
 });
 
 test('keyboard walk through the actions, the player and the tabs (rule 11)', async ({

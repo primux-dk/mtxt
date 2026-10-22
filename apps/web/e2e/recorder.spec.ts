@@ -78,3 +78,94 @@ for (const failure of failures) {
     await expect(alert.getByRole('button', { name: 'Upload a file instead' })).toBeVisible();
   });
 }
+
+async function recordAndStop(page: import('@playwright/test').Page, title: string) {
+  await page.goto('/meetings/new');
+  await page.getByLabel('Meeting title').fill(title);
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByTestId('elapsed')).toHaveText('00:01', { timeout: 10_000 });
+  await page.getByRole('button', { name: 'Stop' }).click();
+}
+
+test('an unconfirmed recording survives in-app navigation, behind a confirm dialog', async ({
+  page,
+}) => {
+  // Every chunk and complete fails, as with no network.
+  await page.route('**/api/v1/recordings/*/c*', (route) => route.abort('internetdisconnected'));
+  await recordAndStop(page, 'Optagelse uden net');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'The recording is not saved yet' }),
+  ).toBeVisible({
+    timeout: 60_000,
+  });
+
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'My meetings' })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Leave without uploading?' });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/meetings\/new$/);
+  await dialog.getByRole('button', { name: 'Leave' }).click();
+  await expect(page).toHaveURL(/\/meetings$/);
+
+  // Back on the recorder: the same recording, with Retry.
+  await page.getByRole('button', { name: 'New meeting' }).click();
+  await page.getByRole('menuitem', { name: 'Record in the browser' }).click();
+  await expect(page).toHaveURL(/\/meetings\/new$/);
+  await expect(page.getByLabel('Meeting title')).toHaveValue('Optagelse uden net');
+  const alert = page.getByRole('alert').filter({ hasText: 'The recording is not saved yet' });
+  await expect(alert).toBeVisible();
+  await page.unrouteAll();
+  await alert.getByRole('button', { name: 'Try again' }).click();
+  await expect(page).toHaveURL(/\/meetings\/[0-9a-f-]{36}$/, { timeout: 20_000 });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Optagelse uden net');
+});
+
+test('a confirmation whose answer was lost counts as confirmed on retry', async ({ page }) => {
+  let completes = 0;
+  // The server confirms every complete, and every answer is lost.
+  await page.route('**/api/v1/recordings/*/complete', async (route) => {
+    completes++;
+    await route.fetch();
+    await route.abort('connectionreset');
+  });
+  let puts = 0;
+  await page.route('**/api/v1/recordings/*/chunks/*', (route) => {
+    puts++;
+    return route.continue();
+  });
+  await recordAndStop(page, 'Tabt svar');
+  const alert = page.getByRole('alert').filter({ hasText: 'The recording is not saved yet' });
+  await expect(alert).toBeVisible({ timeout: 60_000 });
+  expect(completes).toBeGreaterThan(0);
+  const putsBefore = puts;
+  await page.unroute('**/api/v1/recordings/*/complete');
+  await alert.getByRole('button', { name: 'Try again' }).click();
+  await expect(page).toHaveURL(/\/meetings\/[0-9a-f-]{36}$/, { timeout: 20_000 });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tabt svar');
+  // The GET said confirmed: no chunk was sent again and no second recording made.
+  expect(puts).toBe(putsBefore);
+  await expect(page.getByRole('heading', { name: 'Recordings' })).toHaveCount(0);
+});
+
+test('a failed upload is never resumed: a new recording is made from the kept audio', async ({
+  page,
+}) => {
+  let corrupted = false;
+  await page.route('**/api/v1/recordings/*/complete', async (route) => {
+    if (corrupted) return route.continue();
+    corrupted = true;
+    const body = JSON.parse(route.request().postData() ?? '{}');
+    await route.continue({ postData: JSON.stringify({ ...body, sha256: 'f'.repeat(64) }) });
+  });
+  await recordAndStop(page, 'Forkert hash');
+  const alert = page.getByRole('alert').filter({ hasText: 'The recording is not saved yet' });
+  await expect(alert).toBeVisible({ timeout: 30_000 });
+  await alert.getByRole('button', { name: 'Try again' }).click();
+  await expect(page).toHaveURL(/\/meetings\/[0-9a-f-]{36}$/, { timeout: 20_000 });
+  // The same meeting, now with the failed recording and the confirmed one.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forkert hash');
+  await expect(page.getByRole('heading', { name: 'Recordings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Transcribing' })).toBeVisible();
+});

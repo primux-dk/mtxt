@@ -349,7 +349,15 @@
       },
       "disabled": "Browser recording is switched off for this install. Contact your admin.",
       "tryAgain": "Try again",
-      "uploadInstead": "Upload a file instead"
+      "uploadInstead": "Upload a file instead",
+      "leave": {
+        "title": "Leave without uploading?",
+        "body": "The recording stays on this page until it is confirmed. Come back to New meeting to send it.",
+        "stay": "Stay",
+        "leave": "Leave"
+      },
+      "openMeeting": "Open the meeting",
+      "another": "Record another"
     }
   },
   "live": {

@@ -1,29 +1,18 @@
 'use client';
 
 import { MicOff, Square, TriangleAlert } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
-import { renameMeeting } from '@/app/(app)/meetings/actions';
-import { safely } from '@/lib/safe-action';
 import { formatClock } from '@/components/meetings/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UploadButton } from '@/components/upload/new-meeting-menu';
-import { StreamingUpload } from '@/lib/recordings-client';
+import { recorderSession } from '@/lib/recorder-session';
+import { LeaveGuard } from './leave-guard';
 
-type State =
-  | 'idle'
-  | 'starting'
-  | 'recording'
-  | 'finishing'
-  | 'failed'
-  | 'done'
-  | 'denied'
-  | 'noMic'
-  | 'unsupported';
-
-const PREFERRED = 'audio/webm;codecs=opus';
+type Problem = 'denied' | 'noMic' | 'unsupported';
 
 function supported() {
   return (
@@ -34,165 +23,91 @@ function supported() {
 }
 
 /**
- * The browser recorder: MediaRecorder on the microphone, Opus in WebM where
- * the browser has it. The recording uploads while it is made (StreamingUpload)
- * and stays in the tab until the server confirms it. Record and Stop are real
- * buttons; the red dot always has the word beside it. Permission denied, no
- * microphone and an unsupported browser are three different states, each
- * with its next step (behaviour.md rule 9).
+ * The browser recorder page. The recording itself lives in
+ * lib/recorder-session.ts, so it outlives this page: leave and come back
+ * and an unconfirmed recording is still here with Retry. Record and Stop
+ * are real buttons; the red dot always has the word beside it. Permission
+ * denied, no microphone and an unsupported browser are three different
+ * states, each with its next step (behaviour.md rule 9).
  */
 export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canUpload: boolean }) {
   const t = useTranslations('recorder.web');
   const intl = useTranslations('locale')('intl');
-  const stamp = (date: Date) =>
-    new Intl.DateTimeFormat(intl, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
   const router = useRouter();
   const ids = { title: useId(), status: useId() };
-  const [state, setState] = useState<State>('idle');
+  const snapshot = useSyncExternalStore(
+    recorderSession.subscribe,
+    recorderSession.snapshot,
+    () => null,
+  );
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [starting, setStarting] = useState(false);
   const [title, setTitle] = useState('');
-  const [elapsed, setElapsed] = useState(0);
-  const [level, setLevel] = useState(0);
-  const [sent, setSent] = useState(0);
-  const [retrying, setRetrying] = useState(false);
-  const session = useRef<{
-    recorder: MediaRecorder;
-    stream: MediaStream;
-    audio: AudioContext | null;
-    upload: StreamingUpload;
-    startedAt: number;
-    titleAtStart: string;
-    timers: number[];
-  } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const stopButton = useRef<HTMLButtonElement>(null);
-  const recordButton = useRef<HTMLButtonElement>(null);
+  // A recording confirmed while the reader was elsewhere: shown with a link, not opened.
+  const opened = useRef(recorderSession.snapshot()?.phase === 'done');
+  const phase = snapshot?.phase ?? null;
 
   useEffect(() => {
-    setTitle(
-      t('titleDefault', {
-        date: stamp(new Date()),
-      }),
-    );
-    if (!supported()) setState('unsupported');
+    const stamp = new Intl.DateTimeFormat(intl, { dateStyle: 'medium', timeStyle: 'short' });
+    setTitle(recorderSession.title() ?? t('titleDefault', { date: stamp.format(new Date()) }));
+    if (!supported()) setProblem('unsupported');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The button under the pointer changes from Record to Stop; focus follows it.
+  // The clock ticks only while recording.
   useEffect(() => {
-    if (state === 'recording') stopButton.current?.focus();
-  }, [state]);
+    if (phase !== 'recording') return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [phase]);
 
-  // Recording, or holding audio the server has not confirmed: warn before leaving.
+  // Record becomes Stop under the pointer; focus follows it.
   useEffect(() => {
-    if (!['recording', 'finishing', 'failed'].includes(state)) return;
+    if (phase === 'recording') stopButton.current?.focus();
+  }, [phase]);
+
+  // Confirmed: open the meeting, once.
+  useEffect(() => {
+    if (phase !== 'done' || !snapshot?.meetingId || opened.current) return;
+    opened.current = true;
+    const meetingId = snapshot.meetingId;
+    recorderSession.clear();
+    router.push(`/meetings/${meetingId}`);
+  }, [phase, snapshot?.meetingId, router]);
+
+  // Audio the server has not confirmed: warn before the page unloads.
+  useEffect(() => {
+    if (phase !== 'recording' && phase !== 'finishing' && phase !== 'failed') return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [state]);
-
-  useEffect(
-    () => () => {
-      const s = session.current;
-      if (!s) return;
-      s.timers.forEach((id) => clearInterval(id));
-      s.stream.getTracks().forEach((track) => track.stop());
-      void s.audio?.close();
-    },
-    [],
-  );
-
-  const finish = async () => {
-    const s = session.current;
-    if (!s) return;
-    setState('finishing');
-    try {
-      const { meetingId } = await s.upload.finish(Math.round((Date.now() - s.startedAt) / 1000));
-      const finalTitle = title.trim();
-      if (finalTitle && finalTitle !== s.titleAtStart)
-        await safely(() => renameMeeting(meetingId, finalTitle));
-      setState('done');
-      router.push(`/meetings/${meetingId}`);
-    } catch {
-      setState('failed');
-    }
-  };
+  }, [phase]);
 
   const start = async () => {
     if (!supported()) {
-      setState('unsupported');
+      setProblem('unsupported');
       return;
     }
-    setState('starting');
-    let stream: MediaStream;
+    setProblem(null);
+    setStarting(true);
+    recorderSession.clear();
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stamp = new Intl.DateTimeFormat(intl, { dateStyle: 'medium', timeStyle: 'short' });
+      opened.current = false;
+      recorderSession.start(
+        stream,
+        title.trim() || t('titleDefault', { date: stamp.format(new Date()) }),
+      );
+      setNow(Date.now());
     } catch (error) {
       const name = error instanceof DOMException ? error.name : '';
-      setState(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'noMic');
-      return;
+      setProblem(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'noMic');
+    } finally {
+      setStarting(false);
     }
-    const recorder = MediaRecorder.isTypeSupported?.(PREFERRED)
-      ? new MediaRecorder(stream, { mimeType: PREFERRED })
-      : new MediaRecorder(stream);
-
-    // The level meter: an analyser on the same stream, read ten times a second.
-    let audio: AudioContext | null = null;
-    const timers: number[] = [];
-    try {
-      audio = new AudioContext();
-      const analyser = audio.createAnalyser();
-      analyser.fftSize = 512;
-      audio.createMediaStreamSource(stream).connect(analyser);
-      const samples = new Float32Array(analyser.fftSize);
-      timers.push(
-        window.setInterval(() => {
-          analyser.getFloatTimeDomainData(samples);
-          let sum = 0;
-          for (const v of samples) sum += v * v;
-          setLevel(Math.min(100, Math.round(Math.sqrt(sum / samples.length) * 300)));
-        }, 100),
-      );
-    } catch {
-      audio = null;
-    }
-
-    const startedAt = Date.now();
-    const titleAtStart =
-      title.trim() ||
-      t('titleDefault', {
-        date: stamp(new Date(startedAt)),
-      });
-    recorder.start(1000);
-    const upload = new StreamingUpload(
-      { title: titleAtStart, startedAt: new Date(startedAt) },
-      recorder.mimeType || 'audio/webm',
-      {
-        onSent: (n) => {
-          setSent(n);
-          setRetrying(false);
-        },
-        onRetry: () => setRetrying(true),
-      },
-    );
-    upload.start();
-    recorder.ondataavailable = (event) => upload.add(event.data);
-    recorder.onstop = () => {
-      timers.forEach((id) => clearInterval(id));
-      stream.getTracks().forEach((track) => track.stop());
-      void audio?.close();
-      setLevel(0);
-      void finish();
-    };
-    timers.push(
-      window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250),
-    );
-    session.current = { recorder, stream, audio, upload, startedAt, titleAtStart, timers };
-    setElapsed(0);
-    setState('recording');
-  };
-
-  const stop = () => {
-    const s = session.current;
-    if (s && s.recorder.state !== 'inactive') s.recorder.stop();
   };
 
   if (!enabled) {
@@ -204,27 +119,27 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
     );
   }
 
-  const problem =
-    state === 'denied' || state === 'noMic' || state === 'unsupported' || state === 'failed'
-      ? state
-      : null;
+  const elapsed = snapshot
+    ? Math.floor(((snapshot.stoppedAt ?? now) - snapshot.startedAt) / 1000)
+    : 0;
   const status =
-    state === 'idle' || state === 'starting'
+    phase === null
       ? t('status.idle')
-      : state === 'recording'
-        ? retrying
+      : phase === 'recording'
+        ? snapshot!.retrying
           ? t('status.retrying')
-          : t('status.uploading', { done: sent })
-        : state === 'finishing'
-          ? retrying
+          : t('status.uploading', { done: snapshot!.sent })
+        : phase === 'finishing'
+          ? snapshot!.retrying
             ? t('status.retrying')
             : t('status.finishing')
-          : state === 'done'
+          : phase === 'done'
             ? t('status.done')
             : '';
 
   return (
     <div className="grid gap-6 rounded-panel border border-border bg-card p-6 max-shell:p-5">
+      <LeaveGuard active={phase === 'recording' || phase === 'finishing' || phase === 'failed'} />
       <div className="grid gap-1.5 text-sm">
         <label htmlFor={ids.title} className="font-[550]">
           {t('meetingTitle')}
@@ -233,36 +148,32 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
           id={ids.title}
           value={title}
           maxLength={500}
-          onChange={(event) => setTitle(event.target.value)}
-          disabled={state === 'finishing' || state === 'done'}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            recorderSession.setTitle(event.target.value);
+          }}
+          disabled={phase === 'finishing' || phase === 'done'}
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-5">
-        {state === 'recording' ? (
+        {phase === 'recording' ? (
           <Button
             ref={stopButton}
             variant="primary"
             className="min-h-14 rounded-full px-6 text-base"
-            onClick={stop}
+            onClick={() => recorderSession.stop()}
           >
             <Square aria-hidden="true" className="size-4 fill-current" />
             {t('stop')}
           </Button>
         ) : (
           <Button
-            ref={recordButton}
             variant="primary"
             className="min-h-14 rounded-full px-6 text-base"
             onClick={() => void start()}
-            disabled={
-              state === 'starting' ||
-              state === 'finishing' ||
-              state === 'done' ||
-              state === 'unsupported' ||
-              state === 'failed'
-            }
-            aria-busy={state === 'starting'}
+            disabled={starting || (phase !== null && phase !== 'done') || problem === 'unsupported'}
+            aria-busy={starting}
           >
             <span
               aria-hidden="true"
@@ -279,7 +190,7 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
           >
             {formatClock(elapsed)}
           </time>
-          {state === 'recording' && (
+          {phase === 'recording' && (
             <span
               className="inline-flex items-center gap-2 text-xs text-destructive"
               data-testid="recording-indicator"
@@ -296,20 +207,28 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
 
       <label className="grid grid-cols-[auto_1fr] items-center gap-3 text-xs text-muted-foreground">
         <span>{t('level')}</span>
-        <meter min={0} max={100} value={level} className="level-meter h-2 w-full" />
+        <meter min={0} max={100} value={snapshot?.level ?? 0} className="level-meter h-2 w-full" />
       </label>
 
       <p id={ids.status} aria-live="polite" className="text-sm text-muted-foreground">
         {status}
+        {phase === 'done' && snapshot?.meetingId && (
+          <>
+            {' '}
+            <Link href={`/meetings/${snapshot.meetingId}`} className="underline underline-offset-4">
+              {t('openMeeting')}
+            </Link>
+          </>
+        )}
       </p>
 
-      {problem && (
+      {(problem || phase === 'failed') && (
         <div
           role="alert"
           className="grid gap-3 rounded-control border border-border bg-background p-4"
         >
           <p className="flex items-start gap-2 font-[550] text-destructive">
-            {problem === 'failed' ? (
+            {phase === 'failed' ? (
               <TriangleAlert
                 aria-hidden="true"
                 className="mt-0.5 size-5 shrink-0"
@@ -318,16 +237,22 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
             ) : (
               <MicOff aria-hidden="true" className="mt-0.5 size-5 shrink-0" strokeWidth={1.5} />
             )}
-            {t(`${problem}.title`)}
+            {t(`${phase === 'failed' ? 'failed' : problem!}.title`)}
           </p>
-          <p className="text-sm text-muted-foreground">{t(`${problem}.body`)}</p>
+          <p className="text-sm text-muted-foreground">
+            {t(`${phase === 'failed' ? 'failed' : problem!}.body`)}
+          </p>
           <div className="flex flex-wrap gap-2">
-            {problem !== 'unsupported' && (
-              <Button onClick={() => void (problem === 'failed' ? finish() : start())}>
-                {t('tryAgain')}
-              </Button>
+            {phase === 'failed' ? (
+              <Button onClick={() => recorderSession.retry()}>{t('tryAgain')}</Button>
+            ) : (
+              <>
+                {problem !== 'unsupported' && (
+                  <Button onClick={() => void start()}>{t('tryAgain')}</Button>
+                )}
+                {canUpload && <UploadButton label={t('uploadInstead')} />}
+              </>
             )}
-            {problem !== 'failed' && canUpload && <UploadButton label={t('uploadInstead')} />}
           </div>
         </div>
       )}
