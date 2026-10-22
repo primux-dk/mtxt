@@ -1,10 +1,14 @@
 import { AppShell } from '@/components/shell/app-shell';
+import { requireUser } from '@/lib/auth/session';
 import { getInstallSettings } from '@/lib/install';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { productName, companyName } = await getInstallSettings();
+  const [user, { productName, companyName }] = await Promise.all([
+    requireUser(),
+    getInstallSettings(),
+  ]);
   return (
-    <AppShell productName={productName} companyName={companyName}>
+    <AppShell productName={productName} companyName={companyName} user={user}>
       {children}
     </AppShell>
   );

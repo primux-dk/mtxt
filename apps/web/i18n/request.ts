@@ -1,12 +1,15 @@
 import { getRequestConfig } from 'next-intl/server';
 import { headers } from 'next/headers';
-import { resolveLocale, type Locale } from '@/lib/locale';
+import { getInstallSettings } from '@/lib/install';
+import { resolveLocale } from '@/lib/locale';
 
-// TODO(packet 2): read the default from the settings row's interface_language.
-const INSTALL_DEFAULT_LOCALE: Locale = 'en';
-
+// The reader's Accept-Language when a translation exists, else the install's default.
 export default getRequestConfig(async () => {
-  const locale = resolveLocale((await headers()).get('accept-language'), INSTALL_DEFAULT_LOCALE);
+  const [accept, settings] = await Promise.all([
+    headers().then((h) => h.get('accept-language')),
+    getInstallSettings(),
+  ]);
+  const locale = resolveLocale(accept, settings.interfaceLanguage);
   return {
     locale,
     messages: (await import(`../messages/${locale}.json`)).default,

@@ -3,8 +3,49 @@ export type * from './queue';
 export { createDb, schema, type Db } from './db';
 export { DEFAULT_SETTINGS } from './db/defaults';
 export { seedSql } from './db/seed';
-export { readSettings } from './db/settings';
-export type { Settings, Visibility, InterfaceLanguage } from './db/schema';
+export {
+  bootstrapIdentity,
+  claimFirstAdmin,
+  listKeyterms,
+  readSettings,
+  saveSettings,
+  type IdentityBootstrap,
+} from './db/settings';
+export {
+  AccountConflictError,
+  findUser,
+  hasSignInConflict,
+  recordSignIn,
+  type SignInProfile,
+} from './db/users';
+export {
+  createTemplate,
+  deleteTemplate,
+  listTemplates,
+  refoldTemplateKeys,
+  setDefaultTemplate,
+  templateNameKey,
+  updateTemplate,
+} from './db/templates';
+export { open, seal, type SecretContext } from './secrets';
+export {
+  CAPTURE_SOURCES,
+  IDENTITY_PROVIDERS,
+  INTERFACE_LANGUAGES,
+  STT_PROVIDERS,
+  VISIBILITIES,
+} from './db/schema';
+export type {
+  CaptureSource,
+  IdentityProvider,
+  InterfaceLanguage,
+  Keyterm,
+  Settings,
+  SttProvider,
+  Template,
+  User,
+  Visibility,
+} from './db/schema';
 export {
   cloudflareAdapters,
   cloudflareConsumer,

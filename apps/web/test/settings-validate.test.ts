@@ -1,0 +1,256 @@
+import { describe, expect, it } from 'vitest';
+import { validateSettings, validateTemplate, type Current } from '../lib/settings/validate';
+
+const SELF = 'mette@example.com';
+const configured: Current = {
+  identityProvider: 'entra',
+  hasClientSecret: true,
+  sttProvider: 'assemblyai',
+  hasSttKey: true,
+};
+
+/** A form that passes, with overrides. `null` removes a field. */
+function form(overrides: Record<string, string | string[] | null> = {}) {
+  const values: Record<string, string | string[] | null> = {
+    productName: 'Primux Møder',
+    companyName: 'Fiskerihavnens Værksted på Ærø ApS',
+    themeAccent: '#566b45',
+    themePrimary: '#111111',
+    identityProvider: 'entra',
+    oidcTenantId: '00000000-0000-4000-8000-000000000001',
+    oidcClientId: '00000000-0000-4000-8000-000000000002',
+    oidcClientSecret: '',
+    sttProvider: 'assemblyai',
+    sttApiKey: '',
+    sttRegion: '',
+    language: 'da',
+    interfaceLanguage: 'da',
+    keyterms: 'Primux\nlinje 2,2',
+    liveTranscriptDefault: 'on',
+    defaultVisibility: 'private',
+    recordingSources: ['desktop', 'upload'],
+    retentionAudioDays: '30',
+    retentionTranscriptDays: '365',
+    mcpEnabled: null,
+    adminEmails: `${SELF}\nAnne@Example.com`,
+    ...overrides,
+  };
+  const data = new FormData();
+  for (const [key, value] of Object.entries(values)) {
+    if (value === null) continue;
+    for (const v of Array.isArray(value) ? value : [value]) data.append(key, v);
+  }
+  return data;
+}
+
+const errorsOf = (data: FormData, current = configured) => {
+  const result = validateSettings(data, current, SELF);
+  return result.ok ? {} : result.errors;
+};
+
+describe('validateSettings', () => {
+  it('accepts a complete form and keeps stored secrets when the fields are blank', () => {
+    const result = validateSettings(form(), configured, SELF);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.patch).toMatchObject({
+      productName: 'Primux Møder',
+      liveTranscriptDefault: true,
+      mcpEnabled: false,
+      recordingSources: ['desktop', 'upload'],
+      adminEmails: [SELF, 'anne@example.com'],
+    });
+    expect(result.keyterms).toEqual([
+      { term: 'Primux', boost: null },
+      { term: 'linje 2', boost: 2 },
+    ]);
+    expect(result.secrets).toEqual({});
+    expect(result.clearSttKey).toBe(false);
+  });
+
+  it('takes a 120-character product name and refuses 121', () => {
+    expect(errorsOf(form({ productName: 'x'.repeat(120) }))).toEqual({});
+    expect(errorsOf(form({ productName: 'x'.repeat(121) })).productName).toEqual({
+      code: 'tooLong',
+      max: 120,
+    });
+    expect(errorsOf(form({ productName: '   ' })).productName).toEqual({ code: 'required' });
+  });
+
+  it('refuses a bad hex value', () => {
+    expect(errorsOf(form({ themeAccent: '#56b45' })).themeAccent).toEqual({
+      code: 'hex',
+      value: '#56b45',
+    });
+    expect(errorsOf(form({ themePrimary: 'black' })).themePrimary).toMatchObject({ code: 'hex' });
+  });
+
+  it('refuses a colour that fails 4.5:1, with the ratio, at the field it depends on', () => {
+    const errors = errorsOf(form({ themeAccent: '#a3c47d' }));
+    expect(errors.themeAccent).toMatchObject({
+      code: 'contrast',
+      pair: 'accentText',
+      mode: 'light',
+    });
+    expect((errors.themeAccent as { ratio: number }).ratio).toBeLessThan(4.5);
+    expect(errors.themePrimary).toBeUndefined();
+    expect(errorsOf(form({ themePrimary: '#ffd400' })).themePrimary).toMatchObject({
+      code: 'contrast',
+      pair: 'primaryText',
+    });
+  });
+
+  it('refuses retention 0, a fraction and more than ten years', () => {
+    expect(errorsOf(form({ retentionAudioDays: '0' })).retentionAudioDays).toEqual({
+      code: 'range',
+      min: 1,
+      max: 3650,
+    });
+    expect(
+      errorsOf(form({ retentionTranscriptDays: '1.5' })).retentionTranscriptDays,
+    ).toBeDefined();
+    expect(
+      errorsOf(form({ retentionTranscriptDays: '3651' })).retentionTranscriptDays,
+    ).toBeDefined();
+    expect(errorsOf(form({ retentionAudioDays: '1' })).retentionAudioDays).toBeUndefined();
+  });
+
+  it('refuses a bad admin email, an empty list and a list without the signed-in admin', () => {
+    expect(errorsOf(form({ adminEmails: `${SELF}\nnot-an-email` })).adminEmails).toEqual({
+      code: 'email',
+      value: 'not-an-email',
+    });
+    expect(errorsOf(form({ adminEmails: '  ' })).adminEmails).toEqual({ code: 'atLeastOneAdmin' });
+    expect(errorsOf(form({ adminEmails: 'anne@example.com' })).adminEmails).toEqual({
+      code: 'keepSelf',
+      email: SELF,
+    });
+  });
+
+  it('asks for a client secret on a fresh install and when the provider changes', () => {
+    const fresh: Current = {
+      identityProvider: null,
+      hasClientSecret: false,
+      sttProvider: null,
+      hasSttKey: false,
+    };
+    expect(errorsOf(form(), fresh).oidcClientSecret).toEqual({ code: 'secretRequired' });
+    expect(
+      errorsOf(form({ identityProvider: 'google', oidcTenantId: 'example.com' })).oidcClientSecret,
+    ).toEqual({ code: 'secretRequired' });
+    const withSecret = validateSettings(
+      form({ oidcClientSecret: 'new-secret', sttProvider: '' }),
+      fresh,
+      SELF,
+    );
+    expect(withSecret.ok && withSecret.secrets).toEqual({ oidcClientSecret: 'new-secret' });
+  });
+
+  it('pins Entra to a tenant GUID, and holds Google to a domain', () => {
+    // Domains and the multi-tenant aliases are refused for Entra.
+    for (const tenant of ['contoso.onmicrosoft.com', 'common', 'organizations', 'consumers']) {
+      expect(errorsOf(form({ oidcTenantId: tenant })).oidcTenantId, tenant).toEqual({
+        code: 'tenantFormat',
+      });
+    }
+    expect(errorsOf(form({ oidcTenantId: 'not a tenant' })).oidcTenantId).toEqual({
+      code: 'tenantFormat',
+    });
+    expect(
+      errorsOf(
+        form({
+          identityProvider: 'google',
+          oidcTenantId: '00000000-0000-4000-8000-000000000001',
+          oidcClientSecret: 's',
+        }),
+      ).oidcTenantId,
+    ).toEqual({ code: 'domainFormat' });
+  });
+
+  it('needs a key for hosted speech-to-text and none for Workers AI or a local model', () => {
+    expect(errorsOf(form({ sttProvider: 'elevenlabs' })).sttApiKey).toEqual({
+      code: 'secretRequired',
+    });
+    for (const provider of ['workers-ai-whisper', 'local-whisper', 'local-parakeet']) {
+      const result = validateSettings(
+        form({ sttProvider: provider, sttApiKey: 'ignored' }),
+        configured,
+        SELF,
+      );
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.secrets).toEqual({});
+      expect(result.ok && result.clearSttKey).toBe(true);
+    }
+  });
+
+  it('needs an Azure region', () => {
+    expect(errorsOf(form({ sttProvider: 'azure', sttApiKey: 'k' })).sttRegion).toEqual({
+      code: 'required',
+    });
+    const result = validateSettings(
+      form({ sttProvider: 'azure', sttApiKey: 'k', sttRegion: 'WestEurope' }),
+      configured,
+      SELF,
+    );
+    expect(result.ok && result.patch.sttRegion).toBe('westeurope');
+  });
+
+  it('needs at least one recording source', () => {
+    expect(errorsOf(form({ recordingSources: null })).recordingSources).toEqual({
+      code: 'atLeastOneSource',
+    });
+    const result = validateSettings(form({ recordingSources: ['meet', 'zoom'] }), configured, SELF);
+    expect(result.ok && result.patch.recordingSources).toEqual(['meet']);
+  });
+
+  it('reports a keyterm error with its line', () => {
+    expect(errorsOf(form({ keyterms: 'Primux\nlinje 2,lots' })).keyterms).toEqual({
+      code: 'badBoost',
+      record: 2,
+      value: 'lots',
+      max: 10,
+    });
+  });
+
+  it('reports every failing field at once', () => {
+    const errors = errorsOf(form({ productName: '', retentionAudioDays: '0', adminEmails: 'x' }));
+    expect(Object.keys(errors).sort()).toEqual([
+      'adminEmails',
+      'productName',
+      'retentionAudioDays',
+    ]);
+  });
+});
+
+describe('validateTemplate', () => {
+  const others = [{ name: 'Produktionsmøde' }];
+
+  it('accepts a new name', () => {
+    expect(validateTemplate({ name: ' Projektstatus ', bodyMd: '# Overblik' }, others)).toEqual({
+      ok: true,
+      name: 'Projektstatus',
+      bodyMd: '# Overblik',
+    });
+  });
+
+  it('refuses a duplicate name, whatever the casing', () => {
+    expect(validateTemplate({ name: 'PRODUKTIONSMØDE', bodyMd: '' }, others)).toEqual({
+      ok: false,
+      errors: { name: { code: 'duplicate', name: 'PRODUKTIONSMØDE' } },
+    });
+  });
+
+  it('refuses a name that differs only by width or ß', () => {
+    expect(validateTemplate({ name: 'STRASSE', bodyMd: '' }, [{ name: 'Straße' }])).toMatchObject({
+      ok: false,
+      errors: { name: { code: 'duplicate' } },
+    });
+  });
+
+  it('refuses an empty name', () => {
+    expect(validateTemplate({ name: '  ', bodyMd: '' }, others)).toMatchObject({
+      ok: false,
+      errors: { name: { code: 'required' } },
+    });
+  });
+});

@@ -9,6 +9,9 @@ import { join } from 'node:path';
 import { seedSql } from '../../../packages/adapters/src/db/seed.ts';
 
 const remote = process.argv.includes('--remote');
+// `--persist-to <dir>` picks a local state folder other than the default (the e2e run uses its own).
+const persistAt = process.argv.indexOf('--persist-to');
+const persist = persistAt > -1 ? ['--persist-to', process.argv[persistAt + 1]] : [];
 
 // INSTALL_ID from the environment, else from wrangler.jsonc's vars.
 const wranglerConfig = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
@@ -22,7 +25,7 @@ writeFileSync(file, seedSql(installId));
 try {
   execFileSync(
     'wrangler',
-    ['d1', 'execute', 'DB', remote ? '--remote' : '--local', `--file=${file}`, '--yes'],
+    ['d1', 'execute', 'DB', remote ? '--remote' : '--local', ...persist, `--file=${file}`, '--yes'],
     { stdio: 'inherit' },
   );
   console.log(

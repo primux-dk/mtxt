@@ -212,7 +212,18 @@
       "primary": "Knapfarve",
       "primaryHelp": "Den ene hovedhandling på hver skærm.",
       "note": "Toner, linjer, fokusringen og mørkt tema afledes af de to værdier. Accenttekst på baggrunden, knaptekst på knappen og accenttekst på et kort skal hver have mindst 4,5:1 i kontrast i begge temaer. Optageren læser de samme værdier, når brugeren logger ind.",
-      "preview": "Forhåndsvisning"
+      "preview": "Forhåndsvisning",
+      "passes": "Alle par har mindst 4,5:1 i begge temaer.",
+      "fails": "{pair} har {ratio}:1 i {mode} tema, under 4,5:1. Den bliver afvist, når du gemmer.",
+      "pair": {
+        "accentText": "Accenttekst på baggrunden",
+        "primaryText": "Knaptekst på knappen",
+        "accentOnCard": "Accent på et kort"
+      },
+      "mode": {
+        "light": "lyst",
+        "dark": "mørkt"
+      }
     },
     "login": {
       "heading": "Virksomhedslogin",
@@ -221,7 +232,16 @@
       "tenantId": "Lejer-id",
       "clientId": "Klient-id",
       "clientSecret": "Klienthemmelighed",
-      "secretHelp": "Hemmeligheder vises aldrig i klartekst."
+      "secretHelp": "Hemmeligheder vises aldrig i klartekst.",
+      "providers": {
+        "entra": "Microsoft Entra ID",
+        "google": "Google Workspace"
+      },
+      "choose": "Vælg en udbyder",
+      "tenantHelp": "Katalogets lejer-id fra appregistreringen.",
+      "domain": "Workspace-domæne",
+      "domainHelp": "Kun bekræftede konti i dette domæne kan logge ind.",
+      "secretHelpRedirect": "Hemmeligheder vises aldrig i klartekst. Registrér denne omdirigerings-URI hos udbyderen: {url}"
     },
     "stt": {
       "heading": "Transskription",
@@ -234,7 +254,16 @@
       "regionDefault": "Udbyderens standard",
       "regionHelp": "Azure viser sine tilgængelige regioner.",
       "language": "Standardsprog for transskription",
-      "autoDetect": "Find sproget automatisk"
+      "autoDetect": "Find sproget automatisk",
+      "none": "Ikke valgt endnu",
+      "providers": {
+        "assemblyai": "AssemblyAI (EU)",
+        "azure": "Azure Speech",
+        "elevenlabs": "ElevenLabs Scribe",
+        "workersAi": "Workers AI Whisper"
+      },
+      "noKey": "Denne udbyder skal ikke have en API-nøgle.",
+      "azurePlaceholder": "westeurope"
     },
     "interfaceLanguage": {
       "heading": "Sprog i brugerfladen",
@@ -246,8 +275,11 @@
       "heading": "Virksomhedens ord",
       "help": "Produktnavne, navne og fagord.",
       "field": "Nøgleord",
-      "fieldHelp": "Ét ord eller udtryk pr. linje.",
-      "import": "Importér CSV"
+      "fieldHelp": "Ét ord eller udtryk pr. linje. Tilføj en vægt efter et komma for at fremhæve et ord: Primux,2.",
+      "import": "Importér CSV",
+      "imported": "{count, plural, one {# ord} other {# ord}} tilføjet fra {file}. Gem indstillingerne for at beholde dem.",
+      "importNone": "{file} havde ingen nye ord.",
+      "importFailed": "{file} kunne ikke importeres. {reason}"
     },
     "defaults": {
       "heading": "Standarder",
@@ -273,7 +305,23 @@
       "help": "Flere skabeloner. Medarbejderen vælger én til hvert møde.",
       "name": "Skabelonnavn",
       "body": "Indhold i Markdown",
-      "add": "Tilføj skabelon"
+      "add": "Tilføj skabelon",
+      "list": "Skabeloner",
+      "empty": "Ingen skabeloner endnu. Tilføj den første; medarbejderne vælger én til hvert møde.",
+      "default": "Standard",
+      "setDefault": "Gør til standard",
+      "save": "Gem skabelon",
+      "delete": "Slet skabelon",
+      "new": "Ny skabelon",
+      "deleteTitle": "Slet skabelon",
+      "deleteBody": "Slet skabelonen {name} permanent. Møder, der brugte den, beholder deres referater.",
+      "added": "{name} er tilføjet.",
+      "saved": "{name} er gemt.",
+      "deleted": "{name} er slettet.",
+      "nowDefault": "{name} er nu standard.",
+      "addFailed": "{name} kunne ikke tilføjes og er fjernet fra listen igen. Prøv igen.",
+      "saveFailed": "{name} kunne ikke gemmes. Prøv igen.",
+      "deleteFailed": "{name} kunne ikke slettes og er tilbage på listen. Prøv igen."
     },
     "retention": {
       "heading": "Opbevaring",
@@ -295,9 +343,76 @@
       "step4": "Lyd slettes efter {audioDays, plural, one {# dag} other {# dage}}. Transskriptioner og referater slettes efter {textDays, plural, one {# dag} other {# dage}}. Behold forhindrer begge sletninger.",
       "promise": "Det er ikke garanteret, at al behandling sker i EU.",
       "caveats": "D1 har ingen indstilling for jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
-      "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen."
+      "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen.",
+      "step2Gateway": "{provider} modtager lyd og nøgleord gennem AI Gateway og sender tekst og talere tilbage.",
+      "step2Local": "{provider} kører inde i installationen; lyden sendes ikke til et firma, der laver tale til tekst.",
+      "step2None": "Der er ikke valgt en udbyder af tale til tekst endnu. Lyden gemmes, og transskriptionen venter, til der er valgt en."
     },
     "footer": "Ændringer gælder for denne installation.",
-    "save": "Gem indstillinger"
+    "save": "Gem indstillinger",
+    "companyName": {
+      "heading": "Virksomhedsnavn",
+      "help": "Under produktnavnet i sidepanelet og nederst på loginsiden.",
+      "field": "Navn"
+    },
+    "secret": {
+      "set": "Angivet",
+      "notSet": "Ikke angivet",
+      "replace": "Skriv en ny værdi for at erstatte den"
+    },
+    "admins": {
+      "heading": "Administratorer",
+      "help": "Administratorer redigerer disse indstillinger. Den første, der loggede ind, blev den første administrator.",
+      "field": "Administratorers mailadresser",
+      "fieldHelp": "Én adresse pr. linje."
+    },
+    "errors": {
+      "summary": "{count, plural, one {# felt skal} other {# felter skal}} rettes, før indstillingerne kan gemmes:",
+      "required": "Udfyld feltet.",
+      "tooLong": "Brug højst {max} tegn.",
+      "invalid": "Vælg en af mulighederne.",
+      "hex": "Skriv farven som # og seks hexcifre, for eksempel #566b45.",
+      "contrast": "Afvist: {pair} har {ratio}:1 i {mode} tema, under 4,5:1. Vælg en farve med mere kontrast.",
+      "tenantFormat": "Skriv lejer-id’et, et GUID som 00000000-0000-4000-8000-000000000001. common, organizations og consumers afvises.",
+      "domainFormat": "Skriv Workspace-domænet, for eksempel example.com.",
+      "secretRequired": "Skriv hemmeligheden til denne udbyder. Den gemmes krypteret.",
+      "regionFormat": "Skriv Azure-regionens navn med små bogstaver, for eksempel westeurope.",
+      "termTooLong": "Post {record}: et nøgleord må højst have {max} tegn.",
+      "badBoost": "Post {record}: vægten {value} skal være et tal over 0 og højst {max}.",
+      "tooManyFields": "Post {record}: skriv ord eller ord,vægt. Sæt et ord med komma i anførselstegn.",
+      "tooMany": "Brug højst {max} nøgleord.",
+      "atLeastOneSource": "Vælg mindst én optagekilde.",
+      "range": "Skriv et helt antal dage fra {min} til {max}.",
+      "email": "{value} er ikke en mailadresse.",
+      "atLeastOneAdmin": "Tilføj mindst én administratoradresse.",
+      "keepSelf": "Behold din egen adresse, {email}, på listen. En anden administrator kan fjerne den.",
+      "duplicate": "Der findes allerede en skabelon med navnet {name}. Vælg et andet navn.",
+      "saveFailed": "Indstillingerne kunne ikke gemmes, og intet blev ændret. Prøv igen.",
+      "unterminatedQuote": "Post {record}: et anførselstegn åbnes og lukkes aldrig. Intet blev importeret."
+    },
+    "saved": "Indstillingerne er gemt."
+  },
+  "auth": {
+    "signOut": "Log ud",
+    "notConfigured": {
+      "title": "Ingen identitetsudbyder er sat op",
+      "body": "Sæt disse Worker-hemmeligheder med wrangler secret put, eller i apps/web/.dev.vars ved lokal udvikling, og genindlæs siden:",
+      "tenantGuid": "OIDC_TENANT_ID skal være lejerens GUID. common, organizations og consumers afvises."
+    },
+    "broken": {
+      "title": "Login er ikke sat rigtigt op",
+      "body": "Den gemte klienthemmelighed kan ikke læses med installationens SETTINGS_KEY. Gendan den SETTINGS_KEY, den blev gemt med, eller ryd identity_provider i indstillingsrækken, så OIDC-hemmelighederne læses igen."
+    },
+    "error": {
+      "accessDenied": "Kontoen kan ikke logge ind her. Brug din arbejdskonto, eller bed en administrator om at tjekke virksomhedslogin.",
+      "configuration": "Identitetsudbyderen godtog ikke login. Bed en administrator om at tjekke virksomhedslogin i indstillingerne.",
+      "default": "Login blev ikke gennemført. Prøv igen.",
+      "accountConflict": "Adressen hører til en anden konto i denne installation. Intet blev ændret. Kontakt din administrator."
+    },
+    "forbidden": {
+      "title": "Kun for administratorer",
+      "body": "Indstillingerne er for installationens administratorer. Bed en administrator om at føje din adresse til listen.",
+      "back": "Tilbage til mine møder"
+    }
   }
 }

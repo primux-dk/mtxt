@@ -19,6 +19,9 @@ const buttonVariants = cva(
         secondary:
           'rounded-control border-input bg-card text-foreground hover:border-text-muted hover:bg-secondary',
         quiet: 'rounded-control border-transparent bg-transparent hover:bg-secondary',
+        /** The confirming button of a destructive Dialog, never a screen's main action. */
+        destructive:
+          'rounded-pill border-destructive bg-destructive text-destructive-foreground hover:bg-[color-mix(in_oklab,var(--destructive),var(--foreground)_12%)]',
       },
       size: {
         default: 'min-h-10 px-4 py-2 max-shell:min-h-11',

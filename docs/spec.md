@@ -12,18 +12,18 @@ The interface is written in English and translated. English is the source of eve
 
 ## Scope: 10 features
 
-| # | Feature | What it means |
-|---|---|---|
-| 1 | Company login | OIDC against Entra ID or Google Workspace. No local users, no passwords. |
-| 2 | Desktop recorder | Mic plus system audio on Mac and Windows, bot-free. Signed in with the company login, uploads when the meeting ends. Our own Tauri 2 and Rust app, with Vibe, anarlog and Meetily as references. |
-| 3 | Live transcript | Text on screen while the meeting runs, in a small floating window, always on top. A per-user setting with an admin default, off by default. Runs a local model in the recorder. A preview only; the server transcript is the record. |
-| 4 | Other capture | Record in the browser, upload a file, share from a voice recorder. Pull Teams and Meet recordings for meetings the company organised. |
-| 5 | STT adapter | AssemblyAI, Azure Speech, ElevenLabs Scribe, local Whisper or Parakeet. One per install, swappable. |
-| 6 | Keyterms and corrections | One company dictionary per install: product names, people, jargon. CSV import. Danish first. |
-| 7 | Speakers | Diarization, renaming, voice memory per install where the provider allows it. Labels can link to a directory user. |
-| 8 | Recap | AI drafts from the chosen template; the owner edits in a Notion-style Tiptap editor inside the platform. Markdown stored, a version per save, AI text and human edits told apart. Export md and docx. Search across what you may see. |
-| 9 | Private and shared | Each meeting is private, shared with named colleagues, or company-wide. Admin sets the default. Only the owner changes it. Search and MCP respect it. |
-| 10 | Retention, audit, MCP | Delete after N days per install, with a keep flag per meeting. A log of who opened what. MCP server with the same company login, scoped to what the user may see. |
+| #   | Feature                  | What it means                                                                                                                                                                                                                         |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Company login            | OIDC against Entra ID or Google Workspace. No local users, no passwords.                                                                                                                                                              |
+| 2   | Desktop recorder         | Mic plus system audio on Mac and Windows, bot-free. Signed in with the company login, uploads when the meeting ends. Our own Tauri 2 and Rust app, with Vibe, anarlog and Meetily as references.                                      |
+| 3   | Live transcript          | Text on screen while the meeting runs, in a small floating window, always on top. A per-user setting with an admin default, off by default. Runs a local model in the recorder. A preview only; the server transcript is the record.  |
+| 4   | Other capture            | Record in the browser, upload a file, share from a voice recorder. Pull Teams and Meet recordings for meetings the company organised.                                                                                                 |
+| 5   | STT adapter              | AssemblyAI, Azure Speech, ElevenLabs Scribe, local Whisper or Parakeet. One per install, swappable.                                                                                                                                   |
+| 6   | Keyterms and corrections | One company dictionary per install: product names, people, jargon. CSV import. Danish first.                                                                                                                                          |
+| 7   | Speakers                 | Diarization, renaming, voice memory per install where the provider allows it. Labels can link to a directory user.                                                                                                                    |
+| 8   | Recap                    | AI drafts from the chosen template; the owner edits in a Notion-style Tiptap editor inside the platform. Markdown stored, a version per save, AI text and human edits told apart. Export md and docx. Search across what you may see. |
+| 9   | Private and shared       | Each meeting is private, shared with named colleagues, or company-wide. Admin sets the default. Only the owner changes it. Search and MCP respect it.                                                                                 |
+| 10  | Retention, audit, MCP    | Delete after N days per install, with a keep flag per meeting. A log of who opened what. MCP server with the same company login, scoped to what the user may see.                                                                     |
 
 Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins calls; snippets, user-selectable themes beyond the install's two colours, a plugin marketplace, a premium tier, widgets, per-user LLM settings.
 
@@ -38,22 +38,23 @@ Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins cal
 
 The whole admin surface. If a setting is not here, it does not exist.
 
-| Setting | Values |
-|---|---|
-| Product name | Free text, shown on the recorder, the login page and the tray |
-| Company name | Free text, shown under the product name in the sidebar and in the login footer ("An installation for Acme A/S") |
-| Theme | Accent colour and button colour, two hex values. Defaults are sage #566b45 and #111111. Tints, lines, focus ring and the dark mode are derived. Three pairs are checked in both themes, accent text on the background, button text on the button, accent on a card; a value that puts any pair under 4.5:1 is refused with the ratio shown. A preview row under the fields shows the derived states. The recorder reads the same two values at login |
-| Identity provider | Entra ID or Google: tenant id, client id, secret |
-| Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, local Whisper or Parakeet: key, region |
-| Interface language | Default for the install: en or da. A user's browser or OS language wins when a translation exists |
-| Default language | For transcription. ISO code, auto-detect allowed |
-| Keyterms | One list per install, CSV import |
-| Live transcript | On by default: yes or no. Users can switch it for themselves |
-| Default visibility | private, shared, company |
-| Recording sources | Desktop, upload, browser, OneDrive (Teams), Drive (Meet) |
-| Recap templates | Several per install, markdown, admin edits, user picks per meeting |
-| Retention | Audio N days, transcripts and recaps N days |
-| MCP server | Enabled: yes or no |
+| Setting                 | Values                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product name            | Free text, shown on the recorder, the login page and the tray                                                                                                                                                                                                                                                                                                                                                                                        |
+| Company name            | Free text, shown under the product name in the sidebar and in the login footer ("An installation for Acme A/S")                                                                                                                                                                                                                                                                                                                                      |
+| Theme                   | Accent colour and button colour, two hex values. Defaults are sage #566b45 and #111111. Tints, lines, focus ring and the dark mode are derived. Three pairs are checked in both themes, accent text on the background, button text on the button, accent on a card; a value that puts any pair under 4.5:1 is refused with the ratio shown. A preview row under the fields shows the derived states. The recorder reads the same two values at login |
+| Identity provider       | Entra ID or Google: tenant id (for Entra, the tenant's GUID; for Google, the Workspace domain), client id, secret. The secret is stored encrypted and never shown again                                                                                                                                                                                                                                                                              |
+| Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, Workers AI Whisper, local Whisper or Parakeet: key, region. Workers AI and the local models need no key. The key is stored encrypted and never shown again                                                                                                                                                                                                                                |
+| Interface language      | Default for the install: en or da. A user's browser or OS language wins when a translation exists                                                                                                                                                                                                                                                                                                                                                    |
+| Default language        | For transcription. ISO code, auto-detect allowed                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Keyterms                | One list per install, CSV import                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Live transcript         | On by default: yes or no. Users can switch it for themselves                                                                                                                                                                                                                                                                                                                                                                                         |
+| Default visibility      | private, shared, company                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Recording sources       | Desktop, upload, browser, OneDrive (Teams), Drive (Meet)                                                                                                                                                                                                                                                                                                                                                                                             |
+| Recap templates         | Several per install, markdown, admin edits, user picks per meeting                                                                                                                                                                                                                                                                                                                                                                                   |
+| Retention               | Audio N days, transcripts and recaps N days                                                                                                                                                                                                                                                                                                                                                                                                          |
+| MCP server              | Enabled: yes or no                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Admins                  | Email list. The first user to sign in on a fresh install becomes admin; admins edit the list                                                                                                                                                                                                                                                                                                                                                         |
 
 ## How a recording reaches the library
 
@@ -98,7 +99,7 @@ Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-
 One database per install, in the company's own account. Every row carries an install id for safety; v1 runs one company per install and no code assumes otherwise.
 
 ```
-users            id, oidc_subject, email, name, is_admin
+users            id, oidc_subject, email (one user per address), name, is_admin
 meetings         id, owner_id, title, started_at, visibility (private|shared|company),
                  keep (bool), template_id, archived_at, deleted_at   -- archived: out of the views, restorable
 meeting_shares   meeting_id, user_id                       -- "shared" visibility only
@@ -111,16 +112,22 @@ speakers         id, meeting_id, label, user_id (nullable)  -- a label can link 
 recaps           id, meeting_id, template_id, body_md, current_version_id, docx_path
 recap_versions   id, recap_id, author_id (null = AI), body_md, created_at   -- one per save
 decisions        id, recap_id, text, owner_user_id, done     -- lifted from the recap by the AI, editable
-templates        id, name, body_md, is_default                 -- admin edits
+templates        id, name, name_key (unique), body_md, is_default   -- admin edits
 keyterms         id, term, boost                               -- one list per install
-settings         product_name, company_name, theme_accent, theme_primary, identity_provider, stt_provider, language, interface_language, live_transcript_default,
+settings         product_name, company_name, theme_accent, theme_primary, identity_provider,
+                 oidc_tenant_id, oidc_client_id, oidc_client_secret (sealed), stt_provider,
+                 stt_api_key (sealed), stt_region, language, interface_language, live_transcript_default,
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
-                 recording_sources (JSON array of desktop|upload|browser|teams|meet)
+                 recording_sources (JSON array of desktop|upload|browser|teams|meet),
+                 admin_emails (JSON array), admin_bootstrap_claimed_at
 audit_events     id, user_id, meeting_id, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write), at
 ```
 
 Rules:
 
+- A sealed column holds AES-GCM ciphertext under the Worker secret `SETTINGS_KEY`, bound to its column as additional data. The settings page shows only whether it is set.
+- Identity is the OIDC subject. An address belongs to one user row; a sign-in with that address and another subject is refused. The admin list names addresses and applies to the user row that owns each.
+- The first sign-in on a fresh install becomes admin and sets `admin_bootstrap_claimed_at`; the claim never runs again, however empty the list becomes.
 - A meeting can have several recordings; one is primary.
 - Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way.
 - Admin queries never join `segments`, `recaps` or `recap_versions` for a private meeting. Admin sees title, owner, dates and the audit log.

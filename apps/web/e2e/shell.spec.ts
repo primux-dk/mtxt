@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { signIn } from './helpers';
 
 const shot = (name: string) => `e2e/__screenshots__/${name}.png`;
 const DESKTOP = { width: 1280, height: 800 };
@@ -27,6 +28,9 @@ async function tabTo(page: Page, locator: Locator, max = 20) {
   }
   throw new Error('Did not reach the element with Tab');
 }
+
+// Every page needs a session since packet 2.
+test.beforeEach(async ({ page }) => signIn(page));
 
 test.describe('library and design pages', () => {
   for (const viewport of [DESKTOP, PHONE]) {
@@ -106,10 +110,13 @@ test.describe('keyboard and focus (rule 11)', () => {
       await expectFocusRing(nav.getByRole('link', { name }));
       await page.keyboard.press('Tab');
     }
-    // Past the sidebar, focus moves into the page: the search field first.
+    // Then the user slot's "Sign out", and past the sidebar the page: the search field first.
+    await expectFocusRing(page.getByRole('button', { name: 'Sign out' }));
+    await page.keyboard.press('Tab');
     await expect(page.getByRole('searchbox')).toBeFocused();
 
     // Enter on a nav item navigates, and the current item is marked.
+    await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Shift+Tab');
@@ -140,7 +147,7 @@ test.describe('keyboard and focus (rule 11)', () => {
     );
     await page.screenshot({ path: shot('sheet-390') });
 
-    // Ten tabs in a five-control dialog: focus never leaves it.
+    // Ten tabs in a six-control dialog: focus never leaves it.
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
       expect(await sheet.evaluate((el) => el.contains(document.activeElement))).toBe(true);
