@@ -91,3 +91,11 @@ Dated, with the reason. Newest at the bottom. The spec in `spec.md` states the r
 - **Template names collide on a stored key.** `templates.name_key`, the trimmed, NFKC-normalised, case-folded name, with a unique index, replaces the index on the raw name. JavaScript has no full case fold; lower-casing plus the ß and final-sigma folds covers the cases a European install meets.
 - **Keyterm text is CSV per RFC 4180.** Quoted fields may span lines; an unterminated quote or a record with three fields is an error naming the record, and nothing is imported.
 - **A fresh install is called "Meetings".** The seed's "mtxt install" put mtxt on the login page until an admin renamed it.
+
+## 2026-10-22, packet 2 second review
+
+- **The cookie names a user; the user row authorises.** The middleware and every page and action resolve the token's subject to the current user row and use its email, name and `is_admin`; a cookie whose row is gone counts as signed out. Supersedes "the admin check reads the list itself": the list sets `is_admin` at sign-in and on every save, and the row is what a stale cookie cannot carry. One D1 read per request.
+- **On `/settings`, a server action from a non-admin passes the middleware to its own admin check.** Each action refuses a non-admin with a message the form shows; the 403 page in its place left the form waiting with no answer. Pages still get the 403.
+- **Migration 0002 closes the first-admin claim on any install that has a user** as well as on any that has an admin address, so an install whose list was emptied before 0002 is not claimable again.
+- **Template keys reach the full fold in two steps.** Migration 0002 can only lower-case ASCII and appends the row id to the later of two colliding names so the unique index can be built; `refoldTemplateKeys()` then runs once per Worker isolate, recomputes every key with the app's fold and renames the later of two colliding templates "<name> (2)". It is idempotent and keeps every id.
+- **Keyterm records have exactly one or two fields.** `alpha,2,` is refused with its record number, and formatting quotes any field with a quote, a separator or a line break, so a parsed record round-trips.
