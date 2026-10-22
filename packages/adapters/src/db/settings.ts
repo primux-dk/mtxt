@@ -57,10 +57,20 @@ export async function saveSettings(
   patch: Omit<Partial<NewSettings>, 'installId'> & Pick<NewSettings, 'productName'>,
   terms?: readonly { term: string; boost: number | null }[],
 ) {
+  // A saved admin list ends the first-admin bootstrap for good.
+  const claimed = patch.adminEmails
+    ? { adminBootstrapClaimedAt: sql`coalesce(${settings.adminBootstrapClaimedAt}, ${Date.now()})` }
+    : {};
   const upsert = db
     .insert(settings)
-    .values({ installId, ...DEFAULT_SETTINGS, adminEmails: [], ...patch })
-    .onConflictDoUpdate({ target: settings.installId, set: patch });
+    .values({
+      installId,
+      ...DEFAULT_SETTINGS,
+      adminEmails: [],
+      ...patch,
+      ...(patch.adminEmails ? { adminBootstrapClaimedAt: new Date() } : {}),
+    })
+    .onConflictDoUpdate({ target: settings.installId, set: { ...patch, ...claimed } });
   const extra = [];
   if (terms) {
     extra.push(db.delete(keyterms).where(eq(keyterms.installId, installId)));
@@ -96,9 +106,10 @@ export async function listKeyterms(db: Db, installId: string) {
 }
 
 /**
- * Makes `email` the first admin when the install has none yet. Returns true
- * when this call claimed it. The condition is in the statement, so two first
- * sign-ins cannot both win.
+ * Makes `email` the first admin of a fresh install. Returns true when this
+ * call claimed it. One UPDATE, conditional on the claim never having happened,
+ * so two first sign-ins cannot both win and an emptied list is never claimed
+ * again.
  */
 export async function claimFirstAdmin(db: Db, installId: string, email: string) {
   await db
@@ -107,8 +118,8 @@ export async function claimFirstAdmin(db: Db, installId: string, email: string) 
     .onConflictDoNothing();
   const claimed = await db
     .update(settings)
-    .set({ adminEmails: [email] })
-    .where(and(eq(settings.installId, installId), sql`${settings.adminEmails} = '[]'`))
+    .set({ adminEmails: [email], adminBootstrapClaimedAt: new Date() })
+    .where(and(eq(settings.installId, installId), isNull(settings.adminBootstrapClaimedAt)))
     .returning({ installId: settings.installId });
   return claimed.length > 0;
 }

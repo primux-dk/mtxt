@@ -2,6 +2,21 @@ import { and, asc, eq, ne } from 'drizzle-orm';
 import type { Db } from './index';
 import { meetings, recaps, templates } from './schema';
 
+/**
+ * The key two template names collide on: trimmed, Unicode-normalised and
+ * case-folded. JavaScript has no full case fold, so lower-casing covers it
+ * after the two folds that lower-casing misses (ß to ss, final sigma).
+ */
+export function templateNameKey(name: string): string {
+  return name
+    .trim()
+    .normalize('NFKC')
+    .toLowerCase()
+    .replaceAll('ß', 'ss')
+    .replaceAll('ς', 'σ')
+    .normalize('NFKC');
+}
+
 export async function listTemplates(db: Db, installId: string) {
   return db
     .select()
@@ -26,7 +41,12 @@ export async function createTemplate(
     .limit(1);
   await db
     .insert(templates)
-    .values({ installId, ...value, isDefault: existing.length === 0 })
+    .values({
+      installId,
+      ...value,
+      nameKey: templateNameKey(value.name),
+      isDefault: existing.length === 0,
+    })
     .onConflictDoNothing({ target: templates.id });
 }
 
@@ -38,7 +58,7 @@ export async function updateTemplate(
 ) {
   const rows = await db
     .update(templates)
-    .set(value)
+    .set({ ...value, nameKey: templateNameKey(value.name) })
     .where(and(eq(templates.installId, installId), eq(templates.id, id)))
     .returning({ id: templates.id });
   return rows.length > 0;

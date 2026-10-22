@@ -11,15 +11,22 @@ export {
   saveSettings,
   type IdentityBootstrap,
 } from './db/settings';
-export { findUser, recordSignIn, type SignInProfile } from './db/users';
+export {
+  AccountConflictError,
+  findUser,
+  hasSignInConflict,
+  recordSignIn,
+  type SignInProfile,
+} from './db/users';
 export {
   createTemplate,
   deleteTemplate,
   listTemplates,
   setDefaultTemplate,
+  templateNameKey,
   updateTemplate,
 } from './db/templates';
-export { open, seal } from './secrets';
+export { open, seal, type SecretContext } from './secrets';
 export {
   CAPTURE_SOURCES,
   IDENTITY_PROVIDERS,

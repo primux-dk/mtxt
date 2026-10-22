@@ -33,6 +33,7 @@ export function seedSql(installId: string): string {
     ['mcp_enabled', s.mcpEnabled],
     ['recording_sources', JSON.stringify(s.recordingSources)],
     ['admin_emails', JSON.stringify(s.adminEmails)],
+    ['admin_bootstrap_claimed_at', s.adminBootstrapClaimedAt],
   ];
   const values = columns.map(([, v]) =>
     v === null ? 'NULL' : typeof v === 'string' ? quote(v) : Number(v),

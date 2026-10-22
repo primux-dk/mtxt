@@ -91,7 +91,11 @@ export const users = sqliteTable(
     name: text('name').notNull(),
     isAdmin: bool('is_admin').notNull().default(false),
   },
-  (t) => [uniqueIndex('users_install_subject').on(t.installId, t.oidcSubject)],
+  (t) => [
+    uniqueIndex('users_install_subject').on(t.installId, t.oidcSubject),
+    /** One user row per address: identity is the subject, and an address never names two. */
+    uniqueIndex('users_install_email').on(t.installId, t.email),
+  ],
 );
 
 export const templates = sqliteTable(
@@ -100,13 +104,14 @@ export const templates = sqliteTable(
     id: id(),
     installId: installId(),
     name: text('name').notNull(),
+    /** `templateNameKey(name)`: trimmed and case-folded, so names that differ only in case collide. */
+    nameKey: text('name_key').notNull().default(''),
     bodyMd: text('body_md').notNull(),
     isDefault: bool('is_default').notNull().default(false),
   },
   (t) => [
     index('templates_install').on(t.installId),
-    /** The settings page also refuses a name that differs only in case. */
-    uniqueIndex('templates_install_name').on(t.installId, t.name),
+    uniqueIndex('templates_install_name_key').on(t.installId, t.nameKey),
   ],
 );
 
@@ -358,6 +363,8 @@ export const settings = sqliteTable(
       .$type<readonly string[]>()
       .notNull()
       .default(sql`'[]'`),
+    /** Set by the first sign-in's admin claim, or the first save of the list. The claim never runs again. */
+    adminBootstrapClaimedAt: timestamp('admin_bootstrap_claimed_at'),
   },
   () => [
     inValues('settings', 'identity_provider', IDENTITY_PROVIDERS),
