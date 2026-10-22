@@ -89,7 +89,12 @@ export function MeetingMenu({
         </span>
       )}
 
-      <UploadDialog open={uploading} onOpenChange={setUploading} meetingId={meetingId} />
+      <UploadDialog
+        open={uploading}
+        onOpenChange={setUploading}
+        meetingId={meetingId}
+        returnFocusTo={trigger}
+      />
 
       <Dialog
         open={confirming}

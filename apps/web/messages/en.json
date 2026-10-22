@@ -326,7 +326,7 @@
       "level": "Microphone level",
       "status": {
         "idle": "Press Record to start. The browser asks for the microphone.",
-        "uploading": "Uploading as you record · {done, plural, one {# chunk} other {# chunks}} sent",
+        "uploading": "{done, plural, =0 {Recording · the audio uploads in 8 MB pieces as it grows} one {Uploading as you record · # chunk sent} other {Uploading as you record · # chunks sent}}",
         "retrying": "Waiting for network · retrying",
         "finishing": "Finishing the upload",
         "done": "Saved. Opening the meeting."

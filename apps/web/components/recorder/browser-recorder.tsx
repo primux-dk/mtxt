@@ -76,6 +76,11 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The button under the pointer changes from Record to Stop; focus follows it.
+  useEffect(() => {
+    if (state === 'recording') stopButton.current?.focus();
+  }, [state]);
+
   // Recording, or holding audio the server has not confirmed: warn before leaving.
   useEffect(() => {
     if (!['recording', 'finishing', 'failed'].includes(state)) return;
@@ -183,7 +188,6 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
     session.current = { recorder, stream, audio, upload, startedAt, titleAtStart, timers };
     setElapsed(0);
     setState('recording');
-    requestAnimationFrame(() => stopButton.current?.focus());
   };
 
   const stop = () => {
@@ -292,7 +296,7 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
 
       <label className="grid grid-cols-[auto_1fr] items-center gap-3 text-xs text-muted-foreground">
         <span>{t('level')}</span>
-        <meter min={0} max={100} value={level} className="h-2 w-full" />
+        <meter min={0} max={100} value={level} className="level-meter h-2 w-full" />
       </label>
 
       <p id={ids.status} aria-live="polite" className="text-sm text-muted-foreground">

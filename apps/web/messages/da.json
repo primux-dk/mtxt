@@ -326,7 +326,7 @@
       "level": "Mikrofonniveau",
       "status": {
         "idle": "Tryk Optag for at starte. Browseren beder om mikrofonen.",
-        "uploading": "Uploader, mens du optager · {done, plural, one {# del} other {# dele}} sendt",
+        "uploading": "{done, plural, =0 {Optager · lyden uploades i dele på 8 MB, efterhånden som den vokser} one {Uploader, mens du optager · # del sendt} other {Uploader, mens du optager · # dele sendt}}",
         "retrying": "Venter på netværk · prøver igen",
         "finishing": "Gør uploaden færdig",
         "done": "Gemt. Åbner mødet."

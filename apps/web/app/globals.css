@@ -111,3 +111,17 @@
     outline-offset: 2px;
   }
 }
+
+/* The recorder's level meter in the accent, as in the mockups' recorder. */
+@layer components {
+  .level-meter {
+    accent-color: var(--accent-strong);
+  }
+  .level-meter::-webkit-meter-bar {
+    background: var(--muted);
+    border: 0;
+  }
+  .level-meter::-webkit-meter-optimum-value {
+    background: var(--accent-strong);
+  }
+}

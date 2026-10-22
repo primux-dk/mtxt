@@ -2,7 +2,7 @@
 
 import { Mic, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -30,11 +30,12 @@ export function NewMeetingMenu({
   canUpload: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="primary" className="max-shell:px-3 max-shell:text-xs">
+          <Button ref={trigger} variant="primary" className="max-shell:px-3 max-shell:text-xs">
             <Plus aria-hidden="true" />
             {label}
           </Button>
@@ -52,7 +53,7 @@ export function NewMeetingMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <UploadDialog open={uploading} onOpenChange={setUploading} />
+      <UploadDialog open={uploading} onOpenChange={setUploading} returnFocusTo={trigger} />
     </>
   );
 }

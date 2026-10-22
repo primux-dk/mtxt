@@ -48,7 +48,10 @@ export function UploadDialog({
   open: controlledOpen,
   onOpenChange,
   meetingId,
+  returnFocusTo,
 }: {
+  /** Opened from a menu: the menu item is gone on close, so focus goes here. */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -166,6 +169,11 @@ export function UploadDialog({
         closeLabel={common('close')}
         onInteractOutside={(event) => busy && event.preventDefault()}
         onEscapeKeyDown={(event) => busy && event.preventDefault()}
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusTo?.current) return;
+          event.preventDefault();
+          returnFocusTo.current.focus();
+        }}
       >
         <div className="grid gap-2">
           <DialogTitle>{meetingId ? t('titleExisting') : t('title')}</DialogTitle>
