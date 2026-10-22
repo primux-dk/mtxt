@@ -9,6 +9,7 @@
  * is safe to build by string.
  */
 import { foldTitle } from './fold.ts';
+import { accessDemoSql } from './dev-seed-access.ts';
 
 /**
  * The users the demo library belongs to. Their subjects are the ones the e2e
@@ -296,6 +297,7 @@ export function demoSql(installId: string, count: number, now?: number): string 
   sql += graphSql(installId);
   sql += foreignInstallSql(installId);
   if (count > 5) sql += demoTranscriptsSql(installId);
+  sql += accessDemoSql(installId, meetings, now ?? Date.UTC(2026, 9, 22, 9, 0));
   return sql;
 }
 

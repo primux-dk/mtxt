@@ -41,7 +41,8 @@ export default defineConfig({
       process.env.E2E_PREBUILT ? null : 'pnpm build:e2e',
       'rm -rf .wrangler/e2e',
       'pnpm db:migrate --persist-to .wrangler/e2e',
-      // The dev users and a 30-meeting demo library (packet 3).
+      // The dev users and a 30-meeting demo library (packet 3), with packet 6's
+      // 40 colleagues, search transcripts, old meetings and 10,000 audit rows.
       'pnpm db:seed --demo=30 --persist-to .wrangler/e2e',
       // The origin and the fakes follow the port, so two worktrees can run side by side.
       `wrangler dev --local --define MTXT_E2E_BUILD:'"1"' --var MTXT_LOCAL_DEV:1` +
@@ -49,6 +50,8 @@ export default defineConfig({
         ` --var ASSEMBLYAI_BASE_URL:http://localhost:${port}/api/test/fake-assemblyai` +
         ` --var WORKERS_AI_FAKE_URL:http://localhost:${port}/api/test/fake-workers-ai` +
         ` --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e` +
+        // --test-scheduled: GET /__scheduled runs the Cron Trigger (the retention spec).
+        ` --test-scheduled` +
         // Everything the Worker logs, for the spec that checks no secret reaches it.
         ` > .wrangler/e2e-worker.log 2>&1`,
     ]
