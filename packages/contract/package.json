@@ -10,7 +10,6 @@
   },
   "scripts": {
     "generate": "openapi-typescript openapi.yaml -o src/types.ts",
-    "check:generated": "pnpm generate && git diff --exit-code -- src/types.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"

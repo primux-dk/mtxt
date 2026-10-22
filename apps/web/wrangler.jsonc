@@ -1,0 +1,48 @@
+// One install = one Worker in the owning company's own Cloudflare account.
+// No account id here: wrangler takes it from the logged-in account or
+// CLOUDFLARE_ACCOUNT_ID. The ids below are placeholders; a deploy replaces them
+// with the install's own (see README "Run it").
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mtxt",
+  // OpenNext's worker plus the queue consumer and the Durable Object class.
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": { "enabled": true },
+  "vars": {
+    // Written into every row's install_id. One install per account.
+    "INSTALL_ID": "dev",
+    // AI Gateway in front of the recap model and the providers it supports.
+    // Placeholder until the recap packet; the gateway is created in the install's account.
+    "AI_GATEWAY_ID": "",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mtxt",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/adapters/migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AUDIO",
+      "bucket_name": "mtxt-audio",
+      // Audio at rest stays in the EU (docs/spec.md, EU data).
+      "jurisdiction": "eu",
+    },
+  ],
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "mtxt-jobs" }],
+    "consumers": [{ "queue": "mtxt-jobs", "max_batch_size": 1, "max_retries": 5 }],
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "UPLOAD_SESSIONS", "class_name": "UploadSession" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UploadSession"] }],
+}

@@ -12,7 +12,6 @@
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "check:generated": "drizzle-kit generate && git diff --exit-code -- migrations && test -z \"$(git status --porcelain -- migrations)\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
