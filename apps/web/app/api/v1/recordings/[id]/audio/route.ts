@@ -5,6 +5,7 @@ import { HttpError } from '@/lib/http-error';
 import { parseRange } from '@/lib/http-range';
 import { getAdapters } from '@/lib/install';
 import { accessTo } from '@/lib/meetings/queries';
+import { isMediaType } from '@/lib/recordings/media-type';
 
 /**
  * The audio of a recording, streamed from storage after the permission
@@ -27,9 +28,13 @@ async function serve(request: Request, id: string, head: boolean) {
     const info = await storage.head(key);
     if (!info) throw new HttpError(404, 'not_found', 'The audio is not in storage.');
 
+    const type = row.recording.contentType.split(';')[0]!.trim();
     const headers = new Headers({
       'accept-ranges': 'bytes',
-      'content-type': row.recording.contentType.split(';')[0]!,
+      // Checked at create; checked again, so stored data can never be served as a page.
+      'content-type': isMediaType(type) ? type : 'application/octet-stream',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none'; sandbox",
       'cache-control': 'private, no-store',
     });
     const range = parseRange(request.headers.get('range'), info.size);

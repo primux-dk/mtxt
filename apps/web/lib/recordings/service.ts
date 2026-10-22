@@ -22,6 +22,7 @@ import {
 import type { CurrentUser } from '../auth';
 import { HttpError } from '../http-error';
 import { accessTo } from '../meetings/queries';
+import { isMediaType } from './media-type';
 
 export interface RecordingContext {
   db: Db;
@@ -106,9 +107,10 @@ export function validateCreate(
       `This install does not accept ${b.source} recordings.`,
     );
   }
-  if (typeof b.content_type !== 'string' || !b.content_type || b.content_type.length > 200) {
-    invalid('content_type is a MIME type.');
+  if (typeof b.content_type !== 'string' || !isMediaType(b.content_type)) {
+    invalid('content_type is an audio or video MIME type, for example audio/webm.');
   }
+
   const hasSha = b.sha256 !== undefined;
   if (hasSha !== (b.size_bytes !== undefined)) invalid('Send sha256 and size_bytes together.');
   if (hasSha) {

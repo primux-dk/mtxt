@@ -71,6 +71,10 @@ test.describe('recordings API', () => {
     });
     expect(audio.status()).toBe(206);
     expect(audio.headers()['content-range']).toBe(`bytes 0-0/${file.length}`);
+    expect(audio.headers()).toMatchObject({
+      'content-type': 'audio/webm',
+      'x-content-type-options': 'nosniff',
+    });
 
     // A second complete answers the same confirmation.
     const again = await request.post(`/api/v1/recordings/${rec.id}/complete`, { headers: owner });
@@ -189,6 +193,17 @@ test.describe('recordings API', () => {
       },
     });
     expect(big.status()).toBe(413);
+    // Only audio or video types: the audio route sends it back as Content-Type.
+    const html = await request.post('/api/v1/recordings', {
+      headers: owner,
+      data: {
+        meeting: { title: 'x', started_at: '2026-10-22T09:00:00Z' },
+        duration_s: 1,
+        source: 'upload',
+        content_type: 'text/html',
+      },
+    });
+    expect(html.status()).toBe(400);
     const nobody = await request.get('/api/v1/recordings/x', {
       headers: { 'x-mtxt-test-user': 'ghost' },
     });

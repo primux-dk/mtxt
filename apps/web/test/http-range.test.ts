@@ -22,3 +22,15 @@ describe('parseRange', () => {
     expect(parseRange('bytes=-0', 100)).toBe('unsatisfiable');
   });
 });
+
+describe('isMediaType', async () => {
+  const { isMediaType } = await import('../lib/recordings/media-type');
+  it('takes audio and video types only', () => {
+    expect(isMediaType('audio/webm;codecs=opus')).toBe(true);
+    expect(isMediaType('audio/mp4')).toBe(true);
+    expect(isMediaType('video/webm')).toBe(true);
+    expect(isMediaType('text/html')).toBe(false);
+    expect(isMediaType('audio/webm\r\nx-evil: 1')).toBe(false);
+    expect(isMediaType('application/octet-stream')).toBe(false);
+  });
+});

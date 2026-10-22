@@ -134,6 +134,26 @@ export function isAudioFile(file: File): boolean {
   return !file.type && /\.(m4a|mp3|wav|ogg|oga|opus|webm|flac|aac|wma|amr)$/i.test(file.name);
 }
 
+const BY_EXTENSION: Record<string, string> = {
+  m4a: 'audio/mp4',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
+  webm: 'audio/webm',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  wma: 'audio/x-ms-wma',
+  amr: 'audio/amr',
+};
+
+/** The file's MIME type, from its extension when the system gave none. */
+export function contentTypeFor(file: File): string {
+  if (file.type.startsWith('audio/') || file.type.startsWith('video/')) return file.type;
+  return BY_EXTENSION[file.name.split('.').pop()?.toLowerCase() ?? ''] ?? 'audio/mpeg';
+}
+
 export function checkFile(file: File): 'notAudio' | 'tooLarge' | 'empty' | null {
   if (!isAudioFile(file)) return 'notAudio';
   if (file.size === 0) return 'empty';
@@ -222,7 +242,7 @@ export async function uploadFile(
       sha256,
       size_bytes: file.size,
       source: 'upload' as const,
-      content_type: file.type || 'application/octet-stream',
+      content_type: contentTypeFor(file),
     };
     const created = await withRetry(
       () =>
