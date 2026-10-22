@@ -158,9 +158,17 @@ export interface components {
             size_bytes: number;
             duration_s?: number;
         };
-        MissingChunks: {
+        /**
+         * @description Every 409. `reason` says which: `busy` (retry after `retry_after`
+         *     seconds), `not_uploading` (the recording no longer takes chunks or
+         *     the session is gone), `missing_chunks` (`missing` lists them).
+         */
+        Conflict: {
             error: components["schemas"]["ErrorBody"];
-            missing: number[];
+            /** @enum {string} */
+            reason: "busy" | "not_uploading" | "missing_chunks";
+            missing?: number[];
+            retry_after?: number;
         };
         Recording: {
             id: string;
@@ -307,8 +315,9 @@ export interface operations {
     uploadChunk: {
         parameters: {
             query?: never;
-            header: {
-                "Content-Length": number;
+            header?: {
+                /** @description Optional; a chunk sent with chunked transfer encoding has none. Over 8 MiB is refused before reading. */
+                "Content-Length"?: number;
             };
             path: {
                 id: components["parameters"]["RecordingId"];
@@ -349,7 +358,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Conflict"];
                 };
             };
             /** @description The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`). The server stops reading at one byte past the limit. */
@@ -415,7 +424,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MissingChunks"] | components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Conflict"];
                 };
             };
             /** @description `size_bytes` is larger than the install accepts (`too_large`). */

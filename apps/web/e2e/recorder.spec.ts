@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './contract';
 import { asUser, DESKTOP, PHONE, settle, shot } from './helpers';
 
 /*
@@ -7,8 +8,8 @@ import { asUser, DESKTOP, PHONE, settle, shot } from './helpers';
   seeded colleague. Rules 9 (three distinct failure states), 10 (Record and
   Stop are the primary) and 11 (real buttons, focus moves to Stop).
 */
-test.beforeEach(async ({ context, baseURL }) => {
-  await asUser(context, 'colleague', baseURL!);
+test.beforeEach(async ({ context }) => {
+  await asUser(context, 'colleague');
   await context.grantPermissions(['microphone']);
 });
 
@@ -168,4 +169,51 @@ test('a failed upload is never resumed: a new recording is made from the kept au
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Forkert hash');
   await expect(page.getByRole('heading', { name: 'Recordings' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Transcribing' })).toBeVisible();
+});
+
+test('after Leave, every page warns on unload until the audio is discarded by name', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/recordings/*/c*', (route) => route.abort('internetdisconnected'));
+  await recordAndStop(page, 'Optagelse der skal kasseres');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'The recording is not saved yet' }),
+  ).toBeVisible({ timeout: 60_000 });
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'My meetings' })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Leave without uploading?' })
+    .getByRole('button', { name: 'Leave' })
+    .click();
+  await expect(page).toHaveURL(/\/meetings$/);
+
+  // A reload on the library asks first; declining keeps the page and the audio.
+  const dialogs: string[] = [];
+  page.on('dialog', (dialog) => {
+    dialogs.push(dialog.type());
+    void dialog.dismiss();
+  });
+  await page.getByRole('heading', { level: 1 }).click(); // a gesture, so Chromium may ask
+  await page.evaluate(() => location.reload());
+  await expect.poll(() => dialogs).toEqual(['beforeunload']);
+  await expect(page).toHaveURL(/\/meetings$/);
+
+  // Discard, by name, on the New meeting page.
+  await page.getByRole('button', { name: 'New meeting' }).click();
+  await page.getByRole('menuitem', { name: 'Record in the browser' }).click();
+  await page.getByRole('button', { name: 'Discard recording' }).click();
+  const discard = page.getByRole('dialog', { name: 'Discard the recording?' });
+  await expect(discard).toContainText('“Optagelse der skal kasseres”');
+  await expect(discard).toContainText('there is no other copy');
+  await discard.getByRole('button', { name: 'Discard recording' }).click();
+  await expect(page.getByRole('button', { name: 'Record' })).toBeEnabled();
+  await expect(page.getByRole('alert').filter({ hasText: 'not saved yet' })).toHaveCount(0);
+
+  // Nothing held: the next reload goes ahead without a question.
+  await page.unrouteAll();
+  await page.getByRole('heading', { level: 1 }).click();
+  await page.reload();
+  expect(dialogs).toEqual(['beforeunload']);
 });

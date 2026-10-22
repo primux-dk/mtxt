@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { asUser, DESKTOP, PHONE, settle, shot } from './helpers';
+import { asUser, d1, DESKTOP, PHONE, settle, shot } from './helpers';
+
+test.beforeEach(async ({ context }) => asUser(context, 'dev'));
 
 /*
   The library on the 30-meeting demo set (`pnpm db:seed --demo=30`), as the
@@ -93,7 +95,7 @@ test.describe('library', () => {
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(y - 50);
   });
 
-  test('the three empty states differ (rule 8)', async ({ page, context, baseURL }) => {
+  test('the three empty states differ (rule 8)', async ({ page, context }) => {
     await page.goto('/meetings?q=zzzzzz');
     await expect(page.getByRole('heading', { name: 'No meetings match' })).toBeVisible();
     await page.getByRole('link', { name: 'Reset filters' }).click();
@@ -106,7 +108,7 @@ test.describe('library', () => {
     await expect(alert.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.getByTestId('result-count')).toHaveCount(0);
 
-    await asUser(context, 'newcomer', baseURL!);
+    await asUser(context, 'newcomer');
     await page.goto('/meetings');
     await expect(page.getByRole('heading', { name: 'No meetings yet' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
@@ -119,7 +121,15 @@ test.describe('library', () => {
   test('the views show what the user may see, and nothing else', async ({ page }) => {
     await page.goto('/meetings?view=shared');
     await expect(page.getByRole('heading', { level: 1, name: 'Shared with me' })).toBeVisible();
-    await expect(page.getByTestId('result-count')).toHaveText('1 meeting');
+    // Exactly the meetings shared with dev in this install (install-scope.spec deletes one).
+    const [{ n }] = d1<{ n: number }>(`select count(*) as n from meeting_shares s
+      join meetings m on m.id = s.meeting_id and m.install_id = 'dev'
+      where s.install_id = 'dev' and s.user_id = 'dev-user' and m.archived_at is null`) as [
+      { n: number },
+    ];
+    await expect(page.getByTestId('result-count')).toHaveText(
+      `${n} ${n === 1 ? 'meeting' : 'meetings'}`,
+    );
     await page.goto('/meetings?view=company');
     const company = await page.getByTestId('result-count').textContent();
     expect(Number(company!.replace(/\D/g, ''))).toBeGreaterThan(1);

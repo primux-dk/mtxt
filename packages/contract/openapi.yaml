@@ -79,7 +79,8 @@ paths:
       parameters:
         - name: Content-Length
           in: header
-          required: true
+          required: false
+          description: Optional; a chunk sent with chunked transfer encoding has none. Over 8 MiB is refused before reading.
           schema:
             type: integer
             minimum: 1
@@ -121,7 +122,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Conflict'
         '413':
           description: The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`). The server stops reading at one byte past the limit.
           content:
@@ -178,9 +179,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/MissingChunks'
-                  - $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Conflict'
         '413':
           description: '`size_bytes` is larger than the install accepts (`too_large`).'
           content:
@@ -313,7 +312,7 @@ components:
         content_type:
           type: string
           maxLength: 200
-          pattern: '^(audio|video)/[A-Za-z0-9][A-Za-z0-9.+-]*(\s*;\s*[A-Za-z0-9-]+=("[^"]*"|[^;"\s]+))*$'
+          pattern: '^([Aa][Uu][Dd][Ii][Oo]|[Vv][Ii][Dd][Ee][Oo])/[A-Za-z0-9][A-Za-z0-9.+-]*(\s*;\s*[A-Za-z0-9-]+=("[^"]*"|[^;"\s]+))*$'
           description: Audio or video MIME type, for example audio/ogg or audio/mp4. Anything else is refused.
     CreateRecordingRequest:
       description: Exactly one of `meeting_id` (a meeting that exists) or `meeting` (create one).
@@ -340,6 +339,7 @@ components:
                   not: {}
     CreateRecordingResponse:
       type: object
+      additionalProperties: false
       required: [id, meeting_id, upload_url, chunk_size_bytes, chunk_count, status]
       properties:
         id:
@@ -360,6 +360,7 @@ components:
           $ref: '#/components/schemas/RecordingStatus'
     ChunkReceipt:
       type: object
+      additionalProperties: false
       required: [n, size_bytes, chunks_received, chunk_count]
       properties:
         n:
@@ -390,19 +391,31 @@ components:
         duration_s:
           type: integer
           minimum: 0
-    MissingChunks:
+    Conflict:
       type: object
-      required: [error, missing]
+      description: |
+        Every 409. `reason` says which: `busy` (retry after `retry_after`
+        seconds), `not_uploading` (the recording no longer takes chunks or
+        the session is gone), `missing_chunks` (`missing` lists them).
+      additionalProperties: false
+      required: [error, reason]
       properties:
         error:
           $ref: '#/components/schemas/ErrorBody'
+        reason:
+          type: string
+          enum: [busy, not_uploading, missing_chunks]
         missing:
           type: array
           items:
             type: integer
             minimum: 1
+        retry_after:
+          type: integer
+          minimum: 0
     Recording:
       type: object
+      additionalProperties: false
       required:
         [
           id,
@@ -455,6 +468,7 @@ components:
           description: Set when status is failed.
     ErrorBody:
       type: object
+      additionalProperties: false
       required: [code, message]
       properties:
         code:
@@ -470,6 +484,7 @@ components:
           description: English text for logs. The recorder shows its own localised message per code.
     Error:
       type: object
+      additionalProperties: false
       required: [error]
       properties:
         error:

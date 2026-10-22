@@ -1,10 +1,23 @@
-import { expect, test } from '@playwright/test';
-import { asUser, DESKTOP, PHONE, settle, sha256, shot, wav } from './helpers';
+import { expect } from '@playwright/test';
+import { test } from './contract';
+import {
+  asUser,
+  DESKTOP,
+  PHONE,
+  settle,
+  sha256,
+  shot,
+  wav,
+  SESSION_HEADERS,
+  signInHeaders,
+} from './helpers';
+
+test.beforeAll(async ({ baseURL }) => signInHeaders(baseURL!));
 
 /* The upload dialog (rules 9 and 11), as the seeded colleague. */
-const colleague = { 'x-mtxt-test-user': 'colleague' };
+const colleague = SESSION_HEADERS.colleague;
 
-test.beforeEach(async ({ context, baseURL }) => asUser(context, 'colleague', baseURL!));
+test.beforeEach(async ({ context }) => asUser(context, 'colleague'));
 
 test('upload a file through the dialog and land on the meeting page', async ({ page }) => {
   await page.setViewportSize(DESKTOP);

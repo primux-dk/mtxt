@@ -28,7 +28,7 @@ export type CreateRecordingRequest =
 export type CompleteRecordingRequest = Schemas['CompleteRecordingRequest'];
 export type CreateRecordingResponse = Schemas['CreateRecordingResponse'];
 export type ChunkReceipt = Schemas['ChunkReceipt'];
-export type MissingChunks = Schemas['MissingChunks'];
+export type Conflict = Schemas['Conflict'];
 export type Recording = Schemas['Recording'];
 export type ApiError = Schemas['Error'];
 

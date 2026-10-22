@@ -108,13 +108,27 @@ describe('contract details', () => {
     expect(Object.keys(put.requestBody.content)).toEqual(['application/octet-stream']);
     expect(Object.keys(put.responses)).toEqual(expect.arrayContaining(['409', '413', '415']));
     expect(Object.keys(spec.paths['/recordings/{id}/complete'].post.responses)).toContain('413');
+    expect(put.parameters.find((p: { name: string }) => p.name === 'Content-Length').required).toBe(
+      false,
+    );
+    for (const op of [put, spec.paths['/recordings/{id}/complete'].post]) {
+      expect(op.responses['409'].content['application/json'].schema).toEqual({
+        $ref: '#/components/schemas/Conflict',
+      });
+    }
   });
 
   it('encodes the paired hash and size and the media type', async () => {
     const details = parse(await readFile(specUrl, 'utf8')).components.schemas.RecordingDetails;
     expect(details.dependentRequired).toEqual({ sha256: ['size_bytes'], size_bytes: ['sha256'] });
     const pattern = new RegExp(details.properties.content_type.pattern);
-    for (const ok of ['audio/webm;codecs=opus', 'audio/mp4', 'video/webm', 'audio/x-m4a']) {
+    for (const ok of [
+      'audio/webm;codecs=opus',
+      'audio/mp4',
+      'video/webm',
+      'audio/x-m4a',
+      'Audio/WebM',
+    ]) {
       expect(pattern.test(ok), ok).toBe(true);
     }
     for (const bad of ['text/html', 'application/octet-stream', 'audio/webm\r\nx: 1']) {

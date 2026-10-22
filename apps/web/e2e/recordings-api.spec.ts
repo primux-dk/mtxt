@@ -1,6 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { expect, test, type APIRequestContext } from '@playwright/test';
-import { sha256 } from './helpers';
+import { expect, type APIRequestContext } from '@playwright/test';
+import { checkFetch, test } from './contract';
+import { sha256, SESSION_HEADERS, signInHeaders } from './helpers';
+
+test.beforeAll(async ({ baseURL }) => signInHeaders(baseURL!));
 
 /*
   The recorder contract against wrangler dev: the route handlers, the
@@ -8,10 +11,11 @@ import { sha256 } from './helpers';
   Runs as the seeded colleague so the dev user's library keeps its count.
 */
 const CHUNK = 8 * 1024 * 1024;
-const owner = { 'x-mtxt-test-user': 'colleague' };
-const stranger = { 'x-mtxt-test-user': 'newcomer' };
+const owner = SESSION_HEADERS.colleague;
+const stranger = SESSION_HEADERS.newcomer;
 
 const file = new Uint8Array(randomBytes(2 * CHUNK + 1234));
+
 const chunk = (bytes: Uint8Array, n: number) =>
   Buffer.from(bytes.subarray((n - 1) * CHUNK, n * CHUNK));
 
@@ -76,6 +80,9 @@ test.describe('recordings API', () => {
       'x-content-type-options': 'nosniff',
     });
     expect(audio.headers()['content-disposition']).toBe('inline; filename="recording.webm"');
+    // An empty Range header is refused by keepEmptyRange when it reaches the Worker.
+    // Local workerd strips it before Worker code runs (has('range') is false), so it
+    // cannot be seen end to end here; test/http-range.test.ts covers the guard.
     for (const range of ['bytes=abc-def', 'bytes=-', 'bytes=0-1,5-6']) {
       const bad = await request.get(`/api/v1/recordings/${rec.id}/audio`, {
         headers: { ...owner, range },
@@ -173,7 +180,7 @@ test.describe('recordings API', () => {
   test('an admin gets no special read access to a private meeting', async ({ request }) => {
     // `dev` is the seeded admin; the colleague's meeting is private.
     const rec = await create(request, { sha256: sha256(file), size_bytes: file.length });
-    const asAdmin = { 'x-mtxt-test-user': 'dev' };
+    const asAdmin = SESSION_HEADERS.dev;
     expect((await request.get(`/api/v1/recordings/${rec.id}`, { headers: asAdmin })).status()).toBe(
       404,
     );
@@ -213,7 +220,7 @@ test.describe('recordings API', () => {
     });
     expect(html.status()).toBe(400);
     const nobody = await request.get('/api/v1/recordings/x', {
-      headers: { 'x-mtxt-test-user': 'ghost' },
+      headers: {},
     });
     expect(nobody.status()).toBe(401);
   });
@@ -251,6 +258,7 @@ test.describe('recordings API', () => {
       body,
       duplex: 'half',
     } as RequestInit);
+    await checkFetch('PUT', response);
     expect(response.status).toBe(413);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('too_large');
     const after = await (
@@ -269,6 +277,7 @@ test.describe('recordings API', () => {
       headers: { ...owner, 'content-type': 'application/octet-stream' },
       body: new Uint8Array(CHUNK + 1),
     });
+    await checkFetch('PUT', response);
     expect(response.status).toBe(413);
   });
 

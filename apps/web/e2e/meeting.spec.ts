@@ -1,5 +1,19 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { asUser, DESKTOP, expectFocusRing, PHONE, settle, sha256, shot, wav } from './helpers';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test } from './contract';
+import {
+  asUser,
+  DESKTOP,
+  expectFocusRing,
+  PHONE,
+  settle,
+  sha256,
+  shot,
+  wav,
+  SESSION_HEADERS,
+  signInHeaders,
+} from './helpers';
+
+test.beforeAll(async ({ baseURL }) => signInHeaders(baseURL!));
 
 /*
   The meeting page, as the seeded colleague on meetings this spec makes
@@ -7,7 +21,7 @@ import { asUser, DESKTOP, expectFocusRing, PHONE, settle, sha256, shot, wav } fr
   (optimistic with rollback), 3 (archive and delete), 5 (?t=), 11
   (keyboard) and 10 (Export is the primary, disabled until packet 5).
 */
-const colleague = { 'x-mtxt-test-user': 'colleague' };
+const colleague = SESSION_HEADERS.colleague;
 
 async function meetingWithAudio(request: APIRequestContext, title: string) {
   const audio = wav(3);
@@ -39,7 +53,7 @@ async function dropActions(page: Page) {
   );
 }
 
-test.beforeEach(async ({ context, baseURL }) => asUser(context, 'colleague', baseURL!));
+test.beforeEach(async ({ context }) => asUser(context, 'colleague'));
 
 test('rename is optimistic, saved, and rolled back when the server does not get it', async ({
   page,
@@ -79,9 +93,12 @@ test('Keep is optimistic and rolls back to the server state', async ({ page, req
   await page.goto(`/meetings/${id}`);
   const keep = page.getByRole('button', { name: 'Keep this meeting from automatic deletion' });
   await expect(keep).toHaveAttribute('aria-pressed', 'false');
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && Boolean(r.request().headers()['next-action']),
+  );
   await keep.click();
   await expect(keep).toHaveAttribute('aria-pressed', 'true');
-  await page.waitForLoadState('networkidle');
+  await saved;
   await page.reload();
   await expect(keep).toHaveAttribute('aria-pressed', 'true');
 
@@ -253,9 +270,8 @@ test('delete names what goes, then removes the meeting and its audio', async ({
 test('a reader sees a badge, no owner controls; a private meeting is not there at all', async ({
   page,
   context,
-  baseURL,
 }) => {
-  await asUser(context, 'dev', baseURL!);
+  await asUser(context, 'dev');
   // The demo seed: the colleague's 0001 is shared with dev, 0002 company-wide, 0003 private.
   await page.goto('/meetings/demo-colleague-0001');
   await expect(page.getByText('Shared', { exact: true })).toBeVisible();
