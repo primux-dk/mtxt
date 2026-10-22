@@ -248,10 +248,18 @@ describe('dev seed', () => {
       db.exec(demoSql('dev', 30));
     }
     const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
-    expect(count(`SELECT count(*) AS n FROM users`)).toBe(3);
+    expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(3);
     expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-user'`)).toBe(30);
     expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(3);
-    expect(count(`SELECT count(*) AS n FROM meeting_shares`)).toBe(1);
+    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(1);
+    // The foreign-install fixtures: one meeting, one share, one recording.
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE install_id = 'other-install'`)).toBe(1);
+    expect(
+      count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'other-install'`),
+    ).toBe(1);
+    expect(count(`SELECT count(*) AS n FROM recordings WHERE install_id = 'other-install'`)).toBe(
+      1,
+    );
     expect([...LONG_TITLE]).toHaveLength(120);
 
     const big = demoMeetings(2000);

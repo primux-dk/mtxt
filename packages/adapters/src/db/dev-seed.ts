@@ -157,6 +157,30 @@ function insertRows(table: string, columns: string[], rows: string[][]): string 
   return sql;
 }
 
+/** The second install the fixtures plant rows from. Nothing of it may show in the first. */
+export const FOREIGN_INSTALL = 'other-install';
+
+/**
+ * Rows from another install that point into this one: a company meeting of
+ * its own, a share that names the newcomer on the colleague's shared
+ * meeting, and a recording attached to the dev user's first meeting. The
+ * schema allows these references; every query must ignore them.
+ */
+function foreignInstallSql(installId: string): string {
+  const other = quote(FOREIGN_INSTALL);
+  return (
+    [
+      `DELETE FROM meetings WHERE id = 'foreign-meeting';`,
+      `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('foreign-user', ${other}, 'foreign', 'foreign@example.com', 'Foreign User') ON CONFLICT (id) DO NOTHING;`,
+      `INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at, visibility) VALUES ('foreign-meeting', ${other}, 'foreign-user', 'Fremmed møde', 'fremmed møde', ${Date.UTC(2026, 9, 22, 8)}, 'company');`,
+      `INSERT INTO meeting_shares (install_id, meeting_id, user_id) VALUES (${other}, 'demo-colleague-0001', 'dev-newcomer');`,
+      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, content_type, storage_path, status, created_at, confirmed_at) VALUES ` +
+        `('foreign-recording', ${other}, 'demo-0000', 'foreign-user', 'upload', 0, 60, '${'0'.repeat(64)}', 1, 'audio/webm', 'recordings/${FOREIGN_INSTALL}/demo-0000/foreign-recording.webm', 'transcribed', 1, 1);`,
+      `-- install ${installId} must not see any of the above`,
+    ].join('\n') + '\n'
+  );
+}
+
 /**
  * SQL that replaces the dev users' meetings with the demo library. Deleting
  * first keeps the counts the e2e test checks the same on every run.
@@ -236,5 +260,6 @@ export function demoSql(installId: string, count: number, now?: number): string 
       shares.map(([meetingId, userId]) => [iid, quote(meetingId), quote(userId)]),
     );
   }
+  sql += foreignInstallSql(installId);
   return sql;
 }
