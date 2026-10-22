@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { UploadButton } from '@/components/upload/new-meeting-menu';
 import { recorderSession } from '@/lib/recorder-session';
+import { DiscardRecording } from './discard-recording';
 import { LeaveGuard } from './leave-guard';
 
 type Problem = 'denied' | 'noMic' | 'unsupported';
@@ -77,13 +78,7 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
     router.push(`/meetings/${meetingId}`);
   }, [phase, snapshot?.meetingId, router]);
 
-  // Audio the server has not confirmed: warn before the page unloads.
-  useEffect(() => {
-    if (phase !== 'recording' && phase !== 'finishing' && phase !== 'failed') return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [phase]);
+  // The unload warning is UnconfirmedAudioGuard, in the app layout.
 
   const start = async () => {
     if (!supported()) {
@@ -244,7 +239,10 @@ export function BrowserRecorder({ enabled, canUpload }: { enabled: boolean; canU
           </p>
           <div className="flex flex-wrap gap-2">
             {phase === 'failed' ? (
-              <Button onClick={() => recorderSession.retry()}>{t('tryAgain')}</Button>
+              <>
+                <Button onClick={() => recorderSession.retry()}>{t('tryAgain')}</Button>
+                <DiscardRecording title={title} durationS={elapsed} />
+              </>
             ) : (
               <>
                 {problem !== 'unsupported' && (

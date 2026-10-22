@@ -79,7 +79,7 @@ export const recorderSession = {
   title: () => session?.title ?? null,
 
   /** True while there is audio the server has not confirmed. */
-  holdsAudio: () => Boolean(session && session.snapshot.phase !== 'done'),
+  hasUnconfirmedAudio: () => Boolean(session && session.snapshot.phase !== 'done'),
 
   /** Starts recording from a microphone stream the page obtained. */
   start(stream: MediaStream, title: string) {
@@ -156,6 +156,22 @@ export const recorderSession = {
 
   setTitle(title: string) {
     if (session) session.title = title;
+  },
+
+  /**
+   * Throws the unconfirmed audio away, on the reader's explicit word (the
+   * Discard dialog). The server's half-made recording expires with its
+   * upload session after 7 days.
+   */
+  discard() {
+    if (!session) return;
+    if (session.recorder.state !== 'inactive') {
+      session.recorder.onstop = null;
+      session.recorder.stop();
+    }
+    releaseMedia(session);
+    session = null;
+    listeners.forEach((listener) => listener());
   },
 
   /** Lets go of a confirmed recording, so the page can start a new one. */
