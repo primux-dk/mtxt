@@ -116,9 +116,10 @@ export function parseKeyterms(text: string): { terms: Keyterm[]; errors: Keyterm
   const errors: KeytermError[] = [];
   const seen = new Set<string>();
   records.forEach(({ record, fields }, index) => {
-    const [term = '', boostText = '', ...rest] = fields;
+    const [term = '', boostText = ''] = fields;
     if (index === 0 && HEADER.test(term)) return;
-    if (fields.length > 2 && rest.some((f) => f !== '')) {
+    // Three fields is an error even when the third is empty (`alpha,2,`).
+    if (fields.length > 2) {
       errors.push({ code: 'tooManyFields', record });
       return;
     }
@@ -146,7 +147,9 @@ export function parseKeyterms(text: string): { terms: Keyterm[]; errors: Keyterm
   return errors.length ? { terms: [], errors } : { terms, errors };
 }
 
-const quote = (value: string) => (/[",;]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
+/** RFC 4180 quoting: a field with a quote, a separator or a line break goes in quotes, `"` doubled. */
+const quote = (value: string) =>
+  /[",;\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 
 /** Back to the textarea's format, one line per term. */
 export function formatKeyterms(terms: readonly Keyterm[]): string {

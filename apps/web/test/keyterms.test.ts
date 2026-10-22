@@ -68,6 +68,24 @@ describe('parseKeyterms', () => {
     });
   });
 
+  it('refuses three fields even when the third is empty', () => {
+    expect(parseKeyterms('Primux\nalpha,2,')).toEqual({
+      terms: [],
+      errors: [{ code: 'tooManyFields', record: 2 }],
+    });
+  });
+
+  it('round-trips a term with a line break, a comma and a quote', () => {
+    const imported = parseKeyterms('"alpha\nbeta",2\n"Acme, ""Nordic""",1');
+    expect(imported.terms).toEqual([
+      { term: 'alpha\nbeta', boost: 2 },
+      { term: 'Acme, "Nordic"', boost: 1 },
+    ]);
+    const text = formatKeyterms(imported.terms);
+    expect(text).toBe('"alpha\nbeta",2\n"Acme, ""Nordic""",1');
+    expect(parseKeyterms(text).terms).toEqual(imported.terms);
+  });
+
   it('reports a term over 100 characters and a list over 1000 terms', () => {
     expect(parseKeyterms('x'.repeat(101)).errors).toEqual([
       { code: 'termTooLong', record: 1, max: 100 },
