@@ -22,7 +22,7 @@ import {
   type View,
 } from '@/lib/meetings/library-params';
 import { listMeetings, type LibraryPage } from '@/lib/meetings/queries';
-import { pageUser } from '@/lib/page-user';
+import { requireUser } from '@/lib/auth/session';
 import { isTestMode } from '@/lib/test-mode';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -46,7 +46,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
   const raw = await searchParams;
   const params = parseLibraryParams(raw);
   const [user, t, nav, format, settings, testMode] = await Promise.all([
-    pageUser(),
+    requireUser(),
     getTranslations('library'),
     getTranslations('nav'),
     getFormatter(),

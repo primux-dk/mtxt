@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   expect,
+  request as playwrightRequest,
   type APIRequestContext,
   type BrowserContext,
   type Locator,
@@ -100,3 +102,37 @@ export async function settle(page: Page) {
   );
 }
 
+/**
+ * Session cookies for the seeded users, as request headers, for API calls
+ * made as someone other than the page's user. Filled in place by
+ * `signInHeaders` (call it from a `beforeAll`), so module-level constants
+ * that point at these objects work.
+ */
+export const SESSION_HEADERS: Record<keyof typeof USERS, Record<string, string>> = {
+  dev: {},
+  colleague: {},
+  newcomer: {},
+};
+
+export async function signInHeaders(baseURL: string) {
+  for (const who of Object.keys(USERS) as (keyof typeof USERS)[]) {
+    const context = await playwrightRequest.newContext({ baseURL });
+    await signIn(context, USERS[who]);
+    const { cookies } = await context.storageState();
+    SESSION_HEADERS[who].cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+    await context.dispose();
+  }
+}
+
+/**
+ * A read on the e2e run's local D1 (.wrangler/e2e, playwright.config.ts),
+ * for checks the API rightly cannot make, such as rows of another install.
+ */
+export function d1<T = Record<string, unknown>>(sql: string): T[] {
+  const out = execFileSync(
+    'wrangler',
+    ['d1', 'execute', 'DB', '--local', '--persist-to', '.wrangler/e2e', '--json', '--command', sql],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  return JSON.parse(out)[0].results as T[];
+}

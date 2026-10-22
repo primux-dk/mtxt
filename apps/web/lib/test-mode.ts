@@ -3,16 +3,15 @@ import { headers } from 'next/headers';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 /**
- * AUTH_TEST_MODE: `AUTH_TEST_MODE=1` in the Worker's environment
- * (`.dev.vars`, or `wrangler dev --var`), and a development request.
- * NODE_ENV is "production" in every OpenNext build, `wrangler dev`
- * included, so a request to localhost counts as development too. A deployed
- * Worker never answers on localhost, and no deploy sets the variable.
+ * The e2e run's test hooks (the library's forced `?state=failed`): only in
+ * an e2e build (MTXT_E2E_BUILD=1, inlined at build time), with
+ * AUTH_TEST_MODE=1 in the Worker's environment, on localhost. The same
+ * three locks as packet 2's test sign-in (lib/auth/test-sign-in.ts).
  */
 export async function isTestMode(): Promise<boolean> {
+  if (process.env.MTXT_E2E_BUILD !== '1') return false;
   const { env } = await getCloudflareContext({ async: true });
   if ((env as { AUTH_TEST_MODE?: string }).AUTH_TEST_MODE !== '1') return false;
-  if (process.env.NODE_ENV !== 'production') return true;
   const host = ((await headers()).get('host') ?? '').replace(/:\d+$/, '');
   return host === 'localhost' || host === '127.0.0.1';
 }

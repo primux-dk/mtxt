@@ -2,12 +2,12 @@ import { getTranslations } from 'next-intl/server';
 import { BrowserRecorder } from '@/components/recorder/browser-recorder';
 import { PageTitle } from '@/components/page-title';
 import { getInstallSettings } from '@/lib/install';
-import { pageUser } from '@/lib/page-user';
+import { requireUser } from '@/lib/auth/session';
 
 /** Record a meeting in the browser (capture route 2). */
 export default async function NewMeetingPage() {
   const [, t, settings] = await Promise.all([
-    pageUser(),
+    requireUser(),
     getTranslations('recorder.web'),
     getInstallSettings(),
   ]);

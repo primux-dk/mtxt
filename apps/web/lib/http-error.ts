@@ -4,7 +4,8 @@ import type { ErrorCode } from '@mtxt/contract';
 export class HttpError extends Error {
   constructor(
     readonly status: number,
-    readonly code: ErrorCode,
+    /** A contract code, or `install_conflict` for the library's own actions. */
+    readonly code: ErrorCode | 'install_conflict',
     message: string,
     readonly extra: Record<string, unknown> = {},
     readonly headers: Record<string, string> = {},

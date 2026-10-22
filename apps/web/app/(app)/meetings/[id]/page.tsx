@@ -20,7 +20,7 @@ import { UploadButton } from '@/components/upload/new-meeting-menu';
 import { getAdapters, getInstallSettings } from '@/lib/install';
 import { parseStartAt } from '@/lib/meetings/library-params';
 import { loadMeeting, meetingState } from '@/lib/meetings/queries';
-import { pageUser } from '@/lib/page-user';
+import { requireUser } from '@/lib/auth/session';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -70,7 +70,7 @@ function PanelState({
   `?t=1834` opens the transcript tab with the player at 30:34 (rule 5).
 */
 export default async function MeetingPage({ params, searchParams }: Props) {
-  const [{ id }, query, user] = await Promise.all([params, searchParams, pageUser()]);
+  const [{ id }, query, user] = await Promise.all([params, searchParams, requireUser()]);
   const { db, installId } = await getAdapters();
   const detail = await loadMeeting(db, installId, user, id);
   // Not readable looks the same as absent: a link is never permission.

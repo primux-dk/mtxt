@@ -10,23 +10,17 @@
  */
 import { foldTitle } from './fold.ts';
 
-/** The users AUTH_TEST_MODE signs in as, by `oidc_subject`. Names are invented. */
+/**
+ * The users the demo library belongs to. Their subjects are the ones the e2e
+ * build's test sign-in writes (`test|<email>`, lib/auth/test-sign-in.ts), so
+ * signing in as one of them lands on the seeded row. Names are invented.
+ */
+const user = (id: string, email: string, name: string, isAdmin: boolean) =>
+  ({ id, subject: `test|${email}`, email, name, isAdmin }) as const;
 export const DEV_USERS = [
-  { id: 'dev-user', subject: 'dev', email: 'dev@example.com', name: 'Mette Lund', isAdmin: true },
-  {
-    id: 'dev-colleague',
-    subject: 'colleague',
-    email: 'colleague@example.com',
-    name: 'Jonas Skov',
-    isAdmin: false,
-  },
-  {
-    id: 'dev-newcomer',
-    subject: 'newcomer',
-    email: 'newcomer@example.com',
-    name: 'Anne Holm',
-    isAdmin: false,
-  },
+  user('dev-user', 'mette.lund@example.com', 'Mette Lund', true),
+  user('dev-colleague', 'jonas.skov@example.com', 'Jonas Skov', false),
+  user('dev-newcomer', 'anne.holm@example.com', 'Anne Holm', false),
 ] as const;
 
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -157,6 +151,33 @@ function insertRows(table: string, columns: string[], rows: string[][]): string 
   return sql;
 }
 
+/**
+ * A meeting of the colleague with something in every table that hangs off a
+ * meeting, for the delete test: a transcript with a speaker and three
+ * segments, a recap with a version and a decision, a share and an audit row.
+ */
+function graphSql(installId: string): string {
+  const i = quote(installId);
+  const t = Date.UTC(2026, 9, 1, 9);
+  return (
+    [
+      // Audit rows outlive their meeting (meeting_id set null), so a reseed clears this one by id.
+      `DELETE FROM audit_events WHERE id = 'demo-graph-a1';`,
+      `INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at, visibility) VALUES ('demo-graph', ${i}, 'dev-colleague', 'Møde med alt i', 'møde med alt i', ${t}, 'shared');`,
+      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, content_type, storage_path, status, created_at, confirmed_at) VALUES ('demo-graph-r1', ${i}, 'demo-graph', 'dev-colleague', 'upload', 1, 60, '${'0'.repeat(64)}', 1, 'audio/webm', 'recordings/${installId}/demo-graph/demo-graph-r1.webm', 'transcribed', ${t}, ${t});`,
+      `INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('demo-graph-t1', ${i}, 'demo-graph-r1', 'demo', 'demo', 'da', '{}');`,
+      `INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('demo-graph-s1', ${i}, 'demo-graph', 'Speaker 1');`,
+      `INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text) VALUES ('demo-graph-g1', ${i}, 'demo-graph-t1', 'demo-graph-s1', 0, 1000, 'a'), ('demo-graph-g2', ${i}, 'demo-graph-t1', 'demo-graph-s1', 1000, 2000, 'b'), ('demo-graph-g3', ${i}, 'demo-graph-t1', 'demo-graph-s1', 2000, 3000, 'c');`,
+      `INSERT INTO recaps (id, install_id, meeting_id, body_md) VALUES ('demo-graph-c1', ${i}, 'demo-graph', '# Referat');`,
+      `INSERT INTO recap_versions (id, install_id, recap_id, body_md) VALUES ('demo-graph-v1', ${i}, 'demo-graph-c1', '# Referat');`,
+      `UPDATE recaps SET current_version_id = 'demo-graph-v1' WHERE id = 'demo-graph-c1';`,
+      `INSERT INTO decisions (id, install_id, recap_id, text) VALUES ('demo-graph-d1', ${i}, 'demo-graph-c1', 'Beslutning');`,
+      `INSERT INTO meeting_shares (install_id, meeting_id, user_id) VALUES (${i}, 'demo-graph', 'dev-user');`,
+      `INSERT INTO audit_events (id, install_id, user_id, meeting_id, action) VALUES ('demo-graph-a1', ${i}, 'dev-user', 'demo-graph', 'opened');`,
+    ].join('\n') + '\n'
+  );
+}
+
 /** The second install the fixtures plant rows from. Nothing of it may show in the first. */
 export const FOREIGN_INSTALL = 'other-install';
 
@@ -260,6 +281,7 @@ export function demoSql(installId: string, count: number, now?: number): string 
       shares.map(([meetingId, userId]) => [iid, quote(meetingId), quote(userId)]),
     );
   }
+  sql += graphSql(installId);
   sql += foreignInstallSql(installId);
   return sql;
 }

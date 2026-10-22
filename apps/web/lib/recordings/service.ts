@@ -19,7 +19,7 @@ import {
   type StorageAdapter,
   type UploadSessions,
 } from '@mtxt/adapters';
-import type { CurrentUser } from '../auth';
+import type { SessionUser as CurrentUser } from '../auth/session';
 import { HttpError } from '../http-error';
 import { accessTo } from '../meetings/queries';
 import { isMediaType } from './media-type';

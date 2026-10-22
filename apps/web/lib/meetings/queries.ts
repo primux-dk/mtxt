@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { foldTitle, schema, type Db, type Meeting, type Recording } from '@mtxt/adapters';
-import type { CurrentUser } from '../auth';
+import type { SessionUser as CurrentUser } from '../auth/session';
 import { resolveAccess, type Access } from './access';
 import { PAGE_SIZE, type LibraryParams, type StatusFilter } from './library-params';
 
