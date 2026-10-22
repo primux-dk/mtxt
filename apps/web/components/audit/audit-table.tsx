@@ -95,7 +95,7 @@ export async function AuditTable({
                   <span className="block text-xs text-muted-foreground">{t('table.gone')}</span>
                 )}
               </td>
-              <td className={cell}>{row.owner?.name ?? '—'}</td>
+              <td className={`${cell} whitespace-nowrap`}>{row.owner?.name ?? '—'}</td>
               <td className={`${cell} text-muted-foreground`}>{details(row) ?? ''}</td>
             </tr>
           ))}

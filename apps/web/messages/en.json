@@ -734,9 +734,7 @@
       "relevance": "Best match"
     },
     "empty": {
-      "title": "Nothing found for “{q}”",
-      "body": "No meeting you can see has it in its title, transcript or recap.",
-      "reset": "Clear search"
+      "body": "No meeting you can see has “{q}” in its title, transcript or recap."
     },
     "kind": {
       "title": "Title",

@@ -54,7 +54,13 @@ export function libraryHref(params: Partial<LibraryParams>): string {
   if (params.view && params.view !== 'mine') search.set('view', params.view);
   if (params.q) search.set('q', params.q);
   if (params.status) search.set('status', params.status);
-  if (params.sort && params.sort !== defaultSort(params.q)) search.set('sort', params.sort);
+  // Relevance without a search is no order at all; it falls back to the default.
+  if (
+    params.sort &&
+    params.sort !== defaultSort(params.q) &&
+    (params.q || params.sort !== 'relevance')
+  )
+    search.set('sort', params.sort);
   if (params.page && params.page > 1) search.set('page', String(params.page));
   const query = search.toString();
   return query ? `/meetings?${query}` : '/meetings';

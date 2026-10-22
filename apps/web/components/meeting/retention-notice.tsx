@@ -10,7 +10,8 @@ import { useKeep } from './keep-state';
  * The retention announcement in the meeting header (behaviour.md rule 3):
  * "Will be deleted on 30 November 2026 · Keep", from 7 days before a
  * deadline (lib: retentionNotice). Keep here is the same optimistic flag as
- * the toggle in the actions row; once kept, the notice says so instead.
+ * the toggle in the actions row; while kept, the notice says so instead,
+ * so a kept meeting inside the window still says why nothing will happen.
  * Readers see the date, without Keep.
  */
 export function RetentionNotice({ notice, owner }: { notice: Notice | null; owner: boolean }) {

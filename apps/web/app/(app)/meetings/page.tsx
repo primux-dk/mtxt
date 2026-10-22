@@ -182,19 +182,12 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
           </Button>
         </EmptyState>
       )}
-      {state === 'nomatch' && params.q && (
+      {state === 'nomatch' && (
         <EmptyState
           Icon={Search}
-          title={ts('empty.title', { q: params.q })}
-          body={ts('empty.body')}
+          title={t('empty.noMatch.title')}
+          body={params.q ? ts('empty.body', { q: params.q }) : t('empty.noMatch.body')}
         >
-          <Button asChild>
-            <Link href={libraryHref({ view: params.view })}>{ts('empty.reset')}</Link>
-          </Button>
-        </EmptyState>
-      )}
-      {state === 'nomatch' && !params.q && (
-        <EmptyState Icon={Search} title={t('empty.noMatch.title')} body={t('empty.noMatch.body')}>
           <Button asChild>
             <Link href={libraryHref({ view: params.view, sort: params.sort })}>
               {t('empty.noMatch.reset')}

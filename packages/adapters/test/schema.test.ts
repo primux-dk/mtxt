@@ -280,11 +280,13 @@ describe('dev seed', () => {
       db.exec(demoSql('dev', 30));
     }
     const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
-    expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(3);
+    // The three dev users, packet 6's 40 colleagues and the owner of the old meetings.
+    expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(44);
     expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-user'`)).toBe(30);
-    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(4);
-    // The colleague's shared meeting, and the delete test's graph meeting.
-    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(2);
+    // Three demo meetings, the graph meeting and packet 6's two search meetings.
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(6);
+    // The colleague's shared meeting, the delete test's graph meeting, and demo-0001's 40.
+    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(42);
     expect(count(`SELECT count(*) AS n FROM segments WHERE transcript_id = 'demo-graph-t1'`)).toBe(
       3,
     );
@@ -295,6 +297,14 @@ describe('dev seed', () => {
     expect(count(`SELECT count(*) AS n FROM speakers WHERE meeting_id = 'demo-0002'`)).toBe(14);
     expect(count(`SELECT count(*) AS n FROM speakers WHERE meeting_id = 'demo-0004'`)).toBe(0);
     expect(count(`SELECT count(*) AS n FROM segments WHERE transcript_id = 'demo-0005-t'`)).toBe(0);
+    // Packet 6: 10,000 audit rows plus the graph's one, 230 old meetings, the search index.
+    expect(count(`SELECT count(*) AS n FROM audit_events WHERE install_id = 'dev'`)).toBe(10_001);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-archivist'`)).toBe(230);
+    expect(
+      count(
+        `SELECT count(*) AS n FROM meeting_search WHERE meeting_search MATCH 'text : "ugeplanen"'`,
+      ),
+    ).toBe(2);
     // The foreign-install fixtures: one meeting, one share, one recording.
     expect(count(`SELECT count(*) AS n FROM meetings WHERE install_id = 'other-install'`)).toBe(1);
     expect(

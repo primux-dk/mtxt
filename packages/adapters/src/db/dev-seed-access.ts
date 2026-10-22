@@ -56,6 +56,7 @@ export const SEARCH_MEETINGS = {
   company: 'demo-search-company',
   private: 'demo-search-private',
 } as const;
+const SEARCH_TITLES = { company: 'Linjemøde, alle', private: 'Linjemøde, kun ejeren' } as const;
 
 const SEGMENTS = [
   'Så er vi samlet. Lad os begynde med kapaciteten på linje 2. Jonas, hvor står vi med testen?',
@@ -139,7 +140,7 @@ export function accessDemoSql(
     const t = now - 2 * day;
     sql +=
       [
-        `INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at, visibility) VALUES (${quote(id)}, ${iid}, ${quote(colleague.id)}, ${quote(`Linjemøde (${visibility})`)}, ${quote(`linjemøde (${visibility})`)}, ${t}, ${quote(visibility)});`,
+        `INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at, visibility) VALUES (${quote(id)}, ${iid}, ${quote(colleague.id)}, ${quote(SEARCH_TITLES[visibility as keyof typeof SEARCH_TITLES])}, ${quote(SEARCH_TITLES[visibility as keyof typeof SEARCH_TITLES].toLocaleLowerCase())}, ${t}, ${quote(visibility)});`,
         `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, content_type, storage_path, status, created_at, confirmed_at) VALUES (${quote(`${id}-r1`)}, ${iid}, ${quote(id)}, ${quote(colleague.id)}, 'upload', 1, 2526, '${'0'.repeat(64)}', 1, 'audio/webm', ${quote(`recordings/${installId}/${id}/${id}-r1.webm`)}, 'transcribed', ${t}, ${t});`,
         `INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES (${quote(`${id}-t1`)}, ${iid}, ${quote(`${id}-r1`)}, 'demo', 'demo', 'da', '{}');`,
         ...SEGMENTS.map(
@@ -152,7 +153,9 @@ export function accessDemoSql(
   // The search index: every demo title, and the two transcripts.
   const titled = [
     ...meetings.map((m) => [m.id, m.title] as const),
-    ...Object.entries(SEARCH_MEETINGS).map(([v, id]) => [id, `Linjemøde (${v})`] as const),
+    ...Object.entries(SEARCH_MEETINGS).map(
+      ([v, id]) => [id, SEARCH_TITLES[v as keyof typeof SEARCH_TITLES]] as const,
+    ),
     ['demo-graph', 'Møde med alt i'] as const,
   ];
   sql += insertRows(

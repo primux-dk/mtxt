@@ -34,7 +34,11 @@ export function NavItems({ label, onNavigate }: { label: string; onNavigate?: ()
   return (
     <nav aria-label={label} className="grid gap-1">
       {ITEMS.map(({ key, href, path, view: itemView, Icon }) => {
-        const current = pathname === path && (path !== '/meetings' || view === itemView);
+        // Settings covers its sub-pages (/settings/audit); the library items differ by view.
+        const current =
+          path === '/settings'
+            ? pathname === path || pathname.startsWith(`${path}/`)
+            : pathname === path && view === itemView;
         return (
           <Link
             key={key}

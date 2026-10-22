@@ -54,6 +54,8 @@ describe('parseLibraryParams', () => {
     expect(parseLibraryParams({ sort: 'relevance' }).sort).toBe('date');
     expect(libraryHref({ q: 'budget', sort: 'relevance' })).toBe('/meetings?q=budget');
     expect(libraryHref({ q: 'budget', sort: 'date' })).toBe('/meetings?q=budget&sort=date');
+    // Resetting a search keeps no relevance order behind.
+    expect(libraryHref({ view: 'mine', sort: 'relevance' })).toBe('/meetings');
   });
 
   it('tells a narrowed list from a full one', () => {

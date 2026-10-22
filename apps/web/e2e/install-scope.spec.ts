@@ -69,7 +69,7 @@ const COUNTS = `select
   (select count(*) from recap_versions where recap_id = 'demo-graph-c1') as versions,
   (select count(*) from decisions where recap_id = 'demo-graph-c1') as decisions,
   (select count(*) from meeting_shares where meeting_id = 'demo-graph') as shares,
-  (select count(*) from audit_events where id = 'demo-graph-a1') as audit`;
+  (select count(*) from audit_events where meeting_id = 'demo-graph') as audit`;
 
 async function openMenu(page: import('@playwright/test').Page, item: string) {
   await page.getByRole('button', { name: 'More actions' }).click();
@@ -134,4 +134,8 @@ test('delete removes every row under the meeting, table by table, and nothing of
   expect(Object.values(d1(COUNTS)[0]!).every((n) => n === 0)).toBe(true);
   expect(d1(`select id from meetings where id = 'foreign-meeting'`)).toHaveLength(1);
   expect(d1(`select id from recordings where id = 'foreign-recording'`)).toHaveLength(1);
+  // The audit log outlives the meeting (packet 6): its row is detached and keeps the title.
+  expect(
+    d1(`select meeting_id, meeting_title from audit_events where id = 'demo-graph-a1'`),
+  ).toEqual([{ meeting_id: null, meeting_title: 'Møde med alt i' }]);
 });

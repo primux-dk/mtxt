@@ -114,7 +114,8 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     current.storagePath &&
     !(current.failure && UPLOAD_FAILURES.includes(current.failure));
   // Retention: audio and text deadlines from started_at and the settings (rule 3).
-  const notice = retentionNotice(meeting, settings, {
+  // Computed as if not kept: the notice reads the live keep flag and says "Kept" instead.
+  const notice = retentionNotice({ ...meeting, keep: false }, settings, {
     audio: recordings.some((rec) => rec.storagePath),
     text: hasTranscript || hasRecap,
   });

@@ -734,9 +734,7 @@
       "relevance": "Bedste match"
     },
     "empty": {
-      "title": "Intet fundet for “{q}”",
-      "body": "Intet møde, du kan se, har det i titlen, transskriptionen eller referatet.",
-      "reset": "Ryd søgning"
+      "body": "Intet møde, du kan se, har “{q}” i titlen, transskriptionen eller referatet."
     },
     "kind": {
       "title": "Titel",

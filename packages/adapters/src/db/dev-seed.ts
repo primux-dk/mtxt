@@ -186,7 +186,7 @@ function graphSql(installId: string): string {
       `UPDATE recaps SET current_version_id = 'demo-graph-v1' WHERE id = 'demo-graph-c1';`,
       `INSERT INTO decisions (id, install_id, recap_id, text) VALUES ('demo-graph-d1', ${i}, 'demo-graph-c1', 'Beslutning');`,
       `INSERT INTO meeting_shares (install_id, meeting_id, user_id) VALUES (${i}, 'demo-graph', 'dev-user');`,
-      `INSERT INTO audit_events (id, install_id, user_id, meeting_id, action) VALUES ('demo-graph-a1', ${i}, 'dev-user', 'demo-graph', 'opened');`,
+      `INSERT INTO audit_events (id, install_id, user_id, meeting_id, meeting_title, action) VALUES ('demo-graph-a1', ${i}, 'dev-user', 'demo-graph', 'Møde med alt i', 'opened');`,
     ].join('\n') + '\n'
   );
 }

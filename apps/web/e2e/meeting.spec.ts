@@ -173,6 +173,8 @@ test('keyboard walk through the actions, the player and the tabs (rule 11)', asy
   await page.getByRole('link', { name: 'All meetings' }).focus();
   const order = [
     page.getByRole('button', { name: 'Rename meeting' }),
+    // Packet 6: the owner's visibility select is live.
+    page.getByRole('combobox', { name: 'Visibility, only the owner can change it' }),
     page.getByRole('button', { name: 'Keep this meeting from automatic deletion' }),
     page.getByRole('button', { name: 'More actions' }),
     page.getByRole('button', { name: 'Play recording' }),
