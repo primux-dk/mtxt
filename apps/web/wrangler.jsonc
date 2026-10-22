@@ -50,6 +50,8 @@
   // Workers AI, for the Whisper speech-to-text provider. Always remote; local dev and the
   // e2e run use `wrangler dev --local`, where calling it fails and the job records why.
   "ai": { "binding": "AI", "remote": true },
+  // Nightly retention at 03:00 UTC: queues the first batch (workers/jobs.ts).
+  "triggers": { "crons": ["0 3 * * *"] },
   "durable_objects": {
     "bindings": [{ "name": "UPLOAD_SESSIONS", "class_name": "UploadSession" }],
   },

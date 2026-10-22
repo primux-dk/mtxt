@@ -1,7 +1,7 @@
 /**
  * The Worker entry. OpenNext builds the Next.js app into .open-next/worker.js;
- * this file adds what Next.js cannot export: the queue consumer and the
- * Durable Object class.
+ * this file adds what Next.js cannot export: the queue consumer, the Cron
+ * Trigger and the Durable Object class.
  */
 import { cloudflareConsumer } from '@mtxt/adapters/cloudflare';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -15,7 +15,7 @@ import {
   type Guarded,
 } from './lib/chunk-guard';
 import { keepEmptyRange } from './lib/http-range';
-import { handleJobs } from './workers/jobs';
+import { handleJobs, scheduleRetention } from './workers/jobs';
 
 export { UploadSession } from './workers/upload-session';
 
@@ -46,4 +46,8 @@ export default {
     }
   },
   queue,
+  // Nightly retention: the cron only queues; the queue consumer runs the batches.
+  async scheduled(controller, env) {
+    await scheduleRetention(controller.scheduledTime, env);
+  },
 } satisfies ExportedHandler<CloudflareEnv>;
