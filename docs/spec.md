@@ -13,7 +13,7 @@ The product name an employee sees is a setting per install ("Acme Meetings"). mt
 | # | Feature | What it means |
 |---|---|---|
 | 1 | Company login | OIDC against Entra ID or Google Workspace. No local users, no passwords. |
-| 2 | Desktop recorder | Mic plus system audio on Mac and Windows, bot-free. Signed in with the company login, uploads when the meeting ends. A fork of Vibe (Tauri 2, Rust). |
+| 2 | Desktop recorder | Mic plus system audio on Mac and Windows, bot-free. Signed in with the company login, uploads when the meeting ends. Our own Tauri 2 and Rust app, with Vibe, anarlog and Meetily as references. |
 | 3 | Live transcript | Text on screen while the meeting runs, in a small floating window, always on top. A per-user setting with an admin default, off by default. Runs a local model in the recorder. A preview only; the server transcript is the record. |
 | 4 | Other capture | Record in the browser, upload a file, share from a voice recorder. Pull Teams and Meet recordings for meetings the company organised. |
 | 5 | STT adapter | AssemblyAI, Azure Speech, ElevenLabs Scribe, local Whisper or Parakeet. One per install, swappable. |
@@ -27,7 +27,7 @@ Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins cal
 
 ## Capture routes, in build order
 
-1. **Desktop recorder.** The only route that covers a meeting someone else organised. Fork of Vibe: Core Audio process tap on Mac, WASAPI loopback on Windows, whisper.cpp and Parakeet for the live preview.
+1. **Desktop recorder.** The only route that covers a meeting someone else organised. Our own code: Core Audio process tap on Mac, WASAPI loopback on Windows, whisper.cpp and Parakeet for the live preview, the way Vibe, anarlog and Meetily do it.
 2. **Browser and upload.** A recorder in the browser and file upload, in v0.1. A phone app later.
 3. **Pull platform recordings.** Teams recordings through Microsoft Graph (`getAllRecordings`, application permission `OnlineMeetingRecording.Read.All`, admin consent plus an application access policy; organiser's recordings only). Meet recordings through the Meet REST API and a Drive download. Only for meetings the company organised.
 4. **Meeting bot.** Avoided. Visible, brittle, per-minute cost.
@@ -123,6 +123,6 @@ Each write is an audit row. There is no service identity in v1.
 ## Phases
 
 1. **v0.1 library.** Login, upload, browser recorder, AssemblyAI EU adapter plus a local-model adapter tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention.
-2. **v0.2 recorder.** Fork Vibe, strip to record and upload, add company login and the queued upload. Live transcript as the optional setting.
+2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting.
 3. **v0.3.** MCP server. OneDrive and Drive pickup.
 4. **Release.** README, docker compose, one-command deploy, a short post. No announcement before the second install runs.
