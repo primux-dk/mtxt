@@ -8,7 +8,12 @@ export const DEFAULT_SETTINGS = {
   themeAccent: '#566b45',
   themePrimary: '#111111',
   identityProvider: null,
+  oidcTenantId: null,
+  oidcClientId: null,
+  oidcClientSecret: null,
   sttProvider: null,
+  sttApiKey: null,
+  sttRegion: null,
   language: 'auto',
   interfaceLanguage: 'en',
   liveTranscriptDefault: false,
@@ -17,4 +22,5 @@ export const DEFAULT_SETTINGS = {
   retentionTranscriptDays: 365,
   mcpEnabled: false,
   recordingSources: ['desktop', 'upload', 'browser'],
+  adminEmails: [],
 } as const;

@@ -18,7 +18,12 @@ export function seedSql(installId: string): string {
     ['theme_accent', s.themeAccent],
     ['theme_primary', s.themePrimary],
     ['identity_provider', s.identityProvider],
+    ['oidc_tenant_id', s.oidcTenantId],
+    ['oidc_client_id', s.oidcClientId],
+    ['oidc_client_secret', s.oidcClientSecret],
     ['stt_provider', s.sttProvider],
+    ['stt_api_key', s.sttApiKey],
+    ['stt_region', s.sttRegion],
     ['language', s.language],
     ['interface_language', s.interfaceLanguage],
     ['live_transcript_default', s.liveTranscriptDefault],
@@ -27,6 +32,7 @@ export function seedSql(installId: string): string {
     ['retention_transcript_days', s.retentionTranscriptDays],
     ['mcp_enabled', s.mcpEnabled],
     ['recording_sources', JSON.stringify(s.recordingSources)],
+    ['admin_emails', JSON.stringify(s.adminEmails)],
   ];
   const values = columns.map(([, v]) =>
     v === null ? 'NULL' : typeof v === 'string' ? quote(v) : Number(v),

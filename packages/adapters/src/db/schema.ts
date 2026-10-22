@@ -103,7 +103,11 @@ export const templates = sqliteTable(
     bodyMd: text('body_md').notNull(),
     isDefault: bool('is_default').notNull().default(false),
   },
-  (t) => [index('templates_install').on(t.installId)],
+  (t) => [
+    index('templates_install').on(t.installId),
+    /** The settings page also refuses a name that differs only in case. */
+    uniqueIndex('templates_install_name').on(t.installId, t.name),
+  ],
 );
 
 export const meetings = sqliteTable(
@@ -308,8 +312,9 @@ export const keyterms = sqliteTable(
 
 /**
  * One row per install: the whole admin surface (docs/spec.md "Settings page").
- * Credentials for the identity and speech-to-text providers are Worker secrets,
- * not columns.
+ * The provider secrets (`oidc_client_secret`, `stt_api_key`) are sealed with
+ * AES-GCM under the Worker secret SETTINGS_KEY (src/secrets.ts); no code path
+ * returns them to a browser.
  */
 export const settings = sqliteTable(
   'settings',
@@ -321,7 +326,16 @@ export const settings = sqliteTable(
     themeAccent: text('theme_accent').notNull().default('#566b45'),
     themePrimary: text('theme_primary').notNull().default('#111111'),
     identityProvider: text('identity_provider', { enum: IDENTITY_PROVIDERS }),
+    /** Entra: the directory (tenant) id. Google: the Workspace domain sign-in is held to. */
+    oidcTenantId: text('oidc_tenant_id'),
+    oidcClientId: text('oidc_client_id'),
+    /** Sealed. */
+    oidcClientSecret: text('oidc_client_secret'),
     sttProvider: text('stt_provider', { enum: STT_PROVIDERS }),
+    /** Sealed. Workers AI Whisper and the local models have none. */
+    sttApiKey: text('stt_api_key'),
+    /** Azure: the region name. ElevenLabs: `eu` or null for the provider default. */
+    sttRegion: text('stt_region'),
     /** Default transcription language: an ISO code, or `auto`. */
     language: text('language').notNull().default('auto'),
     interfaceLanguage: text('interface_language', { enum: INTERFACE_LANGUAGES })
@@ -339,6 +353,11 @@ export const settings = sqliteTable(
       .$type<readonly (typeof CAPTURE_SOURCES)[number][]>()
       .notNull()
       .default(sql`'["desktop","upload","browser"]'`),
+    /** JSON array of lower-case addresses. Empty on a fresh install: the first sign-in claims it. */
+    adminEmails: text('admin_emails', { mode: 'json' })
+      .$type<readonly string[]>()
+      .notNull()
+      .default(sql`'[]'`),
   },
   () => [
     inValues('settings', 'identity_provider', IDENTITY_PROVIDERS),
@@ -372,3 +391,9 @@ export type Settings = typeof settings.$inferSelect;
 export type NewSettings = typeof settings.$inferInsert;
 export type Visibility = (typeof VISIBILITIES)[number];
 export type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];
+export type IdentityProvider = (typeof IDENTITY_PROVIDERS)[number];
+export type SttProvider = (typeof STT_PROVIDERS)[number];
+export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
+export type User = typeof users.$inferSelect;
+export type Template = typeof templates.$inferSelect;
+export type Keyterm = typeof keyterms.$inferSelect;
