@@ -43,8 +43,8 @@ The whole admin surface. If a setting is not here, it does not exist.
 | Product name | Free text, shown on the recorder, the login page and the tray |
 | Company name | Free text, shown under the product name in the sidebar and in the login footer ("An installation for Acme A/S") |
 | Theme | Accent colour and button colour, two hex values. Defaults are sage #566b45 and #111111. Tints, lines, focus ring and the dark mode are derived. Three pairs are checked in both themes, accent text on the background, button text on the button, accent on a card; a value that puts any pair under 4.5:1 is refused with the ratio shown. A preview row under the fields shows the derived states. The recorder reads the same two values at login |
-| Identity provider | Entra ID or Google: tenant id, client id, secret |
-| Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, local Whisper or Parakeet: key, region |
+| Identity provider | Entra ID or Google: tenant id (for Google, the Workspace domain), client id, secret. The secret is stored encrypted and never shown again |
+| Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, Workers AI Whisper, local Whisper or Parakeet: key, region. Workers AI and the local models need no key. The key is stored encrypted and never shown again |
 | Interface language | Default for the install: en or da. A user's browser or OS language wins when a translation exists |
 | Default language | For transcription. ISO code, auto-detect allowed |
 | Keyterms | One list per install, CSV import |
@@ -54,6 +54,7 @@ The whole admin surface. If a setting is not here, it does not exist.
 | Recap templates | Several per install, markdown, admin edits, user picks per meeting |
 | Retention | Audio N days, transcripts and recaps N days |
 | MCP server | Enabled: yes or no |
+| Admins | Email list. The first user to sign in on a fresh install becomes admin; admins edit the list |
 
 ## How a recording reaches the library
 
@@ -113,14 +114,18 @@ recap_versions   id, recap_id, author_id (null = AI), body_md, created_at   -- o
 decisions        id, recap_id, text, owner_user_id, done     -- lifted from the recap by the AI, editable
 templates        id, name, body_md, is_default                 -- admin edits
 keyterms         id, term, boost                               -- one list per install
-settings         product_name, company_name, theme_accent, theme_primary, identity_provider, stt_provider, language, interface_language, live_transcript_default,
+settings         product_name, company_name, theme_accent, theme_primary, identity_provider,
+                 oidc_tenant_id, oidc_client_id, oidc_client_secret (sealed), stt_provider,
+                 stt_api_key (sealed), stt_region, language, interface_language, live_transcript_default,
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
-                 recording_sources (JSON array of desktop|upload|browser|teams|meet)
+                 recording_sources (JSON array of desktop|upload|browser|teams|meet),
+                 admin_emails (JSON array)
 audit_events     id, user_id, meeting_id, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write), at
 ```
 
 Rules:
 
+- A sealed column holds AES-GCM ciphertext under the Worker secret `SETTINGS_KEY`. The settings page shows only whether it is set.
 - A meeting can have several recordings; one is primary.
 - Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way.
 - Admin queries never join `segments`, `recaps` or `recap_versions` for a private meeting. Admin sees title, owner, dates and the audit log.
