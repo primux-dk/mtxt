@@ -6,7 +6,7 @@
   try goes back to the queue, up to MAX_ATTEMPTS deliveries; anything else
   fails the recording with the reason, and the audio stays.
 */
-import { and, desc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   listKeyterms,
   readSettings,
@@ -150,21 +150,4 @@ export async function runTranscribe(
     log.error('Transcription failed', recordingId, code, message);
     await markFailed(db, installId, recordingId, transcript?.id ?? null, code, message);
   }
-}
-
-/** The provider named on a recording's latest transcript row, for the failed and transcribing states. */
-export async function latestProvider(db: Db, installId: string, recordingId: string) {
-  const row = await db
-    .select({ provider: schema.transcripts.provider })
-    .from(schema.transcripts)
-    .where(
-      and(
-        eq(schema.transcripts.installId, installId),
-        eq(schema.transcripts.recordingId, recordingId),
-        eq(schema.transcripts.isComparison, false),
-      ),
-    )
-    .orderBy(desc(schema.transcripts.createdAt))
-    .get();
-  return row?.provider ?? null;
 }
