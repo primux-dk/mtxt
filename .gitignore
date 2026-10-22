@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+/vendor/
+/node_modules/
+/storage/
+/tmp/
+*.m4a
+*.mp3
+*.wav
+*.ogg
+*.mp4
