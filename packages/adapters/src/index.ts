@@ -9,6 +9,7 @@ export type {
   JobType,
   JobHandlers,
   RecapJob,
+  RetentionJob,
   TranscribeJob,
 } from './jobs';
 export { createDb, schema, type Db } from './db';
@@ -69,6 +70,39 @@ export type {
   Transcript,
   TranscriptStatus,
 } from './db/schema';
+export { AUDIT_ACTIONS } from './db/schema';
+export {
+  audit,
+  detachAuditRows,
+  OPENED_WINDOW_MS,
+  type AuditDetails,
+  type AuditEventInput,
+} from './db/audit';
+export { foreignRows, foreignRowsSql } from './db/integrity';
+export {
+  dropFromSearchStatement,
+  ftsQuery,
+  meetingKey,
+  SEARCH_KINDS,
+  searchHitsSql,
+  searchSnippets,
+  SNIPPET_CLOSE,
+  SNIPPET_OPEN,
+  syncSearch,
+  type SearchHit,
+  type SearchKind,
+  type SearchSync,
+} from './db/search';
+export {
+  DAY_MS,
+  RETENTION_BATCH,
+  RETENTION_NOTICE_DAYS,
+  retentionBatch,
+  retentionDeadlines,
+  retentionNotice,
+  type RetentionNotice,
+  type RetentionResult,
+} from './db/retention';
 export {
   cloudflareAdapters,
   cloudflareConsumer,

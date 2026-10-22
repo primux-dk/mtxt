@@ -28,12 +28,26 @@ export interface DrainTranscriptionsJob {
   after?: string;
 }
 
-export type Job = TranscribeJob | RecapJob | DrainTranscriptionsJob;
+/**
+ * One batch of nightly retention for an install (src/db/retention.ts). The
+ * Cron Trigger queues the first with its scheduled time as `now`; a full
+ * batch queues the next with the same `now`, so every batch of one night
+ * applies the same deadlines.
+ */
+export interface RetentionJob {
+  type: 'retention';
+  install_id: string;
+  /** Epoch milliseconds. */
+  now: number;
+}
+
+export type Job = TranscribeJob | RecapJob | DrainTranscriptionsJob | RetentionJob;
 export type JobType = Job['type'];
 export const JOB_TYPES = [
   'transcribe',
   'recap',
   'drain_transcriptions',
+  'retention',
 ] as const satisfies readonly JobType[];
 
 export function isJob(value: unknown): value is Job {
@@ -52,6 +66,7 @@ export function isJob(value: unknown): value is Job {
   if (job.type === 'drain_transcriptions') {
     return job.after === undefined || typeof job.after === 'string';
   }
+  if (job.type === 'retention') return Number.isFinite(job.now);
   return false;
 }
 

@@ -36,7 +36,7 @@ Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins cal
 
 ## Settings page
 
-The whole admin surface. If a setting is not here, it does not exist.
+The whole admin surface. If a setting is not here, it does not exist. `/settings/audit`, the audit log, is part of it: a paged table of events (user, meeting title, action, time), filtered by action and user, for admins only. It shows titles and owners, never content.
 
 | Setting                 | Values                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -133,7 +133,10 @@ settings         product_name, company_name, theme_accent, theme_primary, identi
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
                  recording_sources (JSON array of desktop|upload|browser|teams|meet),
                  admin_emails (JSON array), admin_bootstrap_claimed_at
-audit_events     id, user_id, meeting_id, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write), at
+audit_events     id, user_id, meeting_id, meeting_title, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write),
+                 details (JSON: before and after for shared and visibility_changed), at
+                 -- meeting_title is the title when the row was written; the row outlives the meeting
+meeting_search   install_id, meeting_id, kind (title|segment|recap), ref, text   -- FTS5 index, kept in sync by the app
 ```
 
 Rules:
@@ -148,7 +151,9 @@ Rules:
 - A speaker's default label is `Speaker n` (n from 1), shown in the reader's language. A rename sets the label; a link sets `user_id`, and the colleague's name is shown. A second recording of the same meeting reuses the row for the same provider speaker number.
 - A comparison transcript (`is_comparison`, written by `pnpm stt:compare`) is never shown, searched or exported by the app.
 - Every query, join and mutation carries `install_id`, child rows and shares included. A row whose install differs from the Worker's is ignored, whatever it points at; a meeting that another install's rows depend on is not deleted or archived.
-- Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way.
+- Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way. Both count from the meeting's `started_at`. The meeting page announces a deletion 7 days ahead with Keep. A meeting whose audio and transcript are both gone keeps its metadata row with `deleted_at` set and shows in its owner's library as "Deleted by retention" until the owner removes it.
+- Audit rows: `opened` when a meeting page or its audio is served to someone other than the owner, at most one per user, meeting and hour; `shared` and `visibility_changed` with before and after; `deleted` on delete; `exported` on export; `mcp_read` and `mcp_write` from MCP. Deleting a meeting keeps its audit rows, detached from it, with the title they were written with.
+- Search covers titles, transcript segments and recap text, through the same permission scope as the library, and answers with a snippet per meeting.
 - Admin queries never join `segments`, `recaps` or `recap_versions` for a private meeting. Admin sees title, owner, dates and the audit log.
 - Only the owner changes visibility. Shared colleagues read; they do not re-share.
 

@@ -1,35 +1,20 @@
 import 'server-only';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
-import { schema, type Db } from '@mtxt/adapters';
+import { and, eq, inArray, or } from 'drizzle-orm';
+import {
+  detachAuditRows,
+  dropFromSearchStatement,
+  foreignRows,
+  schema,
+  type Db,
+} from '@mtxt/adapters';
 import { HttpError } from '../http-error';
 
 /**
- * Rows of another install that hang off this meeting, through any foreign
- * key: shares, recordings, speakers, recaps and audit rows on the meeting;
- * transcripts and segments under its recordings; versions and decisions
- * under its recap. The schema's foreign keys are one column, so a cascade
- * would delete them; nothing here may.
+ * Rows of another install that hang off this meeting (packages/adapters,
+ * src/db/integrity.ts). Retention uses the same count to leave such a
+ * meeting alone.
  */
-export async function foreignRows(db: Db, installId: string, meetingId: string): Promise<number> {
-  const [row] = await db.all<{ n: number }>(sql`
-    with
-      recs as (select id, install_id from recordings where meeting_id = ${meetingId}),
-      trs as (select id, install_id from transcripts where recording_id in (select id from recs)),
-      caps as (select id, install_id from recaps where meeting_id = ${meetingId})
-    select
-      (select count(*) from meeting_shares where meeting_id = ${meetingId} and install_id != ${installId})
-    + (select count(*) from recs where install_id != ${installId})
-    + (select count(*) from speakers where meeting_id = ${meetingId} and install_id != ${installId})
-    + (select count(*) from caps where install_id != ${installId})
-    + (select count(*) from audit_events where meeting_id = ${meetingId} and install_id != ${installId})
-    + (select count(*) from trs where install_id != ${installId})
-    + (select count(*) from segments where transcript_id in (select id from trs) and install_id != ${installId})
-    + (select count(*) from segments where speaker_id in (select id from speakers where meeting_id = ${meetingId}) and install_id != ${installId})
-    + (select count(*) from recap_versions where recap_id in (select id from caps) and install_id != ${installId})
-    + (select count(*) from decisions where recap_id in (select id from caps) and install_id != ${installId})
-    as n`);
-  return Number(row?.n ?? 0);
-}
+export { foreignRows };
 
 /** Refuses a change to a meeting that another install's rows depend on. Nothing has been written. */
 export async function assertOwnRowsOnly(db: Db, installId: string, meetingId: string) {
@@ -45,7 +30,8 @@ export async function assertOwnRowsOnly(db: Db, installId: string, meetingId: st
 /**
  * Deletes the meeting and everything under it, each table by name and by
  * install, in one batch (one transaction on D1), children first so no
- * cascade is left to run. Call assertOwnRowsOnly first.
+ * cascade is left to run. Its audit rows stay, detached. Call
+ * assertOwnRowsOnly first.
  */
 export async function deleteMeetingRows(db: Db, installId: string, meetingId: string) {
   const t = schema;
@@ -99,9 +85,9 @@ export async function deleteMeetingRows(db: Db, installId: string, meetingId: st
       .where(
         and(eq(t.meetingShares.meetingId, meetingId), eq(t.meetingShares.installId, installId)),
       ),
-    db
-      .delete(t.auditEvents)
-      .where(and(eq(t.auditEvents.meetingId, meetingId), eq(t.auditEvents.installId, installId))),
+    // The audit log outlives the meeting: its rows let go of it and keep the title.
+    detachAuditRows(db, installId, meetingId),
+    dropFromSearchStatement(db, installId, meetingId),
     db
       .delete(t.meetings)
       .where(and(eq(t.meetings.id, meetingId), eq(t.meetings.installId, installId))),

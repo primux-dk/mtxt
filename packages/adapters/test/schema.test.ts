@@ -163,7 +163,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0005 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0006 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -192,6 +192,7 @@ describe('schema', () => {
       '0003_capture.sql',
       '0004_transcription.sql',
       '0005_transcription_claims.sql',
+      '0006_access_retention.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);
@@ -207,11 +208,29 @@ describe('schema', () => {
     // The fold is left to the app.
     expect(old.prepare(`SELECT title_folded FROM meetings`).get()).toEqual({ title_folded: null });
     expect(old.prepare(`PRAGMA foreign_key_check`).all()).toEqual([]);
+    // 0006 indexes what is there: the title and the three segments, under the meeting.
+    expect(
+      old
+        .prepare(
+          `SELECT kind, count(*) AS n FROM meeting_search WHERE meeting_id = 'm1' GROUP BY kind`,
+        )
+        .all(),
+    ).toEqual([
+      { kind: 'segment', n: 3 },
+      { kind: 'title', n: 1 },
+    ]);
+    expect(
+      old
+        .prepare(`SELECT meeting_id FROM meeting_search WHERE meeting_search MATCH 'text : "ærø"'`)
+        .all(),
+    ).toEqual([{ meeting_id: 'm1' }]);
   });
 
-  it('only adds to the schema: 0003 drops and rebuilds nothing', async () => {
-    const sql = await readFile(new URL('0003_capture.sql', migrationsDir), 'utf8');
-    expect(sql).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
+  it('only adds to the schema: 0003 and 0006 drop and rebuild nothing', async () => {
+    for (const file of ['0003_capture.sql', '0006_access_retention.sql']) {
+      const sql = await readFile(new URL(file, migrationsDir), 'utf8');
+      expect(sql, file).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
+    }
   });
 
   it('folds packet-1 titles with backfillTitleKeys, once', async () => {
