@@ -14,7 +14,13 @@ import {
 import { NavItems } from './nav-items';
 
 /** Below 720 px the sidebar becomes this Sheet, opened from the top bar. */
-export function MobileNav({ productName }: { productName: string }) {
+export function MobileNav({
+  productName,
+  companyName,
+}: {
+  productName: string;
+  companyName?: string | null;
+}) {
   const t = useTranslations('nav');
   const [open, setOpen] = useState(false);
 
@@ -26,9 +32,12 @@ export function MobileNav({ productName }: { productName: string }) {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" closeLabel={t('close')} className="gap-6 rounded-r-panel p-6">
-        <SheetTitle className="pr-12 text-base leading-[1.3] tracking-[-0.03em]">
-          {productName}
-        </SheetTitle>
+        <div className="pr-12">
+          <SheetTitle className="text-base leading-[1.3] tracking-[-0.03em]">
+            {productName}
+          </SheetTitle>
+          {companyName && <p className="mt-1 text-xs text-muted-foreground">{companyName}</p>}
+        </div>
         <SheetDescription className="sr-only">{t('mobile.description')}</SheetDescription>
         <NavItems label={t('mobile.label')} onNavigate={() => setOpen(false)} />
       </SheetContent>

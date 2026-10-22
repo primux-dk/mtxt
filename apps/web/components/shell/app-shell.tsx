@@ -10,9 +10,12 @@ import { Avatar, UserSlot } from './user-slot';
  */
 export async function AppShell({
   productName,
+  companyName,
   children,
 }: {
   productName: string;
+  /** Optional: the line is left out when the install has not set it. */
+  companyName?: string | null;
   children: React.ReactNode;
 }) {
   const t = await getTranslations('nav');
@@ -20,7 +23,10 @@ export async function AppShell({
   return (
     <div className="min-h-dvh shell:grid shell:grid-cols-[224px_minmax(0,1fr)]">
       <aside className="sticky top-0 flex h-dvh flex-col gap-7 border-r border-sidebar-border bg-sidebar px-4 pt-7 pb-5 max-shell:hidden">
-        <div className="text-base leading-[1.3] font-[650] tracking-[-0.03em]">{productName}</div>
+        <div>
+          <div className="text-base leading-[1.3] font-[650] tracking-[-0.03em]">{productName}</div>
+          {companyName && <div className="mt-1 text-xs text-muted-foreground">{companyName}</div>}
+        </div>
         <Suspense>
           <NavItems label={t('main.label')} />
         </Suspense>
@@ -31,7 +37,7 @@ export async function AppShell({
       <div className="min-w-0">
         <header className="flex min-h-14 items-center justify-between border-b border-border bg-card px-3 py-1.5 shell:hidden">
           <Suspense>
-            <MobileNav productName={productName} />
+            <MobileNav productName={productName} companyName={companyName} />
           </Suspense>
           <span className="text-sm leading-[1.3] font-[650] tracking-[-0.03em]">{productName}</span>
           <Avatar />
