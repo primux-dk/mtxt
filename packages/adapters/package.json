@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./cloudflare": "./src/cloudflare/index.ts",
     "./db/schema": "./src/db/schema.ts",
-    "./db/seed": "./src/db/seed.ts"
+    "./db/seed": "./src/db/seed.ts",
+    "./db/dev-seed": "./src/db/dev-seed.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

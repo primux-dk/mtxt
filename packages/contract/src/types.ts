@@ -33,7 +33,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Upload one chunk. Sending the same chunk again replaces it. */
+        /**
+         * Upload one chunk. Sending the same chunk again replaces it.
+         * @description Every chunk but the last is exactly `chunk_size_bytes`. Chunks may arrive
+         *     in any order and more than once. When the size is not known yet (a
+         *     recording still in progress), a chunk smaller than `chunk_size_bytes` is
+         *     taken as the last one; complete checks it.
+         */
         put: operations["uploadChunk"];
         post?: never;
         delete?: never;
@@ -53,7 +59,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ask the server to verify the whole file against the announced SHA-256. */
+        /**
+         * Ask the server to verify the whole file against the announced SHA-256.
+         * @description Idempotent. Calling it again on a confirmed recording returns the
+         *     recording with its `confirmed_at`; the status may have moved on to
+         *     `transcribing`. The recorder treats `confirmed_at` as the confirmation.
+         */
         post: operations["completeRecording"];
         delete?: never;
         options?: never;
@@ -100,12 +111,18 @@ export interface components {
             /** Format: date-time */
             started_at: string;
         };
+        /**
+         * @description `sha256` and `size_bytes` come together or not at all. A recorder that
+         *     has the whole file sends them here. One that uploads while it records
+         *     (the browser recorder) leaves both out and sends them with complete.
+         */
         RecordingDetails: {
+            /** @description Seconds. 0 when not known yet; complete can set it. */
             duration_s: number;
-            sha256: components["schemas"]["Sha256"];
-            size_bytes: number;
+            sha256?: components["schemas"]["Sha256"];
+            size_bytes?: number;
             source: components["schemas"]["RecordingSource"];
-            /** @description MIME type of the audio, for example audio/ogg or audio/mp4. */
+            /** @description Audio or video MIME type, for example audio/ogg or audio/mp4. Anything else is refused. */
             content_type: string;
         };
         /** @description Exactly one of `meeting_id` (a meeting that exists) or `meeting` (create one). */
@@ -123,25 +140,48 @@ export interface components {
             upload_url: string;
             /** @description Size of every chunk but the last. 8 MB (8388608) in v0.1. */
             chunk_size_bytes: number;
-            chunk_count: number;
+            /** @description Null while the size is not known. */
+            chunk_count: number | null;
             status: components["schemas"]["RecordingStatus"];
         };
         ChunkReceipt: {
             n: number;
             size_bytes: number;
-            chunks_received: number;
-            chunk_count: number;
+            chunks_received: components["schemas"]["ChunkNumbers"];
+            /** @description Null while the size is not known. */
+            chunk_count: number | null;
         };
-        MissingChunks: {
+        /** @description Chunk numbers the server holds, ascending. */
+        ChunkNumbers: number[];
+        CompleteRecordingRequest: {
+            sha256: components["schemas"]["Sha256"];
+            size_bytes: number;
+            duration_s?: number;
+        };
+        /**
+         * @description Every 409. `reason` says which: `busy` (retry after `retry_after`
+         *     seconds), `not_uploading` (the recording no longer takes chunks or
+         *     the session is gone), `missing_chunks` (`missing` lists them).
+         */
+        Conflict: {
             error: components["schemas"]["ErrorBody"];
-            missing: number[];
+            /** @enum {string} */
+            reason: "busy" | "not_uploading" | "missing_chunks";
+            missing?: number[];
+            retry_after?: number;
         };
         Recording: {
             id: string;
             meeting_id: string;
             status: components["schemas"]["RecordingStatus"];
-            sha256: components["schemas"]["Sha256"];
-            size_bytes: number;
+            /** @description Null until known, when the create request left it out. */
+            sha256: components["schemas"]["Sha256"] | null;
+            /** @description Null until known, when the create request left it out. */
+            size_bytes: number | null;
+            /** @description Null while the size is not known. */
+            chunk_count: number | null;
+            /** @description While `uploading`, the chunks the server holds, so a recorder can resume. Empty in every other status. */
+            chunks_received: components["schemas"]["ChunkNumbers"];
             duration_s: number;
             source: components["schemas"]["RecordingSource"];
             /** Format: date-time */
@@ -155,7 +195,13 @@ export interface components {
             error?: components["schemas"]["ErrorBody"] | null;
         };
         ErrorBody: {
-            /** @description Stable machine-readable code, for example `hash_mismatch`. */
+            /**
+             * @description Stable machine-readable code. v0.1 uses `unauthorized`,
+             *     `forbidden`, `not_found`, `invalid_request`, `too_large`,
+             *     `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
+             *     `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
+             *     `unsupported_media_type` and `internal`.
+             */
             code: string;
             /** @description English text for logs. The recorder shows its own localised message per code. */
             message: string;
@@ -176,6 +222,24 @@ export interface components {
         };
         /** @description No valid company login. */
         Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Something went wrong on the server (`internal`). Safe to retry. */
+        Internal: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The caller may see the meeting but does not own it. Only the owner uploads (`forbidden`). */
+        Forbidden: {
             headers: {
                 [name: string]: unknown;
             };
@@ -226,7 +290,17 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
-            /** @description The file is larger than the install accepts. */
+            403: components["responses"]["Forbidden"];
+            /** @description No meeting with this `meeting_id` that the caller may see. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file is larger than the install accepts (2 GB in v0.1, `too_large`). */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -235,13 +309,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["Internal"];
         };
     };
     uploadChunk: {
         parameters: {
             query?: never;
-            header: {
-                "Content-Length": number;
+            header?: {
+                /** @description Optional; a chunk sent with chunked transfer encoding has none. Over 8 MiB is refused before reading. */
+                "Content-Length"?: number;
             };
             path: {
                 id: components["parameters"]["RecordingId"];
@@ -267,9 +343,26 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description The recording is no longer accepting chunks (already confirmed or failed). */
+            /**
+             * @description `not_uploading`: the recording no longer accepts chunks (it is
+             *     confirmed, failed or being verified); the body was not read.
+             *     `busy`: another chunk of this recording is being written; retry
+             *     this one after `Retry-After` seconds.
+             */
             409: {
+                headers: {
+                    /** @description Seconds to wait before retrying. Sent with `busy`. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conflict"];
+                };
+            };
+            /** @description The chunk is larger than `chunk_size_bytes`, or lies past the largest file the install accepts (`too_large`). The server stops reading at one byte past the limit. */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -277,6 +370,16 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description The request body is not `application/octet-stream` (`unsupported_media_type`). */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["Internal"];
         };
     };
     completeRecording: {
@@ -288,7 +391,16 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /**
+         * @description Required when `sha256` and `size_bytes` were left out of the create
+         *     request, because the audio was still being recorded. When both
+         *     requests carry them, they must match.
+         */
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CompleteRecordingRequest"];
+            };
+        };
         responses: {
             /** @description The server holds the whole file and the hash matches. The recording is confirmed. */
             200: {
@@ -299,18 +411,38 @@ export interface operations {
                     "application/json": components["schemas"]["Recording"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Chunks are missing. The body lists them; upload them and call complete again. */
+            /**
+             * @description `missing_chunks`: chunks are missing; the body lists them. Upload
+             *     them and call complete again. `not_uploading`: the session is gone.
+             */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MissingChunks"];
+                    "application/json": components["schemas"]["Conflict"];
                 };
             };
-            /** @description All chunks arrived but the hash does not match. The recorder keeps its file and starts again. */
+            /** @description `size_bytes` is larger than the install accepts (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description All chunks arrived but the file does not match (`hash_mismatch` or
+             *     `size_mismatch`), or the session expired after 7 days
+             *     (`session_expired`). The recording is `failed` and the server has
+             *     deleted what it held. The recorder keeps its file and starts again
+             *     with a new create request.
+             */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -319,6 +451,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["Internal"];
         };
     };
     getRecording: {
@@ -343,6 +476,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
         };
     };
 }

@@ -124,6 +124,13 @@ export const meetings = sqliteTable(
       .notNull()
       .references(() => users.id),
     title: text('title').notNull(),
+    /**
+     * The title NFKC-normalised and lower-cased in JavaScript (foldTitle), for
+     * search. SQLite's LIKE and lower() fold ASCII only, so "MØDE" would not
+     * find "Møde". Null for rows from before migration 0001 until
+     * backfillTitleKeys() has run; the app writes it on create and rename.
+     */
+    titleFolded: text('title_folded'),
     startedAt: timestamp('started_at').notNull(),
     visibility: text('visibility', { enum: VISIBILITIES }).notNull().default('private'),
     keep: bool('keep').notNull().default(false),
@@ -175,10 +182,32 @@ export const recordings = sqliteTable(
     source: text('source', { enum: RECORDING_SOURCES }).notNull(),
     isPrimary: bool('is_primary').notNull().default(false),
     durationS: integer('duration_s').notNull(),
+    /**
+     * '' while a browser recording is still being made, set at complete. The
+     * API answers null for ''. Kept NOT NULL so migration 0001 stays additive:
+     * SQLite cannot drop NOT NULL without rebuilding the table, and D1's
+     * rebuild cascades into transcripts and segments.
+     */
     sha256: text('sha256').notNull(),
+    /** 0 while a browser recording is still being made, set at complete; null in the API. */
     sizeBytes: integer('size_bytes').notNull(),
+    /** An audio or video MIME type. Rows from before 0001 get one from their file extension. */
+    contentType: text('content_type').notNull().default('audio/webm'),
     storagePath: text('storage_path').notNull(),
     status: text('status', { enum: RECORDING_STATUSES }).notNull().default('uploading'),
+    /** A contract error code when status is failed, for example `hash_mismatch`. */
+    failure: text('failure'),
+    /**
+     * When the recording was created. A constant SQL default, because ALTER
+     * TABLE ADD COLUMN takes no expression; the app sets the real time, and
+     * 0001 backfills older rows with their meeting's start.
+     */
+    createdAt: timestamp('created_at')
+      .notNull()
+      .default(sql`0`)
+      .$defaultFn(() => new Date()),
+    /** When the hash matched. The recorder's 7-day local timer starts here. */
+    confirmedAt: timestamp('confirmed_at'),
     deleteAudioAt: timestamp('delete_audio_at'),
   },
   (t) => [
@@ -395,6 +424,9 @@ export const auditEvents = sqliteTable(
 );
 
 export type Settings = typeof settings.$inferSelect;
+export type Meeting = typeof meetings.$inferSelect;
+export type Recording = typeof recordings.$inferSelect;
+export type RecordingStatus = (typeof RECORDING_STATUSES)[number];
 export type NewSettings = typeof settings.$inferInsert;
 export type Visibility = (typeof VISIBILITIES)[number];
 export type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];

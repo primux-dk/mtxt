@@ -32,7 +32,30 @@ export type PutBody = ReadableStream<Uint8Array> | ArrayBuffer | Uint8Array | st
 export type ReadHandle =
   { kind: 'url'; url: string; expiresAt: Date } | { kind: 'stream'; object: StoredObjectBody };
 
-export interface StorageAdapter {
+/** One stored part of a multipart upload. */
+export interface UploadedPart {
+  partNumber: number;
+  etag: string;
+}
+
+/**
+ * Multipart uploads, for audio that arrives in chunks. R2 and S3 share the
+ * model: every part but the last has the same size (at least 5 MiB), parts
+ * may arrive in any order, and uploading a part number again replaces it.
+ */
+export interface MultipartStorage {
+  createUpload(key: string, options?: Omit<PutOptions, 'sha256'>): Promise<{ uploadId: string }>;
+  uploadPart(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    body: ArrayBuffer | Uint8Array,
+  ): Promise<UploadedPart>;
+  completeUpload(key: string, uploadId: string, parts: UploadedPart[]): Promise<StoredObject>;
+  abortUpload(key: string, uploadId: string): Promise<void>;
+}
+
+export interface StorageAdapter extends MultipartStorage {
   put(key: string, body: PutBody, options?: PutOptions): Promise<StoredObject>;
   get(key: string, range?: { offset: number; length?: number }): Promise<StoredObjectBody | null>;
   head(key: string): Promise<StoredObject | null>;

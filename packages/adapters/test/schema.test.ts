@@ -22,6 +22,23 @@ async function migratedDatabase() {
   return db;
 }
 
+/** Drizzle on node:sqlite, the async way D1 runs it. */
+function proxy(db: DatabaseSync) {
+  return drizzle(
+    async (query, params, method) => {
+      const statement = db.prepare(query);
+      if (method === 'run') {
+        statement.run(...(params as never[]));
+        return { rows: [] };
+      }
+      statement.setReturnArrays(true);
+      const rows = statement.all(...(params as never[])) as unknown as unknown[][];
+      return { rows: method === 'get' ? (rows[0] ?? []) : rows } as { rows: unknown[] };
+    },
+    { schema },
+  );
+}
+
 const tables: SQLiteTable[] = Object.values(schema).filter(
   (value): value is never => value instanceof SQLiteTable,
 );
@@ -76,19 +93,7 @@ describe('schema', () => {
   it('seeds the default settings row once and reads it back through Drizzle', async () => {
     db.exec(seedSql('test'));
     db.exec(seedSql('test'));
-    const orm = drizzle(
-      async (query, params, method) => {
-        const statement = db.prepare(query);
-        if (method === 'run') {
-          statement.run(...(params as never[]));
-          return { rows: [] };
-        }
-        statement.setReturnArrays(true);
-        const rows = statement.all(...(params as never[])) as unknown as unknown[][];
-        return { rows: method === 'get' ? (rows[0] ?? []) : rows } as { rows: unknown[] };
-      },
-      { schema },
-    );
+    const orm = proxy(db);
     const rows = await orm
       .select()
       .from(schema.settings)
@@ -121,8 +126,8 @@ describe('schema', () => {
       );
     };
     const recording = (id: string, isPrimary: 0 | 1, source = 'upload') =>
-      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path)
-       VALUES ('${id}', 't', 'm1', 'u1', '${source}', ${isPrimary}, 1, 'h', 1, 'p')`;
+      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, content_type, storage_path)
+       VALUES ('${id}', 't', 'm1', 'u1', '${source}', ${isPrimary}, 1, 'h', 1, 'audio/ogg', 'p')`;
 
     it('allows one primary recording per meeting, any number of others', () => {
       insertUserAndMeeting();
@@ -156,6 +161,74 @@ describe('schema', () => {
     });
   });
 
+  it('upgrades a populated packet-1 database through 0001 to 0003 without losing a row', async () => {
+    const old = new DatabaseSync(':memory:');
+    old.exec('PRAGMA foreign_keys = ON');
+    old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
+    old.exec(
+      `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('u1', 't', 's', 'a@example.com', 'A');
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'MØDE ÆRØ ÅR', 1000);
+       INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path, status)
+       VALUES ('r1', 't', 'm1', 'u1', 'upload', 1, 1, 'h', 1, 'recordings/t/m1/r1.m4a', 'transcribed');
+       INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('t1', 't', 'r1', 'p', 'm', 'da', '{}');
+       INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('s1', 't', 'm1', 'Speaker 1');
+       INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text) VALUES
+         ('g1', 't', 't1', 's1', 0, 1, 'a'), ('g2', 't', 't1', 's1', 1, 2, 'b'), ('g3', 't', 't1', 's1', 2, 3, 'c');`,
+    );
+    const counts = () =>
+      ['meetings', 'recordings', 'transcripts', 'speakers', 'segments'].map(
+        (table) => (old.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
+      );
+    const before = counts();
+    // Packet 2's migrations, then this packet's, on the packet-1 data.
+    const later = (await readdir(migrationsDir))
+      .filter((f) => f.endsWith('.sql') && f !== '0000_init.sql')
+      .sort();
+    expect(later).toEqual([
+      '0001_login_settings.sql',
+      '0002_identity_hardening.sql',
+      '0003_capture.sql',
+    ]);
+    for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
+    expect(counts()).toEqual(before);
+    expect(before).toEqual([1, 1, 1, 1, 3]);
+    // Packet-1 recordings keep working: a media type from the extension, confirmed at their start.
+    expect(
+      old.prepare(`SELECT content_type, created_at, confirmed_at FROM recordings`).get(),
+    ).toEqual({
+      content_type: 'audio/mp4',
+      created_at: 1000,
+      confirmed_at: 1000,
+    });
+    // The fold is left to the app.
+    expect(old.prepare(`SELECT title_folded FROM meetings`).get()).toEqual({ title_folded: null });
+    expect(old.prepare(`PRAGMA foreign_key_check`).all()).toEqual([]);
+  });
+
+  it('only adds to the schema: 0003 drops and rebuilds nothing', async () => {
+    const sql = await readFile(new URL('0003_capture.sql', migrationsDir), 'utf8');
+    expect(sql).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
+  });
+
+  it('folds packet-1 titles with backfillTitleKeys, once', async () => {
+    const { backfillTitleKeys } = await import('../src/db/title-keys');
+    db.exec(
+      `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('u1', 't', 's', 'a@example.com', 'A');
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'MØDE ÆRØ ÅR', 0);
+       INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at) VALUES ('m2', 't', 'u1', 'Other', 'kept', 0);
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m3', 'other', 'u1', 'ÆBLE', 0);`,
+    );
+    const orm = proxy(db);
+    expect(await backfillTitleKeys(orm, 't')).toBe(1);
+    expect(await backfillTitleKeys(orm, 't')).toBe(0);
+    const rows = db.prepare(`SELECT id, title_folded FROM meetings ORDER BY id`).all();
+    expect(rows).toEqual([
+      { id: 'm1', title_folded: 'møde ærø år' },
+      { id: 'm2', title_folded: 'kept' },
+      { id: 'm3', title_folded: null },
+    ]);
+  });
+
   it('refuses an install id that could break the seed SQL', () => {
     expect(() => seedSql("x'); DROP TABLE settings; --")).toThrow();
   });
@@ -172,5 +245,38 @@ describe('schema', () => {
       .get() as { at: number; kind: string };
     expect(kind).toBe('integer');
     expect(Math.abs(Number(at) - Date.now())).toBeLessThan(60_000);
+  });
+});
+
+describe('dev seed', () => {
+  it('writes the users and a demo library that fits the schema, twice', async () => {
+    const { devUsersSql, demoSql, demoMeetings, LONG_TITLE } = await import('../src/db/dev-seed');
+    const db = await migratedDatabase();
+    for (let run = 0; run < 2; run++) {
+      db.exec(devUsersSql('dev'));
+      db.exec(demoSql('dev', 30));
+    }
+    const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+    expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(3);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-user'`)).toBe(30);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(4);
+    // The colleague's shared meeting, and the delete test's graph meeting.
+    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(2);
+    expect(count(`SELECT count(*) AS n FROM segments WHERE install_id = 'dev'`)).toBe(3);
+    // The foreign-install fixtures: one meeting, one share, one recording.
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE install_id = 'other-install'`)).toBe(1);
+    expect(
+      count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'other-install'`),
+    ).toBe(1);
+    expect(count(`SELECT count(*) AS n FROM recordings WHERE install_id = 'other-install'`)).toBe(
+      1,
+    );
+    expect([...LONG_TITLE]).toHaveLength(120);
+
+    const big = demoMeetings(2000);
+    expect(big.filter((m) => m.ownerId === 'dev-user')).toHaveLength(2000);
+    expect(big.some((m) => m.recording?.durationS === 4 * 3600)).toBe(true);
+    expect(big.some((m) => m.recording === null)).toBe(true);
+    expect(big.some((m) => /[æøå]/i.test(m.title))).toBe(true);
   });
 });

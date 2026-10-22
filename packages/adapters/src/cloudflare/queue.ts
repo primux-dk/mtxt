@@ -1,4 +1,5 @@
-import type { Job, JobHandler, JobMessage, QueueAdapter } from '../queue';
+import type { Job } from '../jobs';
+import type { JobHandler, JobMessage, QueueAdapter } from '../queue';
 
 /** Cloudflare Queues behind the queue interface. */
 export function cloudflareQueue<T = Job>(queue: Queue<T>): QueueAdapter<T> {

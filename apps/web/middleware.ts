@@ -42,6 +42,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // The recorder contract's error shape (packages/contract/openapi.yaml, ErrorBody).
+  if (path.startsWith('/api/v1/')) {
+    return NextResponse.json(
+      { error: { code: 'unauthorized', message: 'Sign in with the company login.' } },
+      { status: 401 },
+    );
+  }
   if (path.startsWith('/api/')) {
     return NextResponse.json({ error: 'unauthorized', message: 'Sign in first.' }, { status: 401 });
   }
