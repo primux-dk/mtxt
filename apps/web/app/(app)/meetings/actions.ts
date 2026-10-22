@@ -2,9 +2,10 @@
 
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { foldTitle, schema } from '@mtxt/adapters';
-import { getCurrentUser } from '@/lib/auth';
+import { getSessionUser } from '@/lib/auth/session';
 import { HttpError } from '@/lib/http-error';
 import { getAdapters } from '@/lib/install';
+import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { accessTo } from '@/lib/meetings/queries';
 
 /**
@@ -13,7 +14,7 @@ import { accessTo } from '@/lib/meetings/queries';
  * with the outcome; the screen rolls back on `ok: false`.
  */
 export type ActionResult =
-  { ok: true } | { ok: false; code: 'forbidden' | 'not_found' | 'invalid' | 'server' };
+  { ok: true } | { ok: false; code: 'forbidden' | 'not_found' | 'invalid' | 'conflict' | 'server' };
 
 const m = schema.meetings;
 const r = schema.recordings;
@@ -24,7 +25,8 @@ async function asOwner<T>(
   meetingId: string,
   run: (ctx: Awaited<ReturnType<typeof getAdapters>>) => Promise<T>,
 ) {
-  const user = await getCurrentUser();
+  const user = await getSessionUser();
+  if (!user) throw new HttpError(401, 'unauthorized', 'Sign in first.');
   const ctx = await getAdapters();
   const meeting = await ctx.db.query.meetings.findFirst({
     where: and(eq(m.id, meetingId), eq(m.installId, ctx.installId)),
@@ -45,6 +47,7 @@ async function outcome(run: () => Promise<unknown>): Promise<ActionResult> {
       if (error.status === 403 || error.status === 401) return { ok: false, code: 'forbidden' };
       if (error.status === 404) return { ok: false, code: 'not_found' };
       if (error.status === 400) return { ok: false, code: 'invalid' };
+      if (error.status === 409) return { ok: false, code: 'conflict' };
     }
     console.error(error);
     return { ok: false, code: 'server' };
@@ -75,24 +78,29 @@ export async function setKeep(meetingId: string, keep: boolean): Promise<ActionR
 
 export async function setArchived(meetingId: string, archived: boolean): Promise<ActionResult> {
   return outcome(() =>
-    asOwner(meetingId, ({ db, installId }) =>
-      db
+    asOwner(meetingId, async ({ db, installId }) => {
+      // Archive is refused like delete when another install's rows depend on the meeting.
+      await assertOwnRowsOnly(db, installId, meetingId);
+      await db
         .update(m)
         .set({ archivedAt: archived ? new Date() : null })
-        .where(thisMeeting(meetingId, installId)),
-    ),
+        .where(thisMeeting(meetingId, installId));
+    }),
   );
 }
 
 /**
- * Deletes the meeting for good: open uploads are aborted, every recording's
- * audio is deleted from storage, then the rows (recordings, transcripts,
- * speakers, recap and versions cascade). Storage goes first, so a failure
- * leaves the meeting in place to delete again, never orphaned audio.
+ * Deletes the meeting for good. Refused, with nothing removed, when another
+ * install's rows depend on it (lib/meetings/integrity.ts). Otherwise open
+ * uploads are aborted, every recording's audio is deleted from storage, then
+ * the rows, table by table and by install, in one transaction. Storage goes
+ * first, so a failure leaves the meeting in place to delete again, never
+ * orphaned audio.
  */
 export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
   return outcome(() =>
     asOwner(meetingId, async ({ db, storage, uploads, installId }) => {
+      await assertOwnRowsOnly(db, installId, meetingId);
       const recordings = await db.query.recordings.findMany({
         where: and(eq(r.meetingId, meetingId), eq(r.installId, installId)),
       });
@@ -109,7 +117,7 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
         ...(recap?.docxPath ? [recap.docxPath] : []),
       ];
       if (keys.length) await storage.delete(keys);
-      await db.delete(m).where(thisMeeting(meetingId, installId));
+      await deleteMeetingRows(db, installId, meetingId);
     }),
   );
 }

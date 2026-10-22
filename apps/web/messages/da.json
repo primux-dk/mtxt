@@ -245,7 +245,8 @@
     },
     "retention": {
       "deleteOn": "Slettes {date}"
-    }
+    },
+    "conflict": "Data fra en anden installation afhænger af mødet, så det er ikke ændret. Kontakt din administrator."
   },
   "transcript": {
     "head": "{language} · {count, plural, one {# taler} other {# talere}} · Klik på en taler for at omdøbe",
@@ -357,7 +358,13 @@
         "leave": "Forlad"
       },
       "openMeeting": "Åbn mødet",
-      "another": "Optag et nyt"
+      "another": "Optag et nyt",
+      "discard": {
+        "action": "Kassér optagelsen",
+        "title": "Kassér optagelsen?",
+        "body": "“{title}”, {duration}, slettes fra fanen. Serveren har aldrig bekræftet den, så der findes ingen anden kopi.",
+        "confirm": "Kassér optagelsen"
+      }
     }
   },
   "live": {

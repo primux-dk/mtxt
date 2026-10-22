@@ -48,12 +48,15 @@ export function MeetingMenu({
   const [confirming, setConfirming] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<'archive' | 'delete' | null>(null);
+  // Another install's rows depend on the meeting: a different message, no retry.
+  const [conflict, setConflict] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const archive = (value: boolean) =>
     startTransition(async () => {
       const result = await safely(() => setArchived(meetingId, value));
       setError(result.ok ? null : 'archive');
+      setConflict(!result.ok && result.code === 'conflict');
       if (result.ok) router.refresh();
     });
 
@@ -85,7 +88,7 @@ export function MeetingMenu({
       </DropdownMenu>
       {error === 'archive' && (
         <span role="alert" className="text-xs text-destructive">
-          {t('archive.failed')}
+          {conflict ? t('conflict') : t('archive.failed')}
         </span>
       )}
 
@@ -118,7 +121,7 @@ export function MeetingMenu({
           </div>
           {error === 'delete' && (
             <p role="alert" className="text-sm text-destructive">
-              {t('delete.failed')}
+              {conflict ? t('conflict') : t('delete.failed')}
             </p>
           )}
           <div className="flex flex-wrap justify-end gap-2">
@@ -134,6 +137,7 @@ export function MeetingMenu({
                   const result = await safely(() => deleteMeeting(meetingId));
                   if (!result.ok) {
                     setError('delete');
+                    setConflict(result.code === 'conflict');
                     return;
                   }
                   router.replace('/meetings');

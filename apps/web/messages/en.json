@@ -245,7 +245,8 @@
     },
     "retention": {
       "deleteOn": "Deleted on {date}"
-    }
+    },
+    "conflict": "Data from another installation depends on this meeting, so it was left as it is. Contact your admin."
   },
   "transcript": {
     "head": "{language} · {count, plural, one {# speaker} other {# speakers}} · Click a speaker to rename",
@@ -357,7 +358,13 @@
         "leave": "Leave"
       },
       "openMeeting": "Open the meeting",
-      "another": "Record another"
+      "another": "Record another",
+      "discard": {
+        "action": "Discard recording",
+        "title": "Discard the recording?",
+        "body": "“{title}”, {duration}, is deleted from this tab. The server never confirmed it, so there is no other copy.",
+        "confirm": "Discard recording"
+      }
     }
   },
   "live": {
