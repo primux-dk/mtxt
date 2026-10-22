@@ -44,7 +44,9 @@ async function serve(request: Request, id: string, head: boolean) {
       'content-security-policy': "default-src 'none'; sandbox",
       'cache-control': 'private, no-store',
     });
-    const range = parseRange(request.headers.get('range'), info.size);
+    // Present but empty is a malformed range (416), not an absent one.
+    const header = request.headers.has('range') ? (request.headers.get('range') ?? '') : null;
+    const range = parseRange(header, info.size);
     if (range === 'unsatisfiable') {
       headers.set('content-range', `bytes */${info.size}`);
       return new Response(null, { status: 416, headers });

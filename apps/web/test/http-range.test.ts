@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRange } from '../lib/http-range';
+import { keepEmptyRange, parseRange } from '../lib/http-range';
 
 describe('parseRange', () => {
   it('reads the forms the audio element sends', () => {
@@ -43,5 +43,16 @@ describe('isMediaType', async () => {
     expect(isMediaType('text/html')).toBe(false);
     expect(isMediaType('audio/webm\r\nx-evil: 1')).toBe(false);
     expect(isMediaType('application/octet-stream')).toBe(false);
+  });
+});
+
+describe('keepEmptyRange', () => {
+  it('turns an empty Range into one the route refuses, and leaves the rest alone', () => {
+    const empty = keepEmptyRange(new Request('http://x/a', { headers: { range: '' } }));
+    expect(parseRange(empty.headers.get('range'), 100)).toBe('unsatisfiable');
+    const none = new Request('http://x/a');
+    expect(keepEmptyRange(none)).toBe(none);
+    const real = new Request('http://x/a', { headers: { range: 'bytes=0-1' } });
+    expect(keepEmptyRange(real)).toBe(real);
   });
 });

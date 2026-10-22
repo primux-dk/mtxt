@@ -27,3 +27,17 @@ export function parseRange(
   if (end < start) return 'unsatisfiable';
   return { offset: start, length: end - start + 1 };
 }
+
+/**
+ * A `Range:` header with an empty value, if the runtime passes one, is a
+ * malformed range: give it a value parseRange refuses, so the route answers
+ * 416 even if a hop between here and the route drops empty headers. Local
+ * workerd (wrangler 4.151) already strips an empty header before the Worker
+ * runs, so there the request arrives with no Range at all.
+ */
+export function keepEmptyRange(request: Request): Request {
+  if (!request.headers.has('range') || request.headers.get('range')?.trim()) return request;
+  const headers = new Headers(request.headers);
+  headers.set('range', 'empty');
+  return new Request(request, { headers });
+}
