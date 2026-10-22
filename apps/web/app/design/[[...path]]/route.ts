@@ -1,19 +1,23 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { getSessionUser } from '@/lib/auth/session';
 import { designAsset, guidelinesPage } from '@/lib/design-assets';
 import { getInstallSettings } from '@/lib/install';
 
 /*
   /design serves docs/design: the guidelines rendered with the install's own
   theme, plus the files they link to (tokens.css, fonts, mockups, locales).
-
-  TODO(packet 2): signed-in users only, once the company login exists. This is
-  the one place that check goes.
+  Signed-in users only: the middleware gates it, and this checks again.
 */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path?: string[] }> },
 ) {
   const { path = [] } = await params;
+  if (!(await getSessionUser())) {
+    const login = new URL('/login', request.url);
+    login.searchParams.set('callbackUrl', '/design/');
+    return NextResponse.redirect(login);
+  }
 
   // The guidelines link relative to their own folder, so the page lives at /design/.
   if (request.nextUrl.pathname === '/design') {

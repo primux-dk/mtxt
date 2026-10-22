@@ -1,4 +1,23 @@
 # Copy to .dev.vars for local secrets. Never commit .dev.vars.
-# Nothing is needed in packet 1. Later packets add, for example:
-# OIDC_CLIENT_SECRET=
-# STT_API_KEY=
+# On a deploy, set the same names with `wrangler secret put <NAME>`.
+
+# Signs the session cookie. Any long random string: `openssl rand -base64 32`.
+AUTH_SECRET=
+# 32 bytes, base64. Encrypts the provider secrets stored in the settings row.
+# `openssl rand -base64 32`. Changing it makes the stored secrets unreadable.
+SETTINGS_KEY=
+
+# The company login for a fresh install. Read once, on the first request,
+# while the settings row has no identity provider; after that the settings
+# page is the source and these are ignored.
+# entra or google
+OIDC_PROVIDER=
+# Entra: the directory (tenant) id. Google: the Workspace domain, for example example.com.
+OIDC_TENANT_ID=
+OIDC_CLIENT_ID=
+OIDC_CLIENT_SECRET=
+
+# The redirect URI to register with the provider:
+#   Entra:  https://<host>/api/auth/callback/microsoft-entra-id
+#   Google: https://<host>/api/auth/callback/google
+# Locally the host is localhost:3000 (pnpm dev) or localhost:8787 (pnpm preview).

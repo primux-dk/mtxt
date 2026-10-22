@@ -2,10 +2,16 @@ import { initOpenNextCloudflareForDev } from '@opennextjs/cloudflare';
 import { fileURLToPath } from 'node:url';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { pageExtensions } from './next-page-extensions';
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
+  pageExtensions: pageExtensions(process.env.MTXT_E2E_BUILD),
+  // Inlined at build time: the test sign-in's guard reads it (lib/auth/test-sign-in.ts).
+  env: { MTXT_E2E_BUILD: process.env.MTXT_E2E_BUILD === '1' ? '1' : '' },
+  // forbidden(): /settings answers a non-admin with a 403 page.
+  experimental: { authInterrupts: true },
   transpilePackages: ['@mtxt/adapters', '@mtxt/contract'],
   // /design/ keeps its slash so the guidelines' relative links resolve under it.
   skipTrailingSlashRedirect: true,
