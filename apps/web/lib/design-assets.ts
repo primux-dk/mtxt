@@ -11,31 +11,23 @@ import localeEn from '../../../docs/design/locales/en.json?raw';
 import localeDa from '../../../docs/design/locales/da.json?raw';
 import fontLicence from '../../../docs/design/fonts/LICENSE-mona-sans.txt?raw';
 import font from '../../../docs/design/fonts/mona-sans.woff2?base64';
-
-type Asset = { type: string; body: string } | { type: string; base64: string };
+import { type Asset, lookupAsset } from './asset-map';
 
 const text = (type: string, body: string): Asset => ({ type: `${type}; charset=utf-8`, body });
 
 /** Paths relative to docs/design, as the pages link to them. */
-const ASSETS: Record<string, Asset> = {
-  'mockups/index.html': text('text/html', mockups),
-  'tokens.css': text('text/css', tokens),
-  'README.md': text('text/markdown', readme),
-  'behaviour.md': text('text/markdown', behaviour),
-  'locales/en.json': text('application/json', localeEn),
-  'locales/da.json': text('application/json', localeDa),
-  'fonts/LICENSE-mona-sans.txt': text('text/plain', fontLicence),
-  'fonts/mona-sans.woff2': { type: 'font/woff2', base64: font },
-};
+const ASSETS: ReadonlyMap<string, Asset> = new Map([
+  ['mockups/index.html', text('text/html', mockups)],
+  ['tokens.css', text('text/css', tokens)],
+  ['README.md', text('text/markdown', readme)],
+  ['behaviour.md', text('text/markdown', behaviour)],
+  ['locales/en.json', text('application/json', localeEn)],
+  ['locales/da.json', text('application/json', localeDa)],
+  ['fonts/LICENSE-mona-sans.txt', text('text/plain', fontLicence)],
+  ['fonts/mona-sans.woff2', { type: 'font/woff2', base64: font }],
+]);
 
-export function designAsset(
-  path: string,
-): { type: string; body: string | Uint8Array<ArrayBuffer> } | null {
-  const asset = ASSETS[path];
-  if (!asset) return null;
-  if ('body' in asset) return asset;
-  return { type: asset.type, body: Uint8Array.from(atob(asset.base64), (c) => c.charCodeAt(0)) };
-}
+export const designAsset = (path: string) => lookupAsset(ASSETS, path);
 
 /**
  * guidelines.html with the install's two theme values set on :root, placed
