@@ -100,10 +100,7 @@ export interface components {
             /** Format: date-time */
             started_at: string;
         };
-        /** @description Either `meeting_id` for a meeting that exists, or `meeting` to create one. */
-        CreateRecordingRequest: {
-            meeting_id?: string;
-            meeting?: components["schemas"]["NewMeeting"];
+        RecordingDetails: {
             duration_s: number;
             sha256: components["schemas"]["Sha256"];
             size_bytes: number;
@@ -111,6 +108,14 @@ export interface components {
             /** @description MIME type of the audio, for example audio/ogg or audio/mp4. */
             content_type: string;
         };
+        /** @description Exactly one of `meeting_id` (a meeting that exists) or `meeting` (create one). */
+        CreateRecordingRequest: (components["schemas"]["RecordingDetails"] & {
+            meeting_id: string;
+            meeting?: unknown;
+        }) | (components["schemas"]["RecordingDetails"] & {
+            meeting: components["schemas"]["NewMeeting"];
+            meeting_id?: unknown;
+        });
         CreateRecordingResponse: {
             id: string;
             meeting_id: string;

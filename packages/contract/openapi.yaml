@@ -198,15 +198,10 @@ components:
         started_at:
           type: string
           format: date-time
-    CreateRecordingRequest:
+    RecordingDetails:
       type: object
-      description: Either `meeting_id` for a meeting that exists, or `meeting` to create one.
       required: [duration_s, sha256, size_bytes, source, content_type]
       properties:
-        meeting_id:
-          type: string
-        meeting:
-          $ref: '#/components/schemas/NewMeeting'
         duration_s:
           type: integer
           minimum: 0
@@ -220,6 +215,29 @@ components:
         content_type:
           type: string
           description: MIME type of the audio, for example audio/ogg or audio/mp4.
+    CreateRecordingRequest:
+      description: Exactly one of `meeting_id` (a meeting that exists) or `meeting` (create one).
+      oneOf:
+        - title: ForExistingMeeting
+          allOf:
+            - $ref: '#/components/schemas/RecordingDetails'
+            - type: object
+              required: [meeting_id]
+              properties:
+                meeting_id:
+                  type: string
+                meeting:
+                  not: {}
+        - title: ForNewMeeting
+          allOf:
+            - $ref: '#/components/schemas/RecordingDetails'
+            - type: object
+              required: [meeting]
+              properties:
+                meeting:
+                  $ref: '#/components/schemas/NewMeeting'
+                meeting_id:
+                  not: {}
     CreateRecordingResponse:
       type: object
       required: [id, meeting_id, upload_url, chunk_size_bytes, chunk_count, status]

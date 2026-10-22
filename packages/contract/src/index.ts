@@ -10,7 +10,14 @@ type Schemas = components['schemas'];
 
 export type RecordingStatus = Schemas['RecordingStatus'];
 export type RecordingSource = Schemas['RecordingSource'];
-export type CreateRecordingRequest = Schemas['CreateRecordingRequest'];
+/**
+ * Exactly one of `meeting_id` or `meeting`. openapi.yaml says so with oneOf and
+ * `not: {}`; the generator renders `not: {}` as `unknown`, so this narrows the
+ * excluded property to `never` and TypeScript rejects a body with both.
+ */
+export type CreateRecordingRequest =
+  | (Schemas['RecordingDetails'] & { meeting_id: string; meeting?: never })
+  | (Schemas['RecordingDetails'] & { meeting: Schemas['NewMeeting']; meeting_id?: never });
 export type CreateRecordingResponse = Schemas['CreateRecordingResponse'];
 export type ChunkReceipt = Schemas['ChunkReceipt'];
 export type MissingChunks = Schemas['MissingChunks'];
