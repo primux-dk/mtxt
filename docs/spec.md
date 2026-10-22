@@ -4,7 +4,7 @@ Settled 2026-10-22. Changes go here first, then into code. Decisions and their r
 
 ## What it is
 
-One Docker app a company hosts itself, plus a small recorder on each employee's machine. Every meeting becomes a transcript and an editable recap in the company's own library, private or shared inside the company, and open to the company's AI tools through MCP. Meetings only: no dictation.
+One web app that runs in the company's own Cloudflare account, plus a small recorder on each employee's machine. Every meeting becomes a transcript and an editable recap in the company's own library, private or shared inside the company, and open to the company's AI tools through MCP. Meetings only: no dictation.
 
 The product name an employee sees is a setting per install ("Acme Meetings"). mtxt appears only in About and on GitHub.
 
@@ -75,9 +75,18 @@ Recorder states per recording: Recording, Uploading, Pending (no network), Warn 
 
 Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-4.0, includes Danish) is the default; Whisper large-v3-turbo (MIT) is the fallback. Both switchable in the recorder. The live transcript is discarded when the meeting ends.
 
+## Stack and deployment
+
+- `apps/web`: Next.js, shadcn/ui, Drizzle ORM. Deployed to Cloudflare Workers with OpenNext.
+- Cloudflare bindings in the company's own account: R2 for audio and exports, Queues for transcription and recap jobs, Durable Objects for resumable upload sessions, D1 for the database, AI Gateway in front of the language model used for recaps, Workers AI as one of the speech-to-text adapters.
+- Identity: OIDC against Entra ID or Google Workspace through Auth.js or an equivalent; no local users.
+- MCP: a remote MCP server on Workers with OAuth, using Cloudflare's agents SDK.
+- Every install is single-company, in that company's own account. Primux deploys and holds no data. A Docker edition (S3-compatible storage, database-backed queue, SQLite or Postgres) is possible through `packages/adapters` but is not part of v0.1.
+- Open before the first commit: which Cloudflare plan is needed for EU processing of audio, beyond R2's EU jurisdiction; which speech-to-text providers AI Gateway proxies.
+
 ## Data model
 
-Laravel, one database per install. Every row carries a tenant id so a hosted multi-tenant variant stays possible; v1 runs one company per install.
+One database per install, in the company's own account. Every row carries an install id for safety; v1 runs one company per install and no code assumes otherwise.
 
 ```
 users            id, oidc_subject, email, name, is_admin
@@ -109,7 +118,7 @@ Rules:
 
 ## Recap editor
 
-Tiptap 3 core with open extensions, in a Livewire `wire:ignore` island. Block list: headings, quote, note and warning callouts, lists, checklist, toggle, table of contents, table, divider, code, image. `/` at the start of a word opens the block menu. `@` searches colleagues and the meeting's speakers. Block handles in the gutter add and drag blocks. Markdown in and out; a toggle is `<details>`, a callout is a GitHub alert (`> [!NOTE]`). A version is saved after 1.5 s of quiet. The AI draft is version 1 with no author; every human save is a version with an author. No Tiptap Pro extensions.
+Tiptap 3 core with the open React UI components (MIT), inside the Next.js app. Block list: headings, quote, note and warning callouts, lists, checklist, toggle, table of contents, table, divider, code, image. `/` at the start of a word opens the block menu. `@` searches colleagues and the meeting's speakers. Block handles in the gutter add and drag blocks. Markdown in and out; a toggle is `<details>`, a callout is a GitHub alert (`> [!NOTE]`). A version is saved after 1.5 s of quiet. The AI draft is version 1 with no author; every human save is a version with an author. No Tiptap Pro extensions.
 
 ## MCP
 
@@ -122,7 +131,7 @@ Each write is an audit row. There is no service identity in v1.
 
 ## Phases
 
-1. **v0.1 library.** Login, upload, browser recorder, AssemblyAI EU adapter plus a local-model adapter tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention.
+1. **v0.1 library, for the author's own use** in the Primux Cloudflare account. Login, upload, browser recorder, one speech-to-text adapter plus Workers AI Whisper tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention.
 2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting.
 3. **v0.3.** MCP server. OneDrive and Drive pickup.
-4. **Release.** README, docker compose, one-command deploy, a short post. No announcement before the second install runs.
+4. **Release.** README, a wrangler deploy that targets any Cloudflare account, a short post. Customers come after the author has used it for a while.

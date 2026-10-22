@@ -1,6 +1,6 @@
 # mtxt: agent setup
 
-Read `README.md` and `docs/spec.md` first. Kristian's open-source company meeting transcription platform, built in the open by Primux.
+Read `README.md` and `docs/spec.md` first. Kristian's source-available company meeting transcription platform, built in the open by Primux.
 
 ## Rules
 
@@ -16,20 +16,23 @@ Read `README.md` and `docs/spec.md` first. Kristian's open-source company meetin
 One repo for both halves, the anarlog way, so a change to the recorder-to-server contract lands in one commit.
 
 ```
-apps/server/        Laravel library; the Docker image is built from here
+apps/web/           Next.js and shadcn/ui library, deployed to Cloudflare Workers with OpenNext
 apps/recorder/      Tauri 2 recorder, our own code
-packages/contract/  the recorder-to-server contract: OpenAPI file plus generated TS and PHP types
-docker/             compose and images
+packages/contract/  the recorder-to-server contract: OpenAPI file plus generated TypeScript types
+packages/adapters/  storage (R2 or S3), queue (Cloudflare Queues or database-backed), database (D1 or SQLite/Postgres)
+docker/             the Docker edition, when it exists
 docs/               spec and decisions
 ```
 
-- Each app keeps its own toolchain in its own folder: Composer under `apps/server`, Cargo and pnpm under `apps/recorder`. Nothing at the root runs code.
+- pnpm workspace at the root for the JavaScript packages; Cargo under `apps/recorder`. Nothing at the root runs application code.
+- **Every install runs in the owning company's own Cloudflare account.** Primux deploys with wrangler and holds no customer data. There is no multi-tenant service and no Primux-hosted edition. Code must never assume a shared account, a shared database or a Primux-owned bucket.
+- **Cloudflare is the primary target, not the only one.** Nothing in `apps/web` imports an R2, Queues or D1 binding directly; it goes through `packages/adapters`, so a Docker edition can bind S3, a database queue and Postgres later.
 - **The recorder is written by us.** Vibe, anarlog and Meetily are read for how they capture system audio and run local models; no file is copied from them. Crates they depend on (cpal, whisper-rs, ONNX runtime bindings) are ordinary dependencies under their own permissive licences, listed in `NOTICE.md`.
 - `packages/contract` is the only thing both apps import. The server never reads recorder code and the recorder never reads server code.
 - Decisions go to `docs/decisions.md` with a date. Specs go to `docs/spec.md`. Neither is a changelog; git is.
 
 ## Working
 
-- There is no PHP on agent-server. Run tests with `phptest` from this checkout; it uses the box's test image.
+- Node 22 and pnpm are on agent-server; wrangler runs locally with `wrangler dev`. Deploys to any Cloudflare account wait for Kristian's go.
 - Branch work on agent-server goes in a worktree under `/srv/work/mtxt-<name>`, never in `/srv/work/mtxt` itself.
 - Deploys, merges and anything a client sees wait for Kristian's explicit go, per action.

@@ -4,7 +4,7 @@ Meeting transcription a company hosts itself. A small recorder on each employee'
 
 Meetings only. No dictation.
 
-**Status: specified, not built.** The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). The first install is planned for a Danish organisation in November 2026.
+**Status: specified, not built.** The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). The first install is the author's own. Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -21,8 +21,8 @@ Meetings only. No dictation.
 
 ## Stack
 
-- Library: Laravel, Livewire, queue workers, Docker compose. The recap editor is Tiptap core with open extensions, in a Livewire island.
-- Recorder: Tauri 2 and Rust, our own code under `apps/recorder` in this repo. The library is `apps/server`; the contract between them is `packages/contract`.
+- Library: Next.js with shadcn/ui, deployed to Cloudflare Workers in the company's own account: R2 for audio, Queues for jobs, Durable Objects for upload sessions, D1 for data, AI Gateway in front of the language model. Storage, queue and database sit behind adapters so a Docker edition stays possible. The recap editor is Tiptap core with the open React UI components.
+- Recorder: Tauri 2 and Rust, our own code under `apps/recorder` in this repo. The library is `apps/web`; the contract between them is `packages/contract`.
 - Speech-to-text and language models are adapters. The app holds no opinion about the provider.
 
 ## Licence
