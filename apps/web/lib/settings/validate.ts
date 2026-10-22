@@ -13,7 +13,9 @@ import {
   type CaptureSource,
   type Settings,
   type SttProvider,
+  templateNameKey,
 } from '@mtxt/adapters';
+import { isTenantGuid } from '../auth/identity';
 import { HEX, themeFailures, type ContrastPair, type ThemeMode } from '../theme/contrast';
 import { parseKeyterms, type Keyterm, type KeytermError } from './keyterms';
 
@@ -121,8 +123,8 @@ export interface Current {
   hasSttKey: boolean;
 }
 
-// An Entra tenant is a GUID or a verified domain; a Workspace domain is a domain.
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// An Entra tenant is pinned by its GUID (not `common`, `organizations` or `consumers`);
+// a Workspace domain is a domain.
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 // Deliberately plain: one @, no spaces, a dot in the domain. The IdP decides what is real.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -174,7 +176,7 @@ export function validateSettings(
     errors.identityProvider = { code: 'required' };
   } else {
     if (!oidcTenantId) errors.oidcTenantId = { code: 'required' };
-    else if (identityProvider === 'entra' && !GUID.test(oidcTenantId) && !DOMAIN.test(oidcTenantId))
+    else if (identityProvider === 'entra' && !isTenantGuid(oidcTenantId))
       errors.oidcTenantId = { code: 'tenantFormat' };
     else if (identityProvider === 'google' && !DOMAIN.test(oidcTenantId))
       errors.oidcTenantId = { code: 'domainFormat' };
@@ -299,7 +301,7 @@ export function validateTemplate(
   if (!name) errors.name = { code: 'required' };
   else if (name.length > MAX_TEMPLATE_NAME)
     errors.name = { code: 'tooLong', max: MAX_TEMPLATE_NAME };
-  else if (others.some((t) => t.name.toLocaleLowerCase() === name.toLocaleLowerCase()))
+  else if (others.some((t) => templateNameKey(t.name) === templateNameKey(name)))
     errors.name = { code: 'duplicate', name };
   if (bodyMd.length > MAX_TEMPLATE_BODY)
     errors.bodyMd = { code: 'tooLong', max: MAX_TEMPLATE_BODY };

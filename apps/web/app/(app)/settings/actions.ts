@@ -10,6 +10,7 @@ import {
   seal,
   setDefaultTemplate,
   updateTemplate,
+  type SecretContext,
   type Template,
 } from '@mtxt/adapters';
 import { getSessionUser } from '@/lib/auth/session';
@@ -65,9 +66,9 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
 
   try {
     const env = await getEnv();
-    const sealWith = async (value: string) => {
+    const sealWith = async (value: string, context: SecretContext) => {
       if (!env.SETTINGS_KEY) throw new Error('SETTINGS_KEY is not set.');
-      return seal(value, env.SETTINGS_KEY);
+      return seal(value, context, env.SETTINGS_KEY);
     };
     const { db, installId } = await getAdapters();
     await saveSettings(
@@ -76,10 +77,15 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
       {
         ...result.patch,
         ...(result.secrets.oidcClientSecret
-          ? { oidcClientSecret: await sealWith(result.secrets.oidcClientSecret) }
+          ? {
+              oidcClientSecret: await sealWith(
+                result.secrets.oidcClientSecret,
+                'settings.oidc_client_secret',
+              ),
+            }
           : {}),
         ...(result.secrets.sttApiKey
-          ? { sttApiKey: await sealWith(result.secrets.sttApiKey) }
+          ? { sttApiKey: await sealWith(result.secrets.sttApiKey, 'settings.stt_api_key') }
           : result.clearSttKey
             ? { sttApiKey: null }
             : {}),

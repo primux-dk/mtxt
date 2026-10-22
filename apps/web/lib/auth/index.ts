@@ -1,8 +1,9 @@
 import 'server-only';
 import NextAuth from 'next-auth';
-import { recordSignIn } from '@mtxt/adapters';
+import { hasSignInConflict, recordSignIn } from '@mtxt/adapters';
 import { getAdapters, getEnv, getInstallSettings } from '../install';
-import { allowedProfile, authProvider } from './provider';
+import { makeCallbacks } from './callbacks';
+import { authProvider } from './provider';
 import { SESSION_MAX_AGE } from './session-config';
 
 declare module 'next-auth' {
@@ -17,8 +18,18 @@ declare module 'next-auth' {
   sessions, 8 hours, no session table. One provider: the one configured.
 */
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
-  const [env, settings] = await Promise.all([getEnv(), getInstallSettings()]);
+  const [env, settings, { db, installId }] = await Promise.all([
+    getEnv(),
+    getInstallSettings(),
+    getAdapters(),
+  ]);
   const provider = await authProvider(settings, env);
+  const callbacks = makeCallbacks({
+    settings,
+    maxAge: SESSION_MAX_AGE,
+    hasConflict: (profile) => hasSignInConflict(db, installId, profile),
+    record: (profile) => recordSignIn(db, installId, profile),
+  });
   return {
     secret: env.AUTH_SECRET,
     trustHost: true,
@@ -27,31 +38,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     pages: { signIn: '/login', error: '/login' },
     providers: provider ? [provider] : [],
     callbacks: {
-      signIn: ({ profile, user }) => Boolean(user.email) && allowedProfile(settings, profile),
-      async jwt({ token, account, user }) {
-        // Only on sign-in: create the user row, or refresh its name and email.
-        if (account && user.email) {
-          const { db, installId } = await getAdapters();
-          const row = await recordSignIn(db, installId, {
-            subject: account.providerAccountId,
-            email: user.email,
-            name: user.name || user.email,
-          });
-          token.uid = row.id;
-          token.sub = row.oidcSubject;
-          token.name = row.name;
-          token.email = row.email;
-          token.signedInAt = Date.now();
-        }
-        // Auth.js re-issues the cookie on every read; the 8 hours count from sign-in.
-        const signedInAt = Number(token.signedInAt ?? 0);
-        if (Date.now() - signedInAt > SESSION_MAX_AGE * 1000) return null;
-        return token;
-      },
+      signIn: ({ account, profile }) =>
+        callbacks.signIn({ account, profile: profile as Record<string, unknown> | undefined }),
+      // Auth.js types the token loosely; the callback returns only the allowlisted fields.
+      jwt: async ({ token, account, profile }) =>
+        (await callbacks.jwt({
+          token,
+          account,
+          profile: profile as Record<string, unknown> | undefined,
+        })) as never,
       session({ session, token }) {
         session.user = {
           ...session.user,
-          id: String(token.uid ?? ''),
+          id: String(token.sub ?? ''),
           name: String(token.name ?? ''),
           email: String(token.email ?? ''),
         };

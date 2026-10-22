@@ -14,7 +14,14 @@
      file, never a Worker secret) and only on localhost.
 */
 import { encode } from 'next-auth/jwt';
-import { findUser, readSettings, recordSignIn, saveSettings } from '@mtxt/adapters';
+import {
+  AccountConflictError,
+  findUser,
+  readSettings,
+  recordSignIn,
+  saveSettings,
+} from '@mtxt/adapters';
+import { sessionToken } from './identity';
 import { getAdapters, getEnv } from '../install';
 import { SESSION_MAX_AGE, sessionCookieName } from './session-config';
 
@@ -36,17 +43,27 @@ export async function testSignIn(request: Request): Promise<Response> {
     email?: string;
     name?: string;
     admin?: boolean;
+    /** Defaults to `test|<email>`; a second subject for the same address reproduces a conflict. */
+    subject?: string;
   };
   const email = body.email?.trim().toLowerCase();
   if (!email) return Response.json({ error: 'email is required' }, { status: 400 });
 
   const { db, installId } = await getAdapters();
   // The same path a real sign-in takes, then the admin flag the test asked for.
-  const { id } = await recordSignIn(db, installId, {
-    subject: `test|${email}`,
-    email,
-    name: body.name ?? email,
-  });
+  let id: string;
+  try {
+    ({ id } = await recordSignIn(db, installId, {
+      subject: body.subject ?? `test|${email}`,
+      email,
+      name: body.name ?? email,
+    }));
+  } catch (error) {
+    if (error instanceof AccountConflictError) {
+      return Response.json({ error: 'account_conflict' }, { status: 409 });
+    }
+    throw error;
+  }
   // With no flag the sign-in decides, as a real one does (the first user becomes admin).
   // With a flag, the admin list is set to match; saving it also sets users.is_admin.
   if (typeof body.admin === 'boolean') {
@@ -65,13 +82,8 @@ export async function testSignIn(request: Request): Promise<Response> {
     secret: env.AUTH_SECRET,
     salt: cookie,
     maxAge: SESSION_MAX_AGE,
-    token: {
-      sub: user.oidcSubject,
-      uid: user.id,
-      name: user.name,
-      email: user.email,
-      signedInAt: Date.now(),
-    },
+    // The same allowlisted shape the Auth.js jwt callback writes.
+    token: { ...sessionToken({}, user, SESSION_MAX_AGE)! },
   });
   const headers = new Headers({ 'content-type': 'application/json' });
   headers.append(

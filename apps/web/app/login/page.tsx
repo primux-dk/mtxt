@@ -1,8 +1,10 @@
 import { TriangleAlert } from 'lucide-react';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { signIn } from '@/lib/auth';
+import { safeReturnTo } from '@/lib/auth/identity';
 import { loginSetup, PROVIDER_BRANDS, PROVIDER_IDS } from '@/lib/auth/provider';
 import { getSessionUser } from '@/lib/auth/session';
 import { getEnv, getInstallSettings } from '@/lib/install';
@@ -10,14 +12,9 @@ import { getEnv, getInstallSettings } from '@/lib/install';
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
-/** Only a path on this site, so the login page cannot be used to send someone elsewhere. */
-const safeReturn = (value: string | undefined) =>
-  value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')
-    ? value
-    : '/meetings';
-
-const ERRORS: Record<string, 'accessDenied' | 'configuration'> = {
+const ERRORS: Record<string, 'accessDenied' | 'configuration' | 'accountConflict'> = {
   AccessDenied: 'accessDenied',
+  AccountConflict: 'accountConflict',
   Configuration: 'configuration',
 };
 
@@ -31,7 +28,10 @@ const MARKS = { entra: '⊞', google: 'G' } as const;
  */
 export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const returnTo = safeReturn(one(params.callbackUrl));
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost';
+  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+  const returnTo = safeReturnTo(one(params.callbackUrl), `${proto}://${host}`);
   if (await getSessionUser()) redirect(returnTo);
 
   const [settings, env, t, tLogin] = await Promise.all([
@@ -92,6 +92,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
                   <li key={name}>{name}</li>
                 ))}
               </ul>
+              {setup.tenantNotGuid && (
+                <p className="text-muted-foreground">{t('notConfigured.tenantGuid')}</p>
+              )}
             </div>
           )}
           {setup.kind === 'broken' && (

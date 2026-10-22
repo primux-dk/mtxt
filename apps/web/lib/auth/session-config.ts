@@ -7,4 +7,7 @@ export const sessionCookieName = (secure: boolean) =>
 
 /** Paths that answer without a session. Everything else needs one. */
 export const isPublicPath = (path: string) =>
-  path === '/login' || path.startsWith('/api/auth/') || path === '/api/test/sign-in';
+  path === '/login' ||
+  path.startsWith('/api/auth/') ||
+  // Only an e2e build has the test sign-in (lib/auth/test-sign-in.ts); the flag is inlined at build time.
+  (process.env.MTXT_E2E_BUILD === '1' && path === '/api/test/sign-in');

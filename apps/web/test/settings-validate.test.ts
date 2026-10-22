@@ -146,10 +146,13 @@ describe('validateSettings', () => {
     expect(withSecret.ok && withSecret.secrets).toEqual({ oidcClientSecret: 'new-secret' });
   });
 
-  it('holds the tenant id to a GUID or domain for Entra, and a domain for Google', () => {
-    expect(
-      errorsOf(form({ oidcTenantId: 'contoso.onmicrosoft.com' })).oidcTenantId,
-    ).toBeUndefined();
+  it('pins Entra to a tenant GUID, and holds Google to a domain', () => {
+    // Domains and the multi-tenant aliases are refused for Entra.
+    for (const tenant of ['contoso.onmicrosoft.com', 'common', 'organizations', 'consumers']) {
+      expect(errorsOf(form({ oidcTenantId: tenant })).oidcTenantId, tenant).toEqual({
+        code: 'tenantFormat',
+      });
+    }
     expect(errorsOf(form({ oidcTenantId: 'not a tenant' })).oidcTenantId).toEqual({
       code: 'tenantFormat',
     });
@@ -203,7 +206,7 @@ describe('validateSettings', () => {
   it('reports a keyterm error with its line', () => {
     expect(errorsOf(form({ keyterms: 'Primux\nlinje 2,lots' })).keyterms).toEqual({
       code: 'badBoost',
-      line: 2,
+      record: 2,
       value: 'lots',
       max: 10,
     });
@@ -234,6 +237,13 @@ describe('validateTemplate', () => {
     expect(validateTemplate({ name: 'PRODUKTIONSMØDE', bodyMd: '' }, others)).toEqual({
       ok: false,
       errors: { name: { code: 'duplicate', name: 'PRODUKTIONSMØDE' } },
+    });
+  });
+
+  it('refuses a name that differs only by width or ß', () => {
+    expect(validateTemplate({ name: 'STRASSE', bodyMd: '' }, [{ name: 'Straße' }])).toMatchObject({
+      ok: false,
+      errors: { name: { code: 'duplicate' } },
     });
   });
 

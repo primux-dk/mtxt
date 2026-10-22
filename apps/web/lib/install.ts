@@ -10,6 +10,7 @@ import {
   type IdentityProvider,
   type Settings,
 } from '@mtxt/adapters';
+import { isTenantGuid } from './auth/identity';
 
 /** The Worker's env for this request: bindings, vars and secrets. */
 export const getEnv = cache(async () => (await getCloudflareContext({ async: true })).env);
@@ -38,12 +39,14 @@ async function bootstrap(settings: Settings): Promise<boolean> {
   const clientId = env.OIDC_CLIENT_ID?.trim();
   const secret = env.OIDC_CLIENT_SECRET?.trim();
   if (!provider || !tenant || !clientId || !secret || !env.SETTINGS_KEY) return false;
+  // An Entra tenant is pinned by its GUID; `common` and the like are refused.
+  if (provider === 'entra' && !isTenantGuid(tenant)) return false;
   const { db, installId } = await getAdapters();
   await bootstrapIdentity(db, installId, {
     identityProvider: provider,
     oidcTenantId: tenant,
     oidcClientId: clientId,
-    oidcClientSecret: await seal(secret, env.SETTINGS_KEY),
+    oidcClientSecret: await seal(secret, 'settings.oidc_client_secret', env.SETTINGS_KEY),
   });
   return true;
 }
