@@ -6,7 +6,9 @@
   "format": {
     "durationMinutes": "{minutes} min",
     "others": "{count, plural, one {# other} other {# others}}",
-    "rate": "{rate}×"
+    "rate": "{rate}×",
+    "durationHours": "{hours} h{minutes, plural, =0 {} other { # min}}",
+    "dateTime": "{date} · {time}"
   },
   "common": {
     "save": "Save",
@@ -45,7 +47,10 @@
   },
   "status": {
     "ready": "Ready",
-    "transcribing": "Transcribing"
+    "transcribing": "Transcribing",
+    "uploading": "Uploading",
+    "failed": "Failed",
+    "none": "No recording"
   },
   "library": {
     "search": {
@@ -64,11 +69,16 @@
       "all": "All",
       "thisWeek": "This week",
       "private": "Private",
-      "shared": "Shared"
+      "shared": "Shared",
+      "ready": "Ready",
+      "transcribing": "In progress",
+      "failed": "Failed"
     },
     "count": "{count, plural, one {# meeting} other {# meetings}}",
     "sort": {
-      "newest": "Newest first"
+      "newest": "Newest first",
+      "label": "Sort",
+      "title": "Title A–Z"
     },
     "showing": "Showing {shown} of {total, plural, one {# meeting} other {# meetings}}",
     "showMore": "Show more meetings",
@@ -77,7 +87,9 @@
         "title": "No meetings yet",
         "body": "Record a meeting with the desktop recorder or upload an audio file. It stays private until you share it.",
         "download": "Download the recorder",
-        "upload": "Upload a file"
+        "upload": "Upload a file",
+        "record": "Record in the browser",
+        "downloadSoon": "The desktop recorder arrives in v0.2"
       },
       "noMatch": {
         "title": "No meetings match",
@@ -88,6 +100,18 @@
         "title": "Could not load meetings",
         "body": "The library did not load. Check the connection and try again.",
         "retry": "Try again"
+      },
+      "shared": {
+        "title": "Nothing shared with you yet",
+        "body": "When a colleague shares a meeting with you, it appears here."
+      },
+      "company": {
+        "title": "No company meetings yet",
+        "body": "Meetings shared with the whole company appear here."
+      },
+      "archived": {
+        "title": "No archived meetings",
+        "body": "An archived meeting leaves the library views and waits here until you restore it."
       }
     },
     "shared": {
@@ -95,29 +119,132 @@
     },
     "company": {
       "subheading": "Meetings shared with the whole company."
+    },
+    "range": "{from}–{to} of {total, plural, one {# meeting} other {# meetings}}",
+    "pagination": {
+      "label": "Pages",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page}"
+    },
+    "archived": {
+      "title": "Archived",
+      "subheading": "Out of the other views until you restore them.",
+      "link": "Archived meetings",
+      "restore": "Restore",
+      "restoreLabel": "Restore {title}",
+      "restoreFailed": "Not restored. Try again."
+    },
+    "newMeetingMenu": {
+      "record": "Record in the browser",
+      "upload": "Upload a file"
     }
   },
   "meeting": {
     "back": "All meetings",
     "speakers": "{count, plural, one {# speaker} other {# speakers}}",
     "visibility": {
-      "label": "Visibility, only the owner can change it"
+      "label": "Visibility, only the owner can change it",
+      "later": "Coming in a later packet"
     },
     "keep": {
       "text": "Keep",
-      "label": "Keep this meeting from automatic deletion"
+      "label": "Keep this meeting from automatic deletion",
+      "failed": "Keep was not saved. It is back as it was."
     },
     "export": "Export",
     "player": {
       "label": "Audio player",
       "play": "Play recording",
       "position": "Position in the recording, seconds",
-      "rate": "Playback speed"
+      "rate": "Playback speed",
+      "pause": "Pause recording",
+      "current": "Current position",
+      "duration": "Length of the recording",
+      "unavailable": "The audio could not be loaded. Reload the page to try again."
     },
     "tabs": {
       "label": "Meeting content",
       "recap": "Recap",
       "transcript": "Transcript"
+    },
+    "rename": {
+      "button": "Rename",
+      "label": "Rename meeting",
+      "field": "Meeting title",
+      "save": "Save",
+      "required": "Enter a title.",
+      "failed": "The title was not saved. It is back to the last saved title."
+    },
+    "noRecording": "No recording",
+    "exportLater": "Coming in packet 5",
+    "more": "More actions",
+    "archive": {
+      "action": "Archive",
+      "notice": "This meeting is archived. It is out of the library views.",
+      "restore": "Restore",
+      "failed": "Not archived. Try again."
+    },
+    "delete": {
+      "action": "Delete…",
+      "title": "Delete this meeting?",
+      "body": "{recap, select, yes {{recordings, plural, =0 {Delete the meeting and the recap permanently.} one {Delete the meeting, # recording and the recap permanently.} other {Delete the meeting, # recordings and the recap permanently.}}} other {{recordings, plural, =0 {Delete the meeting permanently.} one {Delete the meeting and # recording permanently.} other {Delete the meeting and # recordings permanently.}}}}",
+      "note": "Nobody can open it afterwards, and the audio is deleted from storage. Archive it instead to keep it out of the way.",
+      "confirm": "Delete permanently",
+      "failed": "The meeting was not deleted. Try again."
+    },
+    "uploadRecording": "Upload another recording",
+    "transcript": {
+      "uploading": {
+        "title": "Uploading",
+        "body": "The recording is still uploading. The transcript starts when the whole file is here."
+      },
+      "transcribing": {
+        "title": "Transcribing",
+        "body": "The transcript appears here when it is ready. You can leave this page."
+      },
+      "failed": {
+        "title": "Transcription failed",
+        "body": "{provider} could not transcribe the recording.",
+        "bodyUnknown": "The speech-to-text provider could not transcribe the recording.",
+        "retry": "Try again",
+        "retryFailed": "Not queued. Try again.",
+        "switchProvider": "Switch provider"
+      },
+      "uploadFailed": {
+        "title": "The upload did not complete",
+        "body": "The server did not keep the file: {reason, select, hash_mismatch {it changed on the way} size_mismatch {the size did not match} session_expired {it was not finished within 7 days} other {it was rejected}}. Upload it again.",
+        "action": "Upload again"
+      },
+      "none": {
+        "title": "No recording yet",
+        "body": "Upload a recording to this meeting to get a transcript.",
+        "action": "Upload a recording"
+      }
+    },
+    "recap": {
+      "pending": {
+        "title": "No recap yet",
+        "body": "The recap is written after the transcript."
+      }
+    },
+    "recordings": {
+      "heading": "Recordings",
+      "primary": "Primary",
+      "makePrimary": "Make primary",
+      "makePrimaryLabel": "Make the recording from {date} primary",
+      "failed": "Not changed. Try again."
+    },
+    "source": {
+      "desktop": "Desktop recorder",
+      "browser": "Browser",
+      "upload": "Upload",
+      "teams": "Teams",
+      "meet": "Meet",
+      "device": "Voice recorder"
+    },
+    "retention": {
+      "deleteOn": "Deleted on {date}"
     }
   },
   "transcript": {
@@ -186,6 +313,43 @@
       "label": "Local model",
       "downloaded": "{model} · Downloaded",
       "download": "{model} · Download model"
+    },
+    "web": {
+      "title": "Record in the browser",
+      "subheading": "For a meeting at this computer. The recording uploads while you record.",
+      "meetingTitle": "Meeting title",
+      "titleDefault": "Meeting {date}",
+      "record": "Record",
+      "stop": "Stop",
+      "recording": "Recording",
+      "elapsed": "Elapsed time",
+      "level": "Microphone level",
+      "status": {
+        "idle": "Press Record to start. The browser asks for the microphone.",
+        "uploading": "Uploading as you record · {done, plural, one {# chunk} other {# chunks}} sent",
+        "retrying": "Waiting for network · retrying",
+        "finishing": "Finishing the upload",
+        "done": "Saved. Opening the meeting."
+      },
+      "denied": {
+        "title": "Microphone access is blocked",
+        "body": "Allow the microphone for this site in the browser's address bar or settings, then try again."
+      },
+      "noMic": {
+        "title": "No microphone found",
+        "body": "Connect a microphone or headset, then try again."
+      },
+      "unsupported": {
+        "title": "This browser cannot record",
+        "body": "Use a current version of Chrome, Edge, Firefox or Safari, or upload an audio file instead."
+      },
+      "failed": {
+        "title": "The recording is not saved yet",
+        "body": "The upload did not finish. The recording is still in this tab; press Try again to send it."
+      },
+      "disabled": "Browser recording is switched off for this install. Contact your admin.",
+      "tryAgain": "Try again",
+      "uploadInstead": "Upload a file instead"
     }
   },
   "live": {
@@ -414,5 +578,38 @@
       "body": "Settings are for this install's admins. Ask an admin to add your address to the list.",
       "back": "Back to my meetings"
     }
+  },
+  "upload": {
+    "title": "Upload audio",
+    "titleExisting": "Upload a recording",
+    "description": "Audio files up to 2 GB. If the page reloads, choose the same file again to resume.",
+    "drop": "Drop an audio file here",
+    "choose": "Choose a file",
+    "field": "Audio file",
+    "meetingTitle": "Meeting title",
+    "start": "Upload",
+    "resume": {
+      "title": "This file was partly uploaded",
+      "body": "{done} of {total, plural, one {# chunk} other {# chunks}} are on the server.",
+      "action": "Resume",
+      "restart": "Start over"
+    },
+    "progress": {
+      "label": "Upload progress",
+      "hashing": "Checking the file · {percent}%",
+      "uploading": "Uploading chunk {done} of {total}",
+      "verifying": "Verifying the file",
+      "done": "Uploaded. Opening the meeting."
+    },
+    "error": {
+      "notAudio": "This is not an audio file. Choose an audio file, for example .m4a, .mp3 or .webm.",
+      "tooLarge": "The file is larger than 2 GB. Split the recording or export it at a lower bitrate.",
+      "empty": "The file is empty. Choose another file.",
+      "network": "The connection dropped. What was sent is kept; press Try again to continue.",
+      "mismatch": "The server got a different file than this one. Start the upload again.",
+      "disabled": "File upload is switched off for this install. Contact your admin.",
+      "rejected": "The server rejected the file ({code}). Contact your admin."
+    },
+    "retry": "Try again"
   }
 }

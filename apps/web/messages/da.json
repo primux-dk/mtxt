@@ -6,7 +6,9 @@
   "format": {
     "durationMinutes": "{minutes} min.",
     "others": "{count, plural, one {# anden} other {# andre}}",
-    "rate": "{rate}×"
+    "rate": "{rate}×",
+    "durationHours": "{hours} t.{minutes, plural, =0 {} other { # min.}}",
+    "dateTime": "{date} · {time}"
   },
   "common": {
     "save": "Gem",
@@ -45,7 +47,10 @@
   },
   "status": {
     "ready": "Klar",
-    "transcribing": "Transskriberer"
+    "transcribing": "Transskriberer",
+    "uploading": "Uploader",
+    "failed": "Fejlet",
+    "none": "Ingen optagelse"
   },
   "library": {
     "search": {
@@ -64,11 +69,16 @@
       "all": "Alle",
       "thisWeek": "Denne uge",
       "private": "Private",
-      "shared": "Delte"
+      "shared": "Delte",
+      "ready": "Klar",
+      "transcribing": "I gang",
+      "failed": "Fejlet"
     },
     "count": "{count, plural, one {# møde} other {# møder}}",
     "sort": {
-      "newest": "Nyeste først"
+      "newest": "Nyeste først",
+      "label": "Sortering",
+      "title": "Titel A–Å"
     },
     "showing": "Viser {shown} af {total, plural, one {# møde} other {# møder}}",
     "showMore": "Vis flere møder",
@@ -77,7 +87,9 @@
         "title": "Ingen møder endnu",
         "body": "Optag et møde med desktopoptageren, eller overfør en lydfil. Det er privat, indtil du deler det.",
         "download": "Hent optageren",
-        "upload": "Overfør en fil"
+        "upload": "Overfør en fil",
+        "record": "Optag i browseren",
+        "downloadSoon": "Optageren til computeren kommer i v0.2"
       },
       "noMatch": {
         "title": "Ingen møder passer til søgningen",
@@ -88,6 +100,18 @@
         "title": "Kunne ikke hente møder",
         "body": "Biblioteket blev ikke hentet. Tjek forbindelsen, og prøv igen.",
         "retry": "Prøv igen"
+      },
+      "shared": {
+        "title": "Intet er delt med dig endnu",
+        "body": "Når en kollega deler et møde med dig, står det her."
+      },
+      "company": {
+        "title": "Ingen møder for hele virksomheden endnu",
+        "body": "Møder, der er delt med hele virksomheden, står her."
+      },
+      "archived": {
+        "title": "Ingen arkiverede møder",
+        "body": "Et arkiveret møde forlader biblioteket og venter her, til du gendanner det."
       }
     },
     "shared": {
@@ -95,29 +119,132 @@
     },
     "company": {
       "subheading": "Møder, der er delt med hele virksomheden."
+    },
+    "range": "{from}–{to} af {total, plural, one {# møde} other {# møder}}",
+    "pagination": {
+      "label": "Sider",
+      "previous": "Forrige",
+      "next": "Næste",
+      "page": "Side {page}"
+    },
+    "archived": {
+      "title": "Arkiveret",
+      "subheading": "Uden for de andre visninger, indtil du gendanner dem.",
+      "link": "Arkiverede møder",
+      "restore": "Gendan",
+      "restoreLabel": "Gendan {title}",
+      "restoreFailed": "Ikke gendannet. Prøv igen."
+    },
+    "newMeetingMenu": {
+      "record": "Optag i browseren",
+      "upload": "Upload en fil"
     }
   },
   "meeting": {
     "back": "Alle møder",
     "speakers": "{count, plural, one {# taler} other {# talere}}",
     "visibility": {
-      "label": "Synlighed. Kun ejeren kan ændre den."
+      "label": "Synlighed. Kun ejeren kan ændre den.",
+      "later": "Kommer i en senere pakke"
     },
     "keep": {
       "text": "Behold",
-      "label": "Behold mødet uden automatisk sletning"
+      "label": "Behold mødet uden automatisk sletning",
+      "failed": "Behold blev ikke gemt. Det er tilbage, som det var."
     },
     "export": "Eksportér",
     "player": {
       "label": "Lydafspiller",
       "play": "Afspil optagelse",
       "position": "Placering i optagelsen, sekunder",
-      "rate": "Afspilningshastighed"
+      "rate": "Afspilningshastighed",
+      "pause": "Sæt optagelsen på pause",
+      "current": "Nuværende position",
+      "duration": "Optagelsens længde",
+      "unavailable": "Lyden kunne ikke hentes. Genindlæs siden for at prøve igen."
     },
     "tabs": {
       "label": "Mødeindhold",
       "recap": "Referat",
       "transcript": "Transskription"
+    },
+    "rename": {
+      "button": "Omdøb",
+      "label": "Omdøb mødet",
+      "field": "Mødets titel",
+      "save": "Gem",
+      "required": "Skriv en titel.",
+      "failed": "Titlen blev ikke gemt. Den sidst gemte titel er tilbage."
+    },
+    "noRecording": "Ingen optagelse",
+    "exportLater": "Kommer i pakke 5",
+    "more": "Flere handlinger",
+    "archive": {
+      "action": "Arkivér",
+      "notice": "Mødet er arkiveret. Det er uden for biblioteket.",
+      "restore": "Gendan",
+      "failed": "Ikke arkiveret. Prøv igen."
+    },
+    "delete": {
+      "action": "Slet…",
+      "title": "Slet mødet?",
+      "body": "{recap, select, yes {{recordings, plural, =0 {Slet mødet og referatet permanent.} one {Slet mødet, # optagelse og referatet permanent.} other {Slet mødet, # optagelser og referatet permanent.}}} other {{recordings, plural, =0 {Slet mødet permanent.} one {Slet mødet og # optagelse permanent.} other {Slet mødet og # optagelser permanent.}}}}",
+      "note": "Ingen kan åbne det bagefter, og lyden slettes fra lageret. Arkivér det i stedet for at få det af vejen.",
+      "confirm": "Slet permanent",
+      "failed": "Mødet blev ikke slettet. Prøv igen."
+    },
+    "uploadRecording": "Upload endnu en optagelse",
+    "transcript": {
+      "uploading": {
+        "title": "Uploader",
+        "body": "Optagelsen uploades stadig. Transskriptionen starter, når hele filen er her."
+      },
+      "transcribing": {
+        "title": "Transskriberer",
+        "body": "Transskriptionen kommer her, når den er klar. Du kan godt forlade siden."
+      },
+      "failed": {
+        "title": "Transskriptionen fejlede",
+        "body": "{provider} kunne ikke transskribere optagelsen.",
+        "bodyUnknown": "Tale-til-tekst-udbyderen kunne ikke transskribere optagelsen.",
+        "retry": "Prøv igen",
+        "retryFailed": "Ikke sat i kø. Prøv igen.",
+        "switchProvider": "Skift udbyder"
+      },
+      "uploadFailed": {
+        "title": "Uploaden blev ikke færdig",
+        "body": "Serveren beholdt ikke filen: {reason, select, hash_mismatch {den ændrede sig undervejs} size_mismatch {størrelsen passede ikke} session_expired {den blev ikke færdig inden for 7 dage} other {den blev afvist}}. Upload den igen.",
+        "action": "Upload igen"
+      },
+      "none": {
+        "title": "Ingen optagelse endnu",
+        "body": "Upload en optagelse til mødet for at få en transskription.",
+        "action": "Upload en optagelse"
+      }
+    },
+    "recap": {
+      "pending": {
+        "title": "Intet referat endnu",
+        "body": "Referatet skrives efter transskriptionen."
+      }
+    },
+    "recordings": {
+      "heading": "Optagelser",
+      "primary": "Primær",
+      "makePrimary": "Gør primær",
+      "makePrimaryLabel": "Gør optagelsen fra {date} primær",
+      "failed": "Ikke ændret. Prøv igen."
+    },
+    "source": {
+      "desktop": "Optageren",
+      "browser": "Browser",
+      "upload": "Upload",
+      "teams": "Teams",
+      "meet": "Meet",
+      "device": "Diktafon"
+    },
+    "retention": {
+      "deleteOn": "Slettes {date}"
     }
   },
   "transcript": {
@@ -186,6 +313,43 @@
       "label": "Lokal model",
       "downloaded": "{model} · Hentet",
       "download": "{model} · Hent model"
+    },
+    "web": {
+      "title": "Optag i browseren",
+      "subheading": "Til et møde ved denne computer. Optagelsen uploades, mens du optager.",
+      "meetingTitle": "Mødets titel",
+      "titleDefault": "Møde {date}",
+      "record": "Optag",
+      "stop": "Stop",
+      "recording": "Optager",
+      "elapsed": "Forløbet tid",
+      "level": "Mikrofonniveau",
+      "status": {
+        "idle": "Tryk Optag for at starte. Browseren beder om mikrofonen.",
+        "uploading": "Uploader, mens du optager · {done, plural, one {# del} other {# dele}} sendt",
+        "retrying": "Venter på netværk · prøver igen",
+        "finishing": "Gør uploaden færdig",
+        "done": "Gemt. Åbner mødet."
+      },
+      "denied": {
+        "title": "Adgang til mikrofonen er blokeret",
+        "body": "Tillad mikrofonen for siden i browserens adresselinje eller indstillinger, og prøv igen."
+      },
+      "noMic": {
+        "title": "Ingen mikrofon fundet",
+        "body": "Tilslut en mikrofon eller et headset, og prøv igen."
+      },
+      "unsupported": {
+        "title": "Browseren kan ikke optage",
+        "body": "Brug en nyere udgave af Chrome, Edge, Firefox eller Safari, eller upload en lydfil i stedet."
+      },
+      "failed": {
+        "title": "Optagelsen er ikke gemt endnu",
+        "body": "Uploaden blev ikke færdig. Optagelsen er stadig i fanen; tryk Prøv igen for at sende den."
+      },
+      "disabled": "Optagelse i browseren er slået fra for denne installation. Kontakt din administrator.",
+      "tryAgain": "Prøv igen",
+      "uploadInstead": "Upload en fil i stedet"
     }
   },
   "live": {
@@ -414,5 +578,38 @@
       "body": "Indstillingerne er for installationens administratorer. Bed en administrator om at føje din adresse til listen.",
       "back": "Tilbage til mine møder"
     }
+  },
+  "upload": {
+    "title": "Upload lyd",
+    "titleExisting": "Upload en optagelse",
+    "description": "Lydfiler op til 2 GB. Genindlæses siden, så vælg den samme fil igen for at fortsætte.",
+    "drop": "Slip en lydfil her",
+    "choose": "Vælg en fil",
+    "field": "Lydfil",
+    "meetingTitle": "Mødets titel",
+    "start": "Upload",
+    "resume": {
+      "title": "Filen blev delvist uploadet",
+      "body": "{done} af {total, plural, one {# del} other {# dele}} er på serveren.",
+      "action": "Fortsæt",
+      "restart": "Start forfra"
+    },
+    "progress": {
+      "label": "Uploadstatus",
+      "hashing": "Tjekker filen · {percent} %",
+      "uploading": "Uploader del {done} af {total}",
+      "verifying": "Kontrollerer filen",
+      "done": "Uploadet. Åbner mødet."
+    },
+    "error": {
+      "notAudio": "Det er ikke en lydfil. Vælg en lydfil, for eksempel .m4a, .mp3 eller .webm.",
+      "tooLarge": "Filen er større end 2 GB. Del optagelsen op, eller eksportér den med lavere bitrate.",
+      "empty": "Filen er tom. Vælg en anden fil.",
+      "network": "Forbindelsen blev afbrudt. Det sendte er gemt; tryk Prøv igen for at fortsætte.",
+      "mismatch": "Serveren fik en anden fil end denne. Start uploaden forfra.",
+      "disabled": "Upload af filer er slået fra for denne installation. Kontakt din administrator.",
+      "rejected": "Serveren afviste filen ({code}). Kontakt din administrator."
+    },
+    "retry": "Prøv igen"
   }
 }

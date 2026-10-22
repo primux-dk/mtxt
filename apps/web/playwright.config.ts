@@ -24,13 +24,25 @@ export default defineConfig({
     locale: 'en-GB',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Chromium's fake microphone, for the browser recorder test.
+        launchOptions: {
+          args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+        },
+      },
+    },
+  ],
   webServer: {
     command: [
       process.env.E2E_PREBUILT ? null : 'pnpm build:e2e',
       'rm -rf .wrangler/e2e',
       'pnpm db:migrate --persist-to .wrangler/e2e',
-      'pnpm db:seed --persist-to .wrangler/e2e',
+      // The dev users and a 30-meeting demo library (packet 3).
+      'pnpm db:seed --demo=30 --persist-to .wrangler/e2e',
       `wrangler dev --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e`,
     ]
       .filter(Boolean)
