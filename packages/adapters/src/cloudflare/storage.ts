@@ -46,5 +46,23 @@ export function r2Storage(bucket: R2Bucket): StorageAdapter {
       const object = await this.get(key);
       return object ? { kind: 'stream', object } : null;
     },
+    async createUpload(key, options = {}) {
+      const upload = await bucket.createMultipartUpload(key, {
+        httpMetadata: options.contentType ? { contentType: options.contentType } : undefined,
+        customMetadata: options.customMetadata,
+      });
+      return { uploadId: upload.uploadId };
+    },
+    async uploadPart(key, uploadId, partNumber, body) {
+      const part = await bucket.resumeMultipartUpload(key, uploadId).uploadPart(partNumber, body);
+      return { partNumber: part.partNumber, etag: part.etag };
+    },
+    async completeUpload(key, uploadId, parts) {
+      const object = await bucket.resumeMultipartUpload(key, uploadId).complete(parts);
+      return describe(object);
+    },
+    async abortUpload(key, uploadId) {
+      await bucket.resumeMultipartUpload(key, uploadId).abort();
+    },
   };
 }

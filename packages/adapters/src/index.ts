@@ -1,5 +1,8 @@
 export type * from './storage';
 export type * from './queue';
+export type * from './uploads';
+export { isJob, JOB_TYPES, routeJobs } from './jobs';
+export type { Job, JobType, JobHandlers, RecapJob, TranscribeJob } from './jobs';
 export { createDb, schema, type Db } from './db';
 export { DEFAULT_SETTINGS } from './db/defaults';
 export { seedSql } from './db/seed';
@@ -46,10 +49,12 @@ export type {
   User,
   Visibility,
 } from './db/schema';
+export type { Meeting, Recording, RecordingStatus } from './db/schema';
 export {
   cloudflareAdapters,
   cloudflareConsumer,
   cloudflareQueue,
+  durableObjectUploadSessions,
   r2Storage,
   type CloudflareBindings,
 } from './cloudflare';

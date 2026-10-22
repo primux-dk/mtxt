@@ -121,8 +121,8 @@ describe('schema', () => {
       );
     };
     const recording = (id: string, isPrimary: 0 | 1, source = 'upload') =>
-      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path)
-       VALUES ('${id}', 't', 'm1', 'u1', '${source}', ${isPrimary}, 1, 'h', 1, 'p')`;
+      `INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, content_type, storage_path)
+       VALUES ('${id}', 't', 'm1', 'u1', '${source}', ${isPrimary}, 1, 'h', 1, 'audio/ogg', 'p')`;
 
     it('allows one primary recording per meeting, any number of others', () => {
       insertUserAndMeeting();
@@ -156,6 +156,25 @@ describe('schema', () => {
     });
   });
 
+  it('keeps recordings from before 0001 when it rebuilds the table', async () => {
+    const old = new DatabaseSync(':memory:');
+    old.exec('PRAGMA foreign_keys = ON');
+    old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
+    old.exec(
+      `INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES ('u1', 't', 's', 'a@example.com', 'A');
+       INSERT INTO meetings (id, install_id, owner_id, title, started_at) VALUES ('m1', 't', 'u1', 'Møde', 0);
+       INSERT INTO recordings (id, install_id, meeting_id, uploaded_by, source, is_primary, duration_s, sha256, size_bytes, storage_path)
+       VALUES ('r1', 't', 'm1', 'u1', 'upload', 1, 1, 'h', 1, 'p');`,
+    );
+    old.exec(await readFile(new URL('0001_capture.sql', migrationsDir), 'utf8'));
+    expect(old.prepare(`SELECT id, content_type, status FROM recordings`).all()).toEqual([
+      { id: 'r1', content_type: 'application/octet-stream', status: 'uploading' },
+    ]);
+    expect(old.prepare(`SELECT title_folded FROM meetings`).get()).toEqual({
+      title_folded: 'møde',
+    });
+  });
+
   it('refuses an install id that could break the seed SQL', () => {
     expect(() => seedSql("x'); DROP TABLE settings; --")).toThrow();
   });
@@ -172,5 +191,28 @@ describe('schema', () => {
       .get() as { at: number; kind: string };
     expect(kind).toBe('integer');
     expect(Math.abs(Number(at) - Date.now())).toBeLessThan(60_000);
+  });
+});
+
+describe('dev seed', () => {
+  it('writes the users and a demo library that fits the schema, twice', async () => {
+    const { devUsersSql, demoSql, demoMeetings, LONG_TITLE } = await import('../src/db/dev-seed');
+    const db = await migratedDatabase();
+    for (let run = 0; run < 2; run++) {
+      db.exec(devUsersSql('dev'));
+      db.exec(demoSql('dev', 30));
+    }
+    const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+    expect(count(`SELECT count(*) AS n FROM users`)).toBe(3);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-user'`)).toBe(30);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(3);
+    expect(count(`SELECT count(*) AS n FROM meeting_shares`)).toBe(1);
+    expect([...LONG_TITLE]).toHaveLength(120);
+
+    const big = demoMeetings(2000);
+    expect(big.filter((m) => m.ownerId === 'dev-user')).toHaveLength(2000);
+    expect(big.some((m) => m.recording?.durationS === 4 * 3600)).toBe(true);
+    expect(big.some((m) => m.recording === null)).toBe(true);
+    expect(big.some((m) => /[æøå]/i.test(m.title))).toBe(true);
   });
 });

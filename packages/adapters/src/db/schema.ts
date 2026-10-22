@@ -124,6 +124,11 @@ export const meetings = sqliteTable(
       .notNull()
       .references(() => users.id),
     title: text('title').notNull(),
+    /**
+     * The title NFKC-normalised and lower-cased in JavaScript, for search.
+     * SQLite's LIKE and lower() fold ASCII only, so "Møde" would not find "MØDE".
+     */
+    titleFolded: text('title_folded').notNull().default(''),
     startedAt: timestamp('started_at').notNull(),
     visibility: text('visibility', { enum: VISIBILITIES }).notNull().default('private'),
     keep: bool('keep').notNull().default(false),
@@ -175,10 +180,18 @@ export const recordings = sqliteTable(
     source: text('source', { enum: RECORDING_SOURCES }).notNull(),
     isPrimary: bool('is_primary').notNull().default(false),
     durationS: integer('duration_s').notNull(),
-    sha256: text('sha256').notNull(),
-    sizeBytes: integer('size_bytes').notNull(),
+    /** Null while a browser recording is still being made; set at complete. */
+    sha256: text('sha256'),
+    /** Null while a browser recording is still being made; set at complete. */
+    sizeBytes: integer('size_bytes'),
+    contentType: text('content_type').notNull(),
     storagePath: text('storage_path').notNull(),
     status: text('status', { enum: RECORDING_STATUSES }).notNull().default('uploading'),
+    /** A contract error code when status is failed, for example `hash_mismatch`. */
+    failure: text('failure'),
+    createdAt: createdAt(),
+    /** When the hash matched. The recorder's 7-day local timer starts here. */
+    confirmedAt: timestamp('confirmed_at'),
     deleteAudioAt: timestamp('delete_audio_at'),
   },
   (t) => [
@@ -395,6 +408,10 @@ export const auditEvents = sqliteTable(
 );
 
 export type Settings = typeof settings.$inferSelect;
+export type Meeting = typeof meetings.$inferSelect;
+export type Recording = typeof recordings.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type RecordingStatus = (typeof RECORDING_STATUSES)[number];
 export type NewSettings = typeof settings.$inferInsert;
 export type Visibility = (typeof VISIBILITIES)[number];
 export type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];

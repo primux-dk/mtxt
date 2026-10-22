@@ -1,10 +1,9 @@
 /**
- * Background jobs: transcription and recap. Cloudflare binds Queues; a Docker
- * edition binds a database-backed queue behind the same interface.
+ * Background jobs: transcription and recap (the message types are in jobs.ts).
+ * Cloudflare binds Queues; a Docker edition binds a database-backed queue
+ * behind the same interface.
  */
-export type Job =
-  | { type: 'transcribe'; installId: string; recordingId: string }
-  | { type: 'recap'; installId: string; meetingId: string };
+import type { Job } from './jobs';
 
 export interface SendOptions {
   delaySeconds?: number;
