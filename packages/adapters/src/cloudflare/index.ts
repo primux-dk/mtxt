@@ -1,12 +1,14 @@
 import { createDb } from '../db';
 import type { Job } from '../jobs';
 import { cloudflareQueue } from './queue';
+import { workersAiSpeech } from './speech';
 import { r2Storage } from './storage';
 import { durableObjectUploadSessions } from './uploads';
 
 export { cloudflareConsumer, cloudflareQueue } from './queue';
 export { r2Storage } from './storage';
 export { durableObjectUploadSessions } from './uploads';
+export { WHISPER_MODEL, workersAiSpeech } from './speech';
 
 /** The Cloudflare bindings the adapters read. Names match apps/web/wrangler.jsonc. */
 export interface CloudflareBindings {
@@ -17,6 +19,8 @@ export interface CloudflareBindings {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   UPLOAD_SESSIONS: DurableObjectNamespace<any>;
   INSTALL_ID: string;
+  /** Workers AI. Optional: `wrangler dev --local` runs without it. */
+  AI?: Ai;
 }
 
 /** Every adapter for one request, bound to the Worker's env. */
@@ -27,5 +31,6 @@ export function cloudflareAdapters(env: CloudflareBindings) {
     storage: r2Storage(env.AUDIO),
     queue: cloudflareQueue(env.JOBS),
     uploads: durableObjectUploadSessions(env.UPLOAD_SESSIONS),
+    speech: workersAiSpeech(env.AI),
   };
 }

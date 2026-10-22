@@ -123,3 +123,46 @@ export async function claimFirstAdmin(db: Db, installId: string, email: string) 
     .returning({ installId: settings.installId });
   return claimed.length > 0;
 }
+
+/** 32 random bytes, base64url: the webhook secret before it is sealed. */
+function randomSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '');
+}
+
+/**
+ * The install's sealed webhook secret, generated on the first call that
+ * finds none. One conditional UPDATE, so two first calls cannot both win:
+ * the loser reads the winner's value. `seal` is passed in so this file stays
+ * free of the key.
+ */
+export async function ensureWebhookSecret(
+  db: Db,
+  installId: string,
+  seal: (plaintext: string) => Promise<string>,
+): Promise<string> {
+  const read = async () =>
+    (
+      await db
+        .select({ value: settings.webhookSecret })
+        .from(settings)
+        .where(eq(settings.installId, installId))
+        .get()
+    )?.value ?? null;
+  const existing = await read();
+  if (existing) return existing;
+  await db
+    .insert(settings)
+    .values({ installId, ...DEFAULT_SETTINGS, adminEmails: [] })
+    .onConflictDoNothing();
+  await db
+    .update(settings)
+    .set({ webhookSecret: await seal(randomSecret()) })
+    .where(and(eq(settings.installId, installId), isNull(settings.webhookSecret)));
+  const value = await read();
+  if (!value) throw new Error('Could not store the webhook secret.');
+  return value;
+}
