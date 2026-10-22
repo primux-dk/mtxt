@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 
 export const ADMIN = { email: 'mette.lund@example.com', name: 'Mette Lund', admin: true };
 export const MEMBER = { email: 'anne.holm@example.com', name: 'Anne Holm', admin: false };
@@ -10,10 +10,11 @@ export const MEMBER = { email: 'anne.holm@example.com', name: 'Anne Holm', admin
  */
 /** Leave `admin` out to let the sign-in decide, as a real one does. */
 export async function signIn(
-  page: Page,
-  user: { email: string; name: string; admin?: boolean } = ADMIN,
+  page: Page | APIRequestContext,
+  user: { email: string; name: string; admin?: boolean; subject?: string } = ADMIN,
 ) {
-  const response = await page.request.post('/api/test/sign-in', { data: user });
+  const request = 'request' in page ? page.request : page;
+  const response = await request.post('/api/test/sign-in', { data: user });
   if (!response.ok())
     throw new Error(`Test sign-in failed: ${response.status()} ${await response.text()}`);
 }

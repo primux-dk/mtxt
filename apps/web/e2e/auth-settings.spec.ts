@@ -157,6 +157,69 @@ test('several errors are listed at the top with links (rule 9)', async ({ page }
   await expect(page.locator('#retentionAudioDays')).toHaveValue('0');
 });
 
+test('an admin cookie from before an email change carries no admin rights', async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  // A is an admin under its own subject, and opens settings.
+  await signIn(page, {
+    email: 'a.old@example.com',
+    name: 'Admin A',
+    admin: true,
+    subject: 'subject-a',
+  });
+  expect((await page.goto('/settings'))?.status()).toBe(200);
+
+  // A signs in again elsewhere; the IdP now gives an address that is not on the list.
+  const elsewhere = await browser.newContext({ baseURL });
+  await signIn(elsewhere.request, {
+    email: 'a.new@example.com',
+    name: 'Admin A',
+    subject: 'subject-a',
+  });
+  await elsewhere.close();
+
+  // The old cookie still says a.old@, but the user row decides: no save, then 403.
+  await page.locator('#productName').fill('Saved with a stale cookie');
+  await save(page).click();
+  await expect(page.getByText("Settings are for this install's admins.")).toBeVisible();
+  await expect(page.getByText('Settings saved.')).toHaveCount(0);
+  expect((await page.goto('/settings'))?.status()).toBe(403);
+
+  await signIn(page, ADMIN);
+  await page.goto('/settings');
+  await expect(page.locator('#productName')).toHaveValue(PRODUCT);
+});
+
+test('an imported term with a line break survives save and reload', async ({ page }) => {
+  await signIn(page, ADMIN);
+  await page.goto('/settings');
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'terms.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('"alpha\nbeta",2\r\n'),
+  });
+  await expect(page.getByText('Added 1 term from terms.csv.')).toBeVisible();
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Keyterms')).toHaveValue(
+    'Primux\nlinje 2,2\nugeplan\n"alpha\nbeta",2',
+  );
+
+  // `alpha,2,` has three fields: refused with its record, nothing imported.
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'bad.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('gamma\nalpha,2,\n'),
+  });
+  await expect(page.getByText(/Could not import bad\.csv\. Record 2:/)).toBeVisible();
+  await expect(page.getByLabel('Keyterms')).toHaveValue(
+    'Primux\nlinje 2,2\nugeplan\n"alpha\nbeta",2',
+  );
+});
+
 test('a template is added and deleted, with a named confirmation', async ({ page }) => {
   await signIn(page, ADMIN);
   await page.goto('/settings');
