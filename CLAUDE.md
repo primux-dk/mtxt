@@ -31,6 +31,10 @@ docs/               spec and decisions
 - `packages/contract` is the only thing both apps import. The server never reads recorder code and the recorder never reads server code.
 - Decisions go to `docs/decisions.md` with a date. Specs go to `docs/spec.md`. Neither is a changelog; git is.
 
+## Who does what
+
+Kristian's setup for this project, 2026-10-22: a **Fable 5.1 (1M, high)** thread leads the work in this BB project: scoping, architecture, reviews of delegated work, anything irreversible. **Opus 5.5 (1M, high)** threads implement from a packet. **Codex (gpt-6.1-sol)** threads review: every implementation packet gets a Codex review before the lead accepts it. The lead does not implement multi-file changes itself.
+
 ## Working
 
 - Node 22 and pnpm are on agent-server; wrangler runs locally with `wrangler dev`. Deploys to any Cloudflare account wait for Kristian's go.
