@@ -34,7 +34,7 @@ docs/               spec and decisions
 
 ## Who does what
 
-Kristian's setup for this project, 2026-10-22: a **Fable 5.1 (1M, high)** thread leads the work in this BB project: scoping, architecture, reviews of delegated work, anything irreversible. **Opus 5.5 (1M, high)** threads implement from a packet. **Codex (gpt-6.1-sol)** threads review: every implementation packet gets a Codex review before the lead accepts it. The lead does not implement multi-file changes itself.
+Kristian's setup for this project, 2026-10-22: a **Fable 5.1 (1M, high)** thread leads the work in this BB project: scoping, architecture, reviews of delegated work, anything irreversible. **Opus 5.5 (1M, high)** threads implement from a packet. **Codex (gpt-6.1-sol)** threads review: every implementation packet gets a Codex review before the lead accepts it. The lead does not implement multi-file changes itself. The lead archives a child thread (`bb thread archive <id>`) as soon as its work is accepted or discarded, so the project's thread list only shows live work.
 
 ## Working
 
