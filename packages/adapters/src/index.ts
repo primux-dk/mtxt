@@ -60,4 +60,3 @@ export {
 } from './cloudflare';
 export { foldTitle } from './db/fold';
 export { backfillTitleKeys } from './db/title-keys';
-export { readSettings } from './db/settings';
