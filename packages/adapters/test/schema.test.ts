@@ -161,7 +161,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0003 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -180,7 +180,16 @@ describe('schema', () => {
         (table) => (old.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
       );
     const before = counts();
-    old.exec(await readFile(new URL('0001_capture.sql', migrationsDir), 'utf8'));
+    // Packet 2's migrations, then this packet's, on the packet-1 data.
+    const later = (await readdir(migrationsDir))
+      .filter((f) => f.endsWith('.sql') && f !== '0000_init.sql')
+      .sort();
+    expect(later).toEqual([
+      '0001_login_settings.sql',
+      '0002_identity_hardening.sql',
+      '0003_capture.sql',
+    ]);
+    for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);
     expect(before).toEqual([1, 1, 1, 1, 3]);
     // Packet-1 recordings keep working: a media type from the extension, confirmed at their start.
@@ -196,8 +205,8 @@ describe('schema', () => {
     expect(old.prepare(`PRAGMA foreign_key_check`).all()).toEqual([]);
   });
 
-  it('only adds to the packet-1 schema: 0001 drops and rebuilds nothing', async () => {
-    const sql = await readFile(new URL('0001_capture.sql', migrationsDir), 'utf8');
+  it('only adds to the schema: 0003 drops and rebuilds nothing', async () => {
+    const sql = await readFile(new URL('0003_capture.sql', migrationsDir), 'utf8');
     expect(sql).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
   });
 
@@ -250,8 +259,10 @@ describe('dev seed', () => {
     const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
     expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(3);
     expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-user'`)).toBe(30);
-    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(3);
-    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(1);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(4);
+    // The colleague's shared meeting, and the delete test's graph meeting.
+    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(2);
+    expect(count(`SELECT count(*) AS n FROM segments WHERE install_id = 'dev'`)).toBe(3);
     // The foreign-install fixtures: one meeting, one share, one recording.
     expect(count(`SELECT count(*) AS n FROM meetings WHERE install_id = 'other-install'`)).toBe(1);
     expect(

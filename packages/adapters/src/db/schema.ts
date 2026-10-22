@@ -426,7 +426,6 @@ export const auditEvents = sqliteTable(
 export type Settings = typeof settings.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;
-export type User = typeof users.$inferSelect;
 export type RecordingStatus = (typeof RECORDING_STATUSES)[number];
 export type NewSettings = typeof settings.$inferInsert;
 export type Visibility = (typeof VISIBILITIES)[number];

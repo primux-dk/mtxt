@@ -15,6 +15,10 @@ UPDATE `recordings` SET `content_type` = CASE lower(substr(`storage_path`, lengt
 	WHEN 'mp3' THEN 'audio/mpeg'
 	WHEN 'wav' THEN 'audio/wav'
 	WHEN 'ogg' THEN 'audio/ogg'
+	WHEN 'oga' THEN 'audio/ogg'
+	WHEN 'opus' THEN 'audio/ogg'
+	WHEN 'flac' THEN 'audio/flac'
+	WHEN 'aac' THEN 'audio/aac'
 	ELSE 'audio/webm' END;--> statement-breakpoint
 UPDATE `recordings` SET `created_at` = coalesce((SELECT `started_at` FROM `meetings` WHERE `meetings`.`id` = `recordings`.`meeting_id`), 0) WHERE `created_at` = 0;--> statement-breakpoint
 UPDATE `recordings` SET `confirmed_at` = `created_at` WHERE `confirmed_at` IS NULL AND `status` IN ('confirmed', 'transcribing', 'transcribed', 'failed');

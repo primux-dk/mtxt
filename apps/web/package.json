@@ -18,7 +18,7 @@
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "check:d1-upgrade": "node scripts/d1-upgrade-check.mjs --from 0001_capture.sql"
+    "check:d1-upgrade": "node scripts/d1-upgrade-check.mjs --from 0001_login_settings.sql"
   },
   "dependencies": {
     "@mtxt/adapters": "workspace:*",
