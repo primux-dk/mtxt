@@ -14,6 +14,9 @@
     "binding": "ASSETS",
   },
   "observability": { "enabled": true },
+  // The e2e run bundles with --define MTXT_E2E_BUILD:"1"; a deploy keeps "" and esbuild
+  // drops the fake providers from the Worker (lib/transcription/deps.ts).
+  "define": { "MTXT_E2E_BUILD": "\"\"" },
   "vars": {
     // Written into every row's install_id. One install per account.
     "INSTALL_ID": "dev",

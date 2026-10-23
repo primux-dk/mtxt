@@ -54,3 +54,8 @@ export function fakeSpeech(env: TestEnv): SpeechModels | undefined {
     },
   };
 }
+
+/** Both overrides at once, for lib/transcription/deps.ts. */
+export function e2eOverrides(env: TestEnv) {
+  return { speech: fakeSpeech(env), assemblyAiBaseUrl: fakeAssemblyAiUrl(env) };
+}
