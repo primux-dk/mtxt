@@ -272,20 +272,35 @@ export async function queueMeetingEvent(
   });
 }
 
-/** The same, never throwing: an event that cannot be queued must not fail what caused it. */
+/** Waits between tries to queue an event: a transient database error should not lose it. */
+export const QUEUE_RETRY_MS = [200, 800] as const;
+
+/**
+ * The same, never throwing: an event that cannot be queued must not fail
+ * what caused it. A failure is tried again twice, shortly (a locked or busy
+ * database), then logged; queueing is idempotent, so a try that half
+ * landed is harmless.
+ */
 export async function queueMeetingEventQuietly(
   deps: QueueDeps,
   input: Parameters<typeof queueMeetingEvent>[1],
+  waits: readonly number[] = QUEUE_RETRY_MS,
 ): Promise<number> {
-  try {
-    return await queueMeetingEvent(deps, input);
-  } catch (error) {
-    (deps.log ?? console).error(
-      `Could not queue the ${input.event} webhook`,
-      input.meetingId,
-      describeError(error),
-    );
-    return 0;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await queueMeetingEvent(deps, input);
+    } catch (error) {
+      if (attempt < waits.length) {
+        await new Promise((resolve) => setTimeout(resolve, waits[attempt]));
+        continue;
+      }
+      (deps.log ?? console).error(
+        `Could not queue the ${input.event} webhook`,
+        input.meetingId,
+        describeError(error),
+      );
+      return 0;
+    }
   }
 }
 

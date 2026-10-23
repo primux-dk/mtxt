@@ -19,6 +19,7 @@ import {
   queueCurrentState,
   queueDeleted,
   queueMeetingEvent,
+  queueMeetingEventQuietly,
   queueTestEvent,
   retryNow,
   sweepDeliveries,
@@ -676,6 +677,26 @@ describe('deliveries', () => {
     await runLast();
     expect(await queueMeetingEvent(q(), once)).toBe(0);
     expect(deliveries().map((row) => row.event)).toEqual(['meeting.shared', 'meeting.transcribed']);
+  });
+
+  it('tries a failed queueing again, so a busy database does not lose the event', async () => {
+    let failures = 2;
+    const flaky = new Proxy(db, {
+      get(target, key, receiver) {
+        if (key === 'select' && failures > 0) {
+          failures--;
+          throw new Error('D1_ERROR: database is locked: SQLITE_BUSY');
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const queued = await queueMeetingEventQuietly(
+      { ...q(), db: flaky },
+      { event: 'meeting.transcribed', meetingId: 'm-company' },
+      [1, 1],
+    );
+    expect(queued).toBe(1);
+    expect(deliveries()).toHaveLength(1);
   });
 
   it('skips an endpoint that is disabled or does not take the event', async () => {
