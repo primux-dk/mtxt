@@ -47,8 +47,15 @@ test.describe('library', () => {
     await search.press('Enter');
     await expect(page).toHaveURL(/q=M%C3%98DE/);
     await expect(rows(page).first()).toBeVisible();
-    for (const title of await rows(page).getByRole('heading').allTextContents()) {
-      expect(title.toLowerCase()).toContain('møde');
+    // Packet 6: a hit is in the title, or in a transcript or recap, shown as a marked snippet.
+    for (const row of await rows(page).all()) {
+      const title = (await row.getByRole('heading').textContent())!.toLowerCase();
+      if (title.includes('møde')) continue;
+      const marks = await row.getByTestId('search-snippet').locator('mark').allTextContents();
+      expect(
+        marks.some((m) => m.toLowerCase().startsWith('møde')),
+        title,
+      ).toBe(true);
     }
     await expect(page.getByRole('link', { name: 'Produktionsmøde, uge 43' })).toBeVisible();
 
