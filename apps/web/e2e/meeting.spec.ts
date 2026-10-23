@@ -19,7 +19,7 @@ test.beforeAll(async ({ baseURL }) => signInHeaders(baseURL!));
   The meeting page, as the seeded colleague on meetings this spec makes
   through the API with a real WAV, so the player has audio. Rules 2
   (optimistic with rollback), 3 (archive and delete), 5 (?t=), 11
-  (keyboard) and 10 (Export is the primary, disabled until packet 5).
+  (keyboard) and 10 (Export is the primary, disabled until there is a recap).
 */
 const colleague = SESSION_HEADERS.colleague;
 
@@ -214,10 +214,10 @@ test('keyboard walk through the actions, the player and the tabs (rule 11)', asy
   await page.keyboard.press('Escape');
   await expect(more).toBeFocused();
 
-  // Export is the primary action, disabled until packet 5, and says why.
+  // Export is the primary action, disabled until there is a recap, and says why.
   const exportButton = page.getByRole('button', { name: 'Export' });
   await expect(exportButton).toBeDisabled();
-  await expect(exportButton).toHaveAccessibleDescription('Coming in packet 5');
+  await expect(exportButton).toHaveAccessibleDescription('There is no recap to export yet.');
 });
 
 test('archive leaves the library views; restore brings it back (rule 3)', async ({

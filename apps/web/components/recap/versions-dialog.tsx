@@ -69,7 +69,10 @@ export function VersionsDialog({
   meetingId,
   owner,
   onRestored,
+  returnFocus,
 }: {
+  /** The button that opened the panel; focus goes back to it when it closes. */
+  returnFocus?: React.RefObject<HTMLButtonElement | null>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   meetingId: string;
@@ -128,7 +131,15 @@ export function VersionsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent closeLabel={tc('close')} className="max-w-[880px]">
+      <DialogContent
+        closeLabel={tc('close')}
+        className="max-w-[880px]"
+        onCloseAutoFocus={(e) => {
+          if (!returnFocus?.current) return;
+          e.preventDefault();
+          returnFocus.current.focus();
+        }}
+      >
         <DialogTitle>{t('title')}</DialogTitle>
         <DialogDescription>{t('description')}</DialogDescription>
         {failed ? (

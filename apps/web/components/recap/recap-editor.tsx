@@ -115,7 +115,10 @@ export function VersionLine({
       new Date(iso),
     );
   return (
-    <div className="flex flex-wrap items-center gap-x-1 border-b border-line-subtle px-5 py-2.5 text-xs leading-[1.6] text-muted-foreground max-shell:px-4">
+    <div
+      data-testid="recap-version"
+      className="flex flex-wrap items-center gap-x-1 border-b border-line-subtle px-5 py-2.5 text-xs leading-[1.6] text-muted-foreground max-shell:px-4"
+    >
       <span>{line}</span>
       {save && (
         <span role="status" aria-live="polite" className="contents">
@@ -216,7 +219,9 @@ function ToolButton({
   disabled,
   children,
   wide,
+  buttonRef,
 }: {
+  buttonRef?: React.Ref<HTMLButtonElement>;
   label: string;
   pressed?: boolean;
   onClick: () => void;
@@ -226,13 +231,14 @@ function ToolButton({
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-label={wide ? undefined : label}
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[4px] text-[13px] transition-colors hover:bg-secondary disabled:opacity-50 max-shell:min-h-11',
+        'inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[4px] text-[13px] transition-[background-color,color] hover:bg-secondary disabled:opacity-50 max-shell:min-h-11',
         wide ? 'px-2 text-xs text-muted-foreground' : 'w-8 max-shell:w-11',
         pressed && 'bg-accent text-accent-foreground',
       )}
@@ -269,6 +275,7 @@ export function RecapEditor(props: RecapEditorProps) {
   const [offered, setOffered] = useState<LocalDraft | null>(null);
   const [hover, setHover] = useState<{ pos: number; size: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const linkButton = useRef<HTMLButtonElement>(null);
   const pendingImage = useRef<Range | null>(null);
 
   const read = useCallback(
@@ -634,6 +641,7 @@ export function RecapEditor(props: RecapEditorProps) {
             <List aria-hidden="true" className="size-4" strokeWidth={1.5} />
           </ToolButton>
           <ToolButton
+            buttonRef={linkButton}
             label={t('toolbar.link')}
             pressed={active?.link}
             onClick={() => setLinkOpen(true)}
@@ -661,6 +669,8 @@ export function RecapEditor(props: RecapEditorProps) {
             <button
               type="button"
               aria-label={te('handle.add')}
+              // A mouse affordance; the keyboard has the `/` menu.
+              tabIndex={-1}
               className="recap-handle-button"
               onClick={() => {
                 if (!hover) return;
@@ -720,7 +730,14 @@ export function RecapEditor(props: RecapEditorProps) {
             label={te('menu.mentions')}
             empty={te('menu.noPeople')}
           />
-          {editor && <LinkDialog open={linkOpen} onOpenChange={setLinkOpen} editor={editor} />}
+          {editor && (
+            <LinkDialog
+              open={linkOpen}
+              onOpenChange={setLinkOpen}
+              editor={editor}
+              returnFocus={linkButton}
+            />
+          )}
         </>
       )}
     </ViewContext.Provider>
@@ -740,23 +757,29 @@ function LinkDialog({
   open,
   onOpenChange,
   editor,
+  returnFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editor: Editor;
+  /** Cancelled: focus goes back to the toolbar's Link button. Applied: to the document. */
+  returnFocus: React.RefObject<HTMLButtonElement | null>;
 }) {
+  const applied = useRef(false);
   const t = useTranslations('editor.link');
   const tc = useTranslations('common');
   const [value, setValue] = useState('');
   const [error, setError] = useState(false);
   useEffect(() => {
     if (open) {
+      applied.current = false;
       setValue(String(editor.getAttributes('link').href ?? ''));
       setError(false);
     }
   }, [open, editor]);
   const apply = () => {
     const href = value.trim();
+    applied.current = true;
     if (!href) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       onOpenChange(false);
@@ -764,6 +787,7 @@ function LinkDialog({
     }
     const url = /^[a-z]+:/i.test(href) ? href : `https://${href}`;
     if (!/^(https?:|mailto:)/i.test(url)) {
+      applied.current = false;
       setError(true);
       return;
     }
@@ -781,7 +805,14 @@ function LinkDialog({
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent closeLabel={tc('close')}>
+      <DialogContent
+        closeLabel={tc('close')}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          if (applied.current) editor.commands.focus();
+          else returnFocus.current?.focus();
+        }}
+      >
         <DialogTitle>{t('title')}</DialogTitle>
         <DialogDescription>{t('help')}</DialogDescription>
         <form

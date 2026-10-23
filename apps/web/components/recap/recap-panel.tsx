@@ -192,6 +192,7 @@ export function RecapPanel(props: RecapPanelProps) {
     setLastAi(props.lastAi);
   }
   const adoptRef = useRef<((version: VersionView, bodyMd: string) => void) | null>(null);
+  const versionsButton = useRef<HTMLButtonElement>(null);
 
   const drafting = recap?.status === 'drafting' && !recap.stale;
 
@@ -238,7 +239,13 @@ export function RecapPanel(props: RecapPanelProps) {
         )}
       </span>
       <span className="inline-flex flex-wrap items-center gap-1">
-        <Button variant="quiet" className="text-xs" onClick={() => setVersionsOpen(true)}>
+        <Button
+          ref={versionsButton}
+          variant="quiet"
+          className="text-xs"
+          aria-haspopup="dialog"
+          onClick={() => setVersionsOpen(true)}
+        >
           <History aria-hidden="true" className="size-4" />
           {t('versionsButton')}
         </Button>
@@ -294,6 +301,7 @@ export function RecapPanel(props: RecapPanelProps) {
       <VersionsDialog
         open={versionsOpen}
         onOpenChange={setVersionsOpen}
+        returnFocus={versionsButton}
         meetingId={meetingId}
         owner={owner}
         currentId={props.current.id}
