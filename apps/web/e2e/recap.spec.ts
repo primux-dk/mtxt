@@ -32,16 +32,23 @@ const KEY = 'ZTJlLXNldHRpbmdzLWtleS1ub3QtYS1zZWNyZXQtMDE='; // e2e/e2e.vars SETT
 const colleague = SESSION_HEADERS.colleague;
 const TEMPLATE = '# Produktionsmøde\n\n## Status\n\n## Beslutninger\n\n## Næste skridt\n';
 
-const recapControl = (request: APIRequestContext, mode: 'completed' | 'error' | 'unauthorised') =>
-  request.post('/api/test/fake-recap/control', { data: { mode } });
+const recapControl = (
+  request: APIRequestContext,
+  mode: 'completed' | 'error' | 'unauthorised',
+  decisions?: string[],
+) => request.post('/api/test/fake-recap/control', { data: { mode, decisions } });
 
 /** A meeting of the colleague with an 80-second recording, transcribed by the fake AssemblyAI. */
-async function transcribed(request: APIRequestContext, title: string) {
+async function transcribed(
+  request: APIRequestContext,
+  title: string,
+  startedAt = '2026-10-22T09:00:00Z',
+) {
   const audio = wav(80);
   const created = await request.post('/api/v1/recordings', {
     headers: colleague,
     data: {
-      meeting: { title, started_at: '2026-10-22T09:00:00Z' },
+      meeting: { title, started_at: startedAt },
       duration_s: 80,
       sha256: sha256(audio),
       size_bytes: audio.length,
@@ -76,8 +83,8 @@ const recapRow = (meetingId: string) =>
   )[0];
 
 /** A transcribed meeting with its AI draft, v1. */
-async function drafted(request: APIRequestContext, title: string) {
-  const meetingId = await transcribed(request, title);
+async function drafted(request: APIRequestContext, title: string, startedAt?: string) {
+  const meetingId = await transcribed(request, title, startedAt);
   await expect.poll(() => versionsOf(meetingId).length, { timeout: 30_000 }).toBe(1);
   return meetingId;
 }
@@ -123,7 +130,7 @@ test.beforeAll(async ({ baseURL }) => {
 });
 
 test.afterAll(() => {
-  d1(`update settings set stt_provider = NULL, stt_api_key = NULL`);
+  d1(`update settings set stt_provider = NULL, stt_api_key = NULL, time_zone = 'UTC'`);
   d1(`update templates set is_default = 0 where id = 'e2e-recap-template'`);
 });
 
@@ -354,6 +361,115 @@ test('a refused save rolls back its own ticks, even after an earlier save landed
   );
   expect(Boolean(row!.done)).toBe(was);
   await page.unroute('**/api/v1/meetings/*/recap');
+});
+
+const decisionRow = (meeting: string, position = 0) =>
+  d1<{ due_on: string | null; text: string }>(
+    `select d.due_on, d.text from decisions d join recaps r on r.id = d.recap_id
+     where r.meeting_id = '${meeting}' and d.position = ${position}`,
+  )[0];
+const dueButton = (page: Page) =>
+  page.getByRole('button', { name: /^(Add due date|Due \d{1,2} \w{3}), / }).first();
+const dueDialog = (page: Page) => page.getByRole('dialog', { name: /^Due date for / });
+
+test('the owner sets, changes and clears a due date; each is a save, and a refused one rolls back (rule 2)', async ({
+  page,
+}) => {
+  await page.goto(`/meetings/${meetingId}`);
+  await expect(status(page)).toContainText('Saved');
+  // The meeting's date is gone from the item; the owner gets the muted affordance.
+  const meta = page.getByTestId('decision-meta').first();
+  await expect(meta).not.toContainText('22 Oct');
+  await expect(dueButton(page)).toHaveText('Add due date');
+
+  // Set.
+  await dueButton(page).click();
+  await expect(dueDialog(page)).toBeVisible();
+  await dueDialog(page).getByLabel('Due date').fill('2026-10-30');
+  await dueDialog(page).getByRole('button', { name: 'Save' }).click();
+  await expect(dueDialog(page)).toBeHidden();
+  await expect(dueButton(page)).toHaveText('Due 30 Oct');
+  await expect(dueButton(page)).toBeFocused();
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+  await expect.poll(() => decisionRow(meetingId)?.due_on).toBe('2026-10-30');
+  expect(recapRow(meetingId)!.body_md).toMatch(/^- \[[ x]\] .* ~2026-10-30$/m);
+
+  // Change, with the keyboard: Enter opens, Enter in the field saves.
+  await dueButton(page).focus();
+  await page.keyboard.press('Enter');
+  const field = dueDialog(page).getByLabel('Due date');
+  await expect(field).toHaveValue('2026-10-30');
+  await field.fill('2026-11-02');
+  await field.press('Enter');
+  await expect(dueButton(page)).toHaveText('Due 2 Nov');
+  await expect.poll(() => decisionRow(meetingId)?.due_on).toBe('2026-11-02');
+
+  // Escape leaves it as it was.
+  await dueButton(page).click();
+  await dueDialog(page).getByLabel('Due date').fill('2026-12-24');
+  await page.keyboard.press('Escape');
+  await expect(dueDialog(page)).toBeHidden();
+  await expect(dueButton(page)).toHaveText('Due 2 Nov');
+  await expect(dueButton(page)).toBeFocused();
+
+  // Refused: the date goes back to what the server has, and the line says so.
+  await page.route('**/api/v1/meetings/*/recap', (route) =>
+    route.request().method() === 'PUT'
+      ? route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'forbidden', message: 'No.' } }),
+        })
+      : route.continue(),
+  );
+  await dueButton(page).click();
+  await dueDialog(page).getByLabel('Due date').fill('2026-11-05');
+  await dueDialog(page).getByRole('button', { name: 'Save' }).click();
+  await expect(dueButton(page)).toHaveText('Due 2 Nov');
+  await expect(status(page)).toContainText('the server refused the save');
+  await expect(status(page)).toContainText('the due date was undone');
+  await page.unroute('**/api/v1/meetings/*/recap');
+  expect(decisionRow(meetingId)?.due_on).toBe('2026-11-02');
+
+  // Clear.
+  await dueButton(page).click();
+  await dueDialog(page).getByRole('button', { name: 'Clear due date' }).click();
+  await expect(dueButton(page)).toHaveText('Add due date');
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+  await expect.poll(() => decisionRow(meetingId)?.due_on).toBeNull();
+  expect(recapRow(meetingId)!.body_md).not.toMatch(/~\d{4}-\d{2}-\d{2}/);
+  // After a reload the item reads as the server has it.
+  await page.reload();
+  await expect(dueButton(page)).toHaveText('Add due date');
+});
+
+test('a draft whose decisions say "på torsdag" and "i morgen" gets their dates, on the install time zone', async ({
+  page,
+  request,
+}) => {
+  // Sunday 18 October 22:30 UTC is Monday 19 October in Copenhagen.
+  d1(`update settings set time_zone = 'Europe/Copenhagen'`);
+  await recapControl(request, 'completed', [
+    'Jonas tester det nye skift på torsdag @Speaker 2',
+    'Anne samler tallene i morgen @Speaker 3',
+    'Vi tager den næste fredag @Speaker 1',
+  ]);
+  const meeting = await drafted(request, 'Fristmøde', '2026-10-18T22:30:00Z');
+  const sent = await (await request.get('/api/test/fake-recap/control')).json();
+  expect(sent.last.user).toMatch(/^Meeting date: Monday 2026-10-19\n/);
+  expect(decisionRow(meeting, 0)?.due_on).toBe('2026-10-22');
+  expect(decisionRow(meeting, 1)?.due_on).toBe('2026-10-20');
+  // "næste fredag" could be either Friday: no date.
+  expect(decisionRow(meeting, 2)?.due_on).toBeNull();
+  expect(recapRow(meeting)!.body_md).toMatch(
+    /^- \[ \] Jonas tester det nye skift på torsdag \[@Speaker 2\]\(mtxt:speaker\/[a-f0-9-]+\) ~2026-10-22$/m,
+  );
+  await page.goto(`/meetings/${meeting}`);
+  const metas = page.getByTestId('decision-meta');
+  await expect(metas.nth(0)).toHaveText('Speaker 2 · Due 22 Oct');
+  await expect(metas.nth(1)).toHaveText('Speaker 3 · Due 20 Oct');
+  await expect(metas.nth(2)).toHaveText('Speaker 1 · Add due date');
+  d1(`update settings set time_zone = 'UTC'`);
 });
 
 test('after the server turns an unknown mention into text, typing goes on where the caret was', async ({
@@ -814,4 +930,32 @@ test('screenshots at 1280 and 390: the editor, the / menu, versions, export; the
     await settle(page);
     await page.screenshot({ path: shot(`recap-long-decisions-${name}`) });
   }
+});
+
+test('screenshots at 1280 and 390: decisions with their owner and due date, and the date picker', async ({
+  page,
+  context,
+}) => {
+  // Figure 04's recap: one decision due 29 Oct, one with none. Only looked at.
+  await asDev(context);
+  for (const [name, size] of [
+    ['desktop', DESKTOP],
+    ['phone', PHONE],
+  ] as const) {
+    await page.setViewportSize(size);
+    await page.goto('/meetings/demo-0000');
+    const decisions = editor(page).locator('ul[data-decisions]');
+    await expect(page.getByTestId('decision-meta').first()).toHaveText('Jonas Skov · Due 29 Oct');
+    await expect(page.getByTestId('decision-meta').nth(1)).toHaveText('Anne Holm · Add due date');
+    await decisions.scrollIntoViewIfNeeded();
+    await settle(page);
+    await decisions.screenshot({ path: shot(`recap-decisions-due-${name}`) });
+    await dueButton(page).click();
+    await expect(dueDialog(page)).toBeVisible();
+    await settle(page);
+    await page.screenshot({ path: shot(`recap-due-picker-${name}`) });
+    await page.keyboard.press('Escape');
+    await expect(dueDialog(page)).toBeHidden();
+  }
+  expect(versionsOf('demo-0000')).toHaveLength(4);
 });
