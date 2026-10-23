@@ -177,7 +177,6 @@
       "failed": "The title was not saved. It is back to the last saved title."
     },
     "noRecording": "No recording",
-    "exportLater": "Coming in packet 5",
     "more": "More actions",
     "archive": {
       "action": "Archive",
@@ -208,12 +207,6 @@
         "title": "No recording yet",
         "body": "Upload a recording to this meeting to get a transcript.",
         "action": "Upload a recording"
-      }
-    },
-    "recap": {
-      "pending": {
-        "title": "No recap yet",
-        "body": "The recap is written after the transcript."
       }
     },
     "recordings": {
@@ -309,13 +302,23 @@
   "recap": {
     "template": {
       "heading": "Recap template",
-      "label": "Choose recap template"
+      "label": "Choose recap template",
+      "default": "Install default",
+      "failed": "The template was not changed. Try again."
     },
-    "versions": "AI draft v1, edited by {name} v{version}",
+    "versions": "AI draft v{ai}, edited by {name} v{version}",
     "status": {
       "saving": "Saving",
       "saved": "Saved",
-      "notSaved": "Not saved"
+      "notSaved": "Not saved",
+      "changedElsewhere": "Changed elsewhere",
+      "changedBy": "Changed elsewhere by {name}, {time}",
+      "reload": "Reload",
+      "problem": {
+        "offline": "no network, kept in this browser",
+        "too_long": "too long to save",
+        "refused": "the server refused the save"
+      }
     },
     "toolbar": {
       "label": "Recap formatting",
@@ -327,9 +330,54 @@
       "undo": "Undo"
     },
     "decision": {
-      "markDone": "Mark as done: {task}"
+      "markDone": "Mark as done: {task}",
+      "untitled": "an empty decision"
     },
-    "editorHint": "Type / for blocks. Use @ for colleagues."
+    "editorHint": "Type / for blocks. Use @ for colleagues.",
+    "versionLine": {
+      "ai": "AI draft v{version}",
+      "human": "Written by {name}, v{version}",
+      "someone": "a colleague",
+      "aiName": "the AI"
+    },
+    "placeholder": "Write the recap. Type / for blocks.",
+    "editorLabel": "Recap",
+    "readerLabel": "Recap, read only",
+    "local": {
+      "offer": "Text you wrote at {time} was not saved, and the recap has changed since.",
+      "use": "Use my text",
+      "discard": "Discard it"
+    },
+    "versionsButton": "Versions",
+    "draft": {
+      "drafting": "Drafting the recap",
+      "draftingBody": "The AI writes the first draft from the transcript and the template. It shows here when it is done.",
+      "start": "Draft it now",
+      "failed": "The recap could not be drafted",
+      "failedBody": "The language model did not answer.",
+      "tryAgain": "Try again",
+      "askOwner": "The meeting's owner can try again.",
+      "regenerate": "Regenerate draft",
+      "newVersion": "Drafting a new version. The current one stays in Versions.",
+      "newFailed": "The new draft failed. {reason}",
+      "noTranscript": "There is no transcript to draft from yet.",
+      "couldNotStart": "The draft could not be started. Try again."
+    },
+    "pending": {
+      "title": "No recap yet",
+      "body": "The recap is written after the transcript."
+    },
+    "reason": {
+      "unauthorised": "The recap model refused the API key{status, select, none {} other { (HTTP {status})}}.",
+      "rate_limited": "The recap model was busy and refused more requests{status, select, none {} other { (HTTP {status})}}.",
+      "provider_error": "The recap model had an error{status, select, none {} other { (HTTP {status})}}.",
+      "timeout": "The recap model did not answer in time.",
+      "refused": "The recap model declined to write this recap.",
+      "empty": "The recap model answered with no text.",
+      "config": "A setting the recap model needs is missing or wrong.",
+      "no_transcript": "There is no transcript to draft from.",
+      "internal": "The installation had an error while it drafted the recap."
+    }
   },
   "recorder": {
     "meetingTitle": "Meeting title",
@@ -827,6 +875,87 @@
         "body": "The log did not load. Check the connection and try again.",
         "retry": "Try again"
       }
+    }
+  },
+  "editor": {
+    "block": {
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "bulletList": "Bulleted list",
+      "orderedList": "Numbered list",
+      "checklist": "Checklist",
+      "decisions": "Decisions",
+      "quote": "Quote",
+      "note": "Note",
+      "warning": "Warning",
+      "toggle": "Toggle",
+      "toc": "Table of contents",
+      "table": "Table",
+      "divider": "Divider",
+      "code": "Code",
+      "image": "Image"
+    },
+    "toc": {
+      "empty": "Add headings to fill the table of contents.",
+      "untitled": "Untitled heading"
+    },
+    "menu": {
+      "blocks": "Blocks",
+      "noBlocks": "No block matches",
+      "mentions": "Colleagues and speakers",
+      "noPeople": "Nobody matches"
+    },
+    "mention": {
+      "speaker": "Speaker in this meeting"
+    },
+    "handle": {
+      "add": "Add a block below",
+      "drag": "Drag to move the block"
+    },
+    "image": {
+      "uploading": "Adding the image",
+      "failed": "The image could not be added. Use a PNG, JPEG, GIF or WebP file of at most 10 MB."
+    },
+    "link": {
+      "title": "Link",
+      "help": "The address the selected text links to. Leave it empty to remove the link.",
+      "field": "Address",
+      "invalid": "Use an address that starts with https://, http:// or mailto:.",
+      "apply": "Apply"
+    }
+  },
+  "export": {
+    "button": "Export",
+    "title": "Export the recap",
+    "description": "Download the current version.",
+    "none": "There is no recap to export yet.",
+    "md": {
+      "label": "Markdown (.md)",
+      "help": "The recap as it is stored, for other tools."
+    },
+    "docx": {
+      "label": "Word (.docx)",
+      "help": "For sharing and printing."
+    }
+  },
+  "versions": {
+    "title": "Versions",
+    "description": "Every save is a version. Restore makes a new version from an older one; nothing is lost.",
+    "list": "Versions, newest first",
+    "item": "v{version}, {who}",
+    "ai": "AI draft",
+    "someone": "a colleague",
+    "current": "Current",
+    "preview": "Version {version}",
+    "previewNone": "Preview",
+    "loading": "Loading",
+    "loadFailed": "The versions could not be loaded. Close and try again.",
+    "restore": "Restore v{version}",
+    "restoreFailed": "The version was not restored. Try again.",
+    "note": {
+      "restored": "Restored from v{version}",
+      "chunked": "Drafted from summaries of {parts} parts of the transcript"
     }
   }
 }

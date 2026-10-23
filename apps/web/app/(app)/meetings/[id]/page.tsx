@@ -1,4 +1,4 @@
-import { Download, FileText, Loader, MicOff, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { FileText, Loader, MicOff, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -18,6 +18,9 @@ import { RefreshWhile } from '@/components/meeting/refresh-while';
 import { VisibilityControl } from '@/components/meeting/visibility-control';
 import { VisibilityBadge } from '@/components/meetings/badges';
 import { TranscriptView } from '@/components/transcript/transcript-view';
+import { ExportDialog } from '@/components/recap/export-dialog';
+import { RecapPanel } from '@/components/recap/recap-panel';
+import { recapPanelData } from '@/lib/recap/panel-data';
 import { formatClock, formatDuration } from '@/components/meetings/format';
 import { Button } from '@/components/ui/button';
 import { UploadButton } from '@/components/upload/new-meeting-menu';
@@ -74,7 +77,7 @@ function PanelState({
   A meeting (figure 04, figure 10 on a phone): title, metadata, the actions
   row, the player, and Recap and Transcript as tabs. The transcript tab has
   four states (rule 8): transcribing, failed with its two next steps (rule
-  9), the transcript, and no speech. The recap arrives in packet 5.
+  9), the transcript, and no speech. The recap tab is components/recap.
   `?t=1834` opens the transcript tab with the player at 30:34 (rule 5).
 */
 export default async function MeetingPage({ params, searchParams }: Props) {
@@ -94,7 +97,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
   }
 
   const { meeting, access, recordings, current, hasRecap, hasTranscript, shares } = detail;
-  const [t, tr, ts, tf, tlocale, tt, tstt, settings, view, keyterms] = await Promise.all([
+  const [t, tr, ts, tf, tlocale, tt, tstt, settings, view, keyterms, trecap] = await Promise.all([
     getTranslations('meeting'),
     getTranslations('retention'),
     getTranslations('status'),
@@ -105,7 +108,15 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     getInstallSettings(),
     current ? loadTranscript(db, installId, meeting.id, current.id) : Promise.resolve(null),
     keytermList(db, installId),
+    getTranslations('recap'),
   ]);
+  const recapData = await recapPanelData(
+    db,
+    installId,
+    meeting,
+    access === 'owner',
+    trecap as unknown as Parameters<typeof recapPanelData>[4],
+  );
   const intl = tlocale('intl');
   const owner = access === 'owner';
   const state = meetingState(current?.status);
@@ -275,9 +286,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     );
   })();
 
-  const recapPanel = (
-    <PanelState Icon={FileText} title={t('recap.pending.title')} body={t('recap.pending.body')} />
-  );
+  const recapPanel = <RecapPanel meetingId={meeting.id} owner={owner} {...recapData} />;
 
   const meta = [
     <LocalTime key="date" date={meeting.startedAt} options={{ dateStyle: 'long' }} />,
@@ -329,21 +338,8 @@ export default async function MeetingPage({ params, searchParams }: Props) {
           )}
           {owner && <KeepToggle />}
           <div className="grow" />
-          {/* The primary action, disabled until export exists (rule 10). */}
-          <span title={t('exportLater')}>
-            <Button
-              variant="primary"
-              disabled
-              aria-describedby="export-later"
-              className="max-shell:text-xs"
-            >
-              <Download aria-hidden="true" />
-              {t('export')}
-            </Button>
-            <span id="export-later" className="sr-only">
-              {t('exportLater')}
-            </span>
-          </span>
+          {/* The primary action (rule 10): Markdown or Word, for anyone who may read the recap. */}
+          <ExportDialog meetingId={meeting.id} available={Boolean(recapData.current)} />
           {owner && (
             <MeetingMenu
               meetingId={meeting.id}

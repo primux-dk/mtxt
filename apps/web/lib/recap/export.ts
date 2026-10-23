@@ -15,7 +15,6 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
 export function exportFileName(title: string, startedAt: Date, format: ExportFormat): string {
   const safe = title
     .normalize('NFC')
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

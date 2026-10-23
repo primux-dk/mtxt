@@ -17,7 +17,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import Image from '@tiptap/extension-image';
-import Mention from '@tiptap/extension-mention';
+import Mention, { type MentionOptions } from '@tiptap/extension-mention';
 import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
 
 export const CALLOUT_KINDS = ['note', 'warning'] as const;
@@ -107,28 +107,34 @@ export const DecisionItem = Node.create({
 /** `user:<id>` names a colleague, `speaker:<id>` one of the meeting's speakers. */
 export const MENTION_ID = /^(user|speaker):([A-Za-z0-9_-]{1,64})$/;
 
-export const RecapMention = Mention.extend({
-  // A mention keeps its label as written; the reader's view shows the colleague's current name.
-  renderText({ node }) {
-    return `@${node.attrs.label ?? ''}`;
-  },
-}).configure({
-  HTMLAttributes: { class: 'mention' },
-  renderHTML({ options, node }) {
-    return ['span', mergeAttributes(options.HTMLAttributes), `@${node.attrs.label ?? ''}`];
-  },
-});
+/** The mention node; the client passes its `@` suggestion. */
+export function recapMention(suggestion?: MentionOptions['suggestion']) {
+  return Mention.extend({
+    renderText({ node }) {
+      return `@${node.attrs.label ?? ''}`;
+    },
+  }).configure({
+    HTMLAttributes: { class: 'mention' },
+    renderHTML({ options, node }) {
+      return ['span', mergeAttributes(options.HTMLAttributes), `@${node.attrs.label ?? ''}`];
+    },
+    deleteTriggerWithBackspace: true,
+    ...(suggestion ? { suggestion } : {}),
+  });
+}
 
 /** Image sources the recap may show: the meeting's own permission-checked image route, nothing remote. */
 export const IMAGE_SRC =
   /^\/api\/v1\/meetings\/[A-Za-z0-9_-]{1,64}\/recap\/images\/[a-f0-9-]{36}\.(png|jpg|gif|webp)$/;
 
 /**
- * The extensions that define the schema. `mention` is the one the client
- * reconfigures with its `@` suggestion; the rest are used as they are.
+ * The extensions that define the schema. The client replaces some by name
+ * (`overrides`) with node views and its `@` suggestion; the schema stays the same.
  */
-export function recapExtensions(options: { mention?: AnyExtension } = {}): AnyExtension[] {
-  return [
+export function recapExtensions(
+  options: { overrides?: Record<string, AnyExtension> } = {},
+): AnyExtension[] {
+  const list: AnyExtension[] = [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
       underline: false,
@@ -148,7 +154,7 @@ export function recapExtensions(options: { mention?: AnyExtension } = {}): AnyEx
     TableHeader,
     TableCell,
     Image.configure({ inline: false, allowBase64: false }),
-    options.mention ?? RecapMention,
+    recapMention(),
     Details.configure({ persist: false, HTMLAttributes: { class: 'details' } }),
     DetailsSummary,
     DetailsContent,
@@ -157,4 +163,6 @@ export function recapExtensions(options: { mention?: AnyExtension } = {}): AnyEx
     DecisionList,
     DecisionItem,
   ];
+  const overrides = options.overrides ?? {};
+  return list.map((extension) => overrides[extension.name] ?? extension);
 }

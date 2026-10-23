@@ -177,7 +177,6 @@
       "failed": "Titlen blev ikke gemt. Den sidst gemte titel er tilbage."
     },
     "noRecording": "Ingen optagelse",
-    "exportLater": "Kommer i pakke 5",
     "more": "Flere handlinger",
     "archive": {
       "action": "Arkivér",
@@ -208,12 +207,6 @@
         "title": "Ingen optagelse endnu",
         "body": "Upload en optagelse til mødet for at få en transskription.",
         "action": "Upload en optagelse"
-      }
-    },
-    "recap": {
-      "pending": {
-        "title": "Intet referat endnu",
-        "body": "Referatet skrives efter transskriptionen."
       }
     },
     "recordings": {
@@ -309,13 +302,23 @@
   "recap": {
     "template": {
       "heading": "Referatskabelon",
-      "label": "Vælg referatskabelon"
+      "label": "Vælg referatskabelon",
+      "default": "Installationens standard",
+      "failed": "Skabelonen blev ikke ændret. Prøv igen."
     },
-    "versions": "AI-udkast v1, redigeret af {name} v{version}",
+    "versions": "AI-udkast v{ai}, redigeret af {name} v{version}",
     "status": {
       "saving": "Gemmer",
       "saved": "Gemt",
-      "notSaved": "Ikke gemt"
+      "notSaved": "Ikke gemt",
+      "changedElsewhere": "Ændret et andet sted",
+      "changedBy": "Ændret et andet sted af {name}, {time}",
+      "reload": "Genindlæs",
+      "problem": {
+        "offline": "intet netværk, gemt i denne browser",
+        "too_long": "for langt til at gemme",
+        "refused": "serveren afviste at gemme"
+      }
     },
     "toolbar": {
       "label": "Referatformatering",
@@ -327,9 +330,54 @@
       "undo": "Fortryd"
     },
     "decision": {
-      "markDone": "Markér som færdig: {task}"
+      "markDone": "Markér som færdig: {task}",
+      "untitled": "en tom beslutning"
     },
-    "editorHint": "Skriv / for blokke. Brug @ til kolleger."
+    "editorHint": "Skriv / for blokke. Brug @ til kolleger.",
+    "versionLine": {
+      "ai": "AI-udkast v{version}",
+      "human": "Skrevet af {name}, v{version}",
+      "someone": "en kollega",
+      "aiName": "AI'en"
+    },
+    "placeholder": "Skriv referatet. Skriv / for blokke.",
+    "editorLabel": "Referat",
+    "readerLabel": "Referat, kun læsning",
+    "local": {
+      "offer": "Tekst, du skrev {time}, blev ikke gemt, og referatet er ændret siden.",
+      "use": "Brug min tekst",
+      "discard": "Kassér den"
+    },
+    "versionsButton": "Versioner",
+    "draft": {
+      "drafting": "Referatet skrives",
+      "draftingBody": "AI'en skriver det første udkast ud fra transskriptionen og skabelonen. Det vises her, når det er færdigt.",
+      "start": "Skriv udkast nu",
+      "failed": "Referatet kunne ikke skrives",
+      "failedBody": "Sprogmodellen svarede ikke.",
+      "tryAgain": "Prøv igen",
+      "askOwner": "Mødets ejer kan prøve igen.",
+      "regenerate": "Skriv nyt udkast",
+      "newVersion": "Et nyt udkast skrives. Den nuværende version bliver i Versioner.",
+      "newFailed": "Det nye udkast mislykkedes. {reason}",
+      "noTranscript": "Der er endnu ingen transskription at skrive ud fra.",
+      "couldNotStart": "Udkastet kunne ikke startes. Prøv igen."
+    },
+    "pending": {
+      "title": "Intet referat endnu",
+      "body": "Referatet skrives efter transskriptionen."
+    },
+    "reason": {
+      "unauthorised": "Referatmodellen afviste API-nøglen{status, select, none {} other { (HTTP {status})}}.",
+      "rate_limited": "Referatmodellen havde travlt og afviste flere forespørgsler{status, select, none {} other { (HTTP {status})}}.",
+      "provider_error": "Referatmodellen havde en fejl{status, select, none {} other { (HTTP {status})}}.",
+      "timeout": "Referatmodellen svarede ikke i tide.",
+      "refused": "Referatmodellen afslog at skrive dette referat.",
+      "empty": "Referatmodellen svarede uden tekst.",
+      "config": "En indstilling, som referatmodellen skal bruge, mangler eller er forkert.",
+      "no_transcript": "Der er ingen transskription at skrive ud fra.",
+      "internal": "Installationen fik en fejl, mens den skrev referatet."
+    }
   },
   "recorder": {
     "meetingTitle": "Mødetitel",
@@ -827,6 +875,87 @@
         "body": "Loggen blev ikke hentet. Tjek forbindelsen, og prøv igen.",
         "retry": "Prøv igen"
       }
+    }
+  },
+  "editor": {
+    "block": {
+      "heading1": "Overskrift 1",
+      "heading2": "Overskrift 2",
+      "heading3": "Overskrift 3",
+      "bulletList": "Punktopstilling",
+      "orderedList": "Nummereret liste",
+      "checklist": "Tjekliste",
+      "decisions": "Beslutninger",
+      "quote": "Citat",
+      "note": "Note",
+      "warning": "Advarsel",
+      "toggle": "Fold ud",
+      "toc": "Indholdsfortegnelse",
+      "table": "Tabel",
+      "divider": "Skillelinje",
+      "code": "Kode",
+      "image": "Billede"
+    },
+    "toc": {
+      "empty": "Tilføj overskrifter for at fylde indholdsfortegnelsen.",
+      "untitled": "Overskrift uden tekst"
+    },
+    "menu": {
+      "blocks": "Blokke",
+      "noBlocks": "Ingen blok passer",
+      "mentions": "Kolleger og talere",
+      "noPeople": "Ingen passer"
+    },
+    "mention": {
+      "speaker": "Taler i dette møde"
+    },
+    "handle": {
+      "add": "Tilføj en blok nedenfor",
+      "drag": "Træk for at flytte blokken"
+    },
+    "image": {
+      "uploading": "Tilføjer billedet",
+      "failed": "Billedet kunne ikke tilføjes. Brug en PNG-, JPEG-, GIF- eller WebP-fil på højst 10 MB."
+    },
+    "link": {
+      "title": "Link",
+      "help": "Adressen, som den markerede tekst linker til. Lad feltet stå tomt for at fjerne linket.",
+      "field": "Adresse",
+      "invalid": "Brug en adresse, der begynder med https://, http:// eller mailto:.",
+      "apply": "Anvend"
+    }
+  },
+  "export": {
+    "button": "Eksportér",
+    "title": "Eksportér referatet",
+    "description": "Hent den nuværende version.",
+    "none": "Der er endnu intet referat at eksportere.",
+    "md": {
+      "label": "Markdown (.md)",
+      "help": "Referatet, som det er gemt, til andre værktøjer."
+    },
+    "docx": {
+      "label": "Word (.docx)",
+      "help": "Til deling og udskrift."
+    }
+  },
+  "versions": {
+    "title": "Versioner",
+    "description": "Hver gang der gemmes, bliver det en version. Gendan laver en ny version ud fra en ældre; intet går tabt.",
+    "list": "Versioner, nyeste først",
+    "item": "v{version}, {who}",
+    "ai": "AI-udkast",
+    "someone": "en kollega",
+    "current": "Nuværende",
+    "preview": "Version {version}",
+    "previewNone": "Forhåndsvisning",
+    "loading": "Indlæser",
+    "loadFailed": "Versionerne kunne ikke indlæses. Luk og prøv igen.",
+    "restore": "Gendan v{version}",
+    "restoreFailed": "Versionen blev ikke gendannet. Prøv igen.",
+    "note": {
+      "restored": "Gendannet fra v{version}",
+      "chunked": "Skrevet ud fra resuméer af {parts} dele af transskriptionen"
     }
   }
 }

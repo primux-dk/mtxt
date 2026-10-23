@@ -247,14 +247,12 @@ async function block(node: PmNode, ctx: Ctx, style: Style = {}): Promise<Block[]
       return out;
     }
     case 'codeBlock':
-      return node.textContent
-        .split('\n')
-        .map((line) =>
-          paragraph([new TextRun({ text: line || ' ', font: MONO, size: 20 })], {
-            ...plain,
-            shading: SHADE.code,
-          }),
-        );
+      return node.textContent.split('\n').map((line) =>
+        paragraph([new TextRun({ text: line || ' ', font: MONO, size: 20 })], {
+          ...plain,
+          shading: SHADE.code,
+        }),
+      );
     case 'horizontalRule':
       return [
         new Paragraph({
