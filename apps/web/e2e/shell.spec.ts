@@ -43,6 +43,8 @@ test.describe('keyboard and focus (rule 11)', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'API tokens' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('menu')).toHaveCount(0);
@@ -113,6 +115,8 @@ test.describe('keyboard and focus (rule 11)', () => {
     await userRow.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'API tokens' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
     await page.keyboard.press('Escape');

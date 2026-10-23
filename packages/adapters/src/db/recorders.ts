@@ -11,7 +11,14 @@ import {
   TOKEN_LIFETIME_MS,
 } from '../recorder-auth';
 import type { Db } from './index';
-import { auditEvents, recorderGrants, recorderTokens, users, type RecorderGrant } from './schema';
+import {
+  auditEvents,
+  recorderGrants,
+  recorderTokens,
+  users,
+  type RecorderGrant,
+  type TokenKind,
+} from './schema';
 import { findUser } from './users';
 
 /*
@@ -156,6 +163,10 @@ export async function pollGrant(
           lastUsedAt: value(null, 'last_used_at'),
           expiresAt: value(expiresAt, 'expires_at'),
           revokedAt: value(null, 'revoked_at'),
+          kind: value('recorder', 'kind'),
+          scope: value(null, 'scope'),
+          rateWindowAt: value(null, 'rate_window_at'),
+          rateCount: value(0, 'rate_count'),
         })
         .from(g)
         .where(live),
@@ -197,7 +208,8 @@ export async function pollGrant(
  * The user a bearer token stands for, or null for a token that is unknown,
  * revoked, expired or whose user row is gone. The user row decides, as it
  * does for a session cookie. `last_used_at` is written at most once per
- * LAST_USED_EVERY_MS.
+ * LAST_USED_EVERY_MS. Recorder and API tokens alike; `kind` says which, and
+ * the caller decides what each may reach.
  */
 export async function findRecorderUser(
   db: Db,
@@ -225,7 +237,14 @@ export async function findRecorderUser(
         ),
       );
   }
-  return { user, tokenId: token.id };
+  return {
+    user,
+    tokenId: token.id,
+    kind: token.kind,
+    scope: token.scope,
+    /** The device name, or the API token's name. */
+    name: token.deviceName,
+  };
 }
 
 export interface RecorderConnection {
@@ -257,6 +276,7 @@ export async function listRecorderTokens(
       and(
         eq(tk.installId, installId),
         eq(tk.userId, userId),
+        eq(tk.kind, 'recorder'),
         isNull(tk.revokedAt),
         gt(tk.expiresAt, now),
       ),
@@ -266,22 +286,37 @@ export async function listRecorderTokens(
 }
 
 /**
- * Disconnect: revokes one of the user's own tokens and writes
+ * Disconnect: revokes one of the user's own recorder tokens and writes
  * `recorder_disconnected`, in one batch. Sets a value, so a retry is
- * `already` and writes nothing. Another user's token is `not_found`.
+ * `already` and writes nothing. Another user's token, or an API token, is
+ * `not_found`.
  */
-export async function revokeRecorderToken(
+export const revokeRecorderToken = (
   db: Db,
   installId: string,
   input: { userId: string; tokenId: string; now?: Date },
+) => revokeToken(db, installId, { ...input, kind: 'recorder' });
+
+/**
+ * Revokes one of the user's own tokens of one kind, with its audit row
+ * (`recorder_disconnected` with the device, or `api_token_revoked` with the
+ * token's name) in the same batch. A token of the other kind is `not_found`,
+ * so the Recorders dialog never revokes an API token and the reverse.
+ */
+export async function revokeToken(
+  db: Db,
+  installId: string,
+  input: { userId: string; tokenId: string; kind: TokenKind; now?: Date },
 ): Promise<'revoked' | 'already' | 'not_found'> {
   const now = input.now ?? new Date();
   const own = and(
     eq(tk.installId, installId),
     eq(tk.id, input.tokenId),
     eq(tk.userId, input.userId),
+    eq(tk.kind, input.kind),
   );
   const live = and(own, isNull(tk.revokedAt));
+  const recorder = input.kind === 'recorder';
   const [, revoked] = await db.batch([
     db.insert(auditEvents).select(
       db
@@ -291,8 +326,11 @@ export async function revokeRecorderToken(
           userId: tk.userId,
           meetingId: value(null, 'meeting_id'),
           meetingTitle: value(null, 'meeting_title'),
-          action: value('recorder_disconnected', 'action'),
-          details: sql<string>`json_object('device', ${tk.deviceName})`.as('details'),
+          action: value(recorder ? 'recorder_disconnected' : 'api_token_revoked', 'action'),
+          details: (recorder
+            ? sql<string>`json_object('device', ${tk.deviceName})`
+            : sql<string>`json_object('name', ${tk.deviceName}, 'scope', ${tk.scope})`
+          ).as('details'),
           at: value(now.getTime(), 'at'),
         })
         .from(tk)

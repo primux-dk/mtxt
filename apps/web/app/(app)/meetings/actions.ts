@@ -5,12 +5,11 @@ import {
   auditStatement,
   cleanupEntries,
   finishCleanup,
-  foldTitle,
   recordCleanup,
   schema,
-  syncSearch,
 } from '@mtxt/adapters';
 import { HttpError } from '@/lib/http-error';
+import { renameMeetingRows, setKeepRow } from '@/lib/meetings/changes';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { resetForRetry } from '@/lib/transcription/store';
 import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
@@ -26,24 +25,13 @@ const thisMeeting = (meetingId: string, installId: string) =>
 
 export async function renameMeeting(meetingId: string, title: string): Promise<ActionResult> {
   return outcome(() =>
-    asOwner(meetingId, async ({ db, installId }) => {
-      const clean = title.trim();
-      if (!clean || clean.length > 500)
-        throw new HttpError(400, 'invalid_request', 'Title is 1 to 500 characters.');
-      await db
-        .update(m)
-        .set({ title: clean, titleFolded: foldTitle(clean) })
-        .where(thisMeeting(meetingId, installId));
-      await syncSearch(db, installId, { meetingId, title: clean });
-    }),
+    asOwner(meetingId, ({ db, installId }) => renameMeetingRows(db, installId, meetingId, title)),
   );
 }
 
 export async function setKeep(meetingId: string, keep: boolean): Promise<ActionResult> {
   return outcome(() =>
-    asOwner(meetingId, ({ db, installId }) =>
-      db.update(m).set({ keep }).where(thisMeeting(meetingId, installId)),
-    ),
+    asOwner(meetingId, ({ db, installId }) => setKeepRow(db, installId, meetingId, keep)),
   );
 }
 

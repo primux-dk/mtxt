@@ -6,8 +6,8 @@
   and then its body, the table of contents as the list of headings,
   mentions as plain names, and images from the meeting's own storage.
 
-  Plain TypeScript with no Next.js imports. Packer.toArrayBuffer needs no
-  Node stream, so it runs in a Worker.
+  Plain TypeScript with no Next.js imports. Packing needs no Node stream,
+  so it runs in a Worker, and the same document packs to the same bytes.
 */
 import {
   AlignmentType,
@@ -34,6 +34,8 @@ export interface DocxInput {
   doc: PmNode;
   title: string;
   subtitle?: string;
+  /** The time the file says it was made: the recap version's, so the same version gives the same bytes. */
+  at?: Date;
   /** Bytes and type for an image src; null when it cannot be read. */
   image?: (src: string) => Promise<{ bytes: Uint8Array; type: 'png' | 'jpg' | 'gif' } | null>;
   /** The current name for a mention id (`user:<id>`); the label written in the recap otherwise. */
@@ -392,5 +394,83 @@ export async function recapDocx(input: DocxInput): Promise<Uint8Array<ArrayBuffe
       },
     ],
   });
-  return new Uint8Array(await Packer.toArrayBuffer(document)) as Uint8Array<ArrayBuffer>;
+  return deterministicPack(document, input.at ?? EPOCH);
+}
+
+/** The zip that docx's compiler builds before it is written out: the part of JSZip used here. */
+interface ZipParts {
+  files: Record<string, { dir: boolean; date: Date }>;
+  file(path: string): { async(type: 'string'): Promise<string> } | null;
+  file(path: string, data: string): unknown;
+  generateAsync(options: {
+    type: 'uint8array';
+    mimeType: string;
+    compression: 'DEFLATE';
+  }): Promise<Uint8Array>;
+}
+
+const EPOCH = new Date(Date.UTC(2020, 0, 1));
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/**
+ * The same document gives the same bytes (packet 16 review), so the REST
+ * API's ETag can be a hash of what it sends. `docx` writes three things that
+ * change on every build: a random relationship id per hyperlink, the time in
+ * `docProps/core.xml`, the time on every zip entry, and drawing ids counted
+ * across every document the isolate builds. The parts are taken
+ * from docx's own compiler before they are zipped (`Packer.toArrayBuffer`
+ * runs the same compiler and gives no hook in between); the random ids
+ * become `rIdLink1`, `rIdLink2`… in the order the relationships list them,
+ * both times become `at`, the recap version's time, and drawings are
+ * numbered from 1 in each file.
+ * test/recap-docx.test.ts fails if a docx upgrade moves the compiler.
+ */
+async function deterministicPack(document: Document, at: Date): Promise<Uint8Array<ArrayBuffer>> {
+  const compiler = (
+    Packer as unknown as {
+      compiler?: { compile(file: Document, prettify?: unknown, overrides?: unknown[]): ZipParts };
+    }
+  ).compiler;
+  if (!compiler) throw new Error('docx has no compiler to pack from; check the docx version.');
+  const zip = compiler.compile(document, undefined, []);
+  const paths = Object.keys(zip.files)
+    .filter((path) => !zip.files[path]!.dir)
+    .sort();
+  const text = new Map<string, string>();
+  for (const path of paths.filter((p) => /\.(xml|rels)$/.test(p))) {
+    text.set(path, await zip.file(path)!.async('string'));
+  }
+  // Every relationship id that is not docx's own counted `rIdN`, in the order the rels list them.
+  const ids = new Map<string, string>();
+  for (const [path, xml] of text) {
+    if (!path.endsWith('.rels')) continue;
+    for (const [, id] of xml.matchAll(/\bId="(rId(?!\d+")[^"]+)"/g)) {
+      if (!ids.has(id!)) ids.set(id!, `rIdLink${ids.size + 1}`);
+    }
+  }
+  const stamp = at.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  for (const [path, xml] of text) {
+    let next = xml.replace(/"(rId[^"]+)"/g, (whole, id: string) =>
+      ids.has(id) ? `"${ids.get(id)}"` : whole,
+    );
+    if (path === 'word/document.xml') {
+      // docx counts drawing ids across every document the isolate builds; number them per file.
+      let drawing = 0;
+      next = next.replace(/<wp:docPr id="\d+"/g, () => `<wp:docPr id="${++drawing}"`);
+    }
+    if (path === 'docProps/core.xml') {
+      next = next.replace(
+        /(<dcterms:(?:created|modified)[^>]*>)[^<]*(<\/dcterms:(?:created|modified)>)/g,
+        `$1${stamp}$2`,
+      );
+    }
+    if (next !== xml) zip.file(path, next);
+  }
+  for (const path of Object.keys(zip.files)) zip.files[path]!.date = at;
+  const bytes = await zip.generateAsync({
+    type: 'uint8array',
+    mimeType: DOCX_TYPE,
+    compression: 'DEFLATE',
+  });
+  return new Uint8Array(bytes) as Uint8Array<ArrayBuffer>;
 }

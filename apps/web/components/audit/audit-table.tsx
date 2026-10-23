@@ -30,9 +30,26 @@ export async function AuditTable({
       : shown.join(', ');
   };
 
+  /** A row a personal API token wrote: its own details, then "through the API (name)". */
   const details = (row: AuditRow) => {
+    const own = ownDetails(row);
+    const d = row.details;
+    if (d?.via !== 'api' || typeof d.token !== 'string') return own;
+    const via = t('details.viaApi', { token: d.token });
+    return own ? `${own} · ${via}` : via;
+  };
+
+  const ownDetails = (row: AuditRow) => {
     const d = row.details;
     if (!d) return null;
+    if (
+      (row.action === 'api_token_created' || row.action === 'api_token_revoked') &&
+      typeof d.name === 'string'
+    ) {
+      const scope =
+        d.scope === 'read_write' ? t('details.scope.readWrite') : t('details.scope.read');
+      return t('details.token', { name: d.name, scope });
+    }
     if (
       (row.action === 'recorder_connected' || row.action === 'recorder_disconnected') &&
       typeof d.device === 'string'
@@ -65,7 +82,11 @@ export async function AuditTable({
       typeof value === 'string' && value ? value : t('details.unnamedEndpoint');
     if (
       row.action === 'exported' &&
-      (d.format === 'md' || d.format === 'docx' || d.format === 'transcript')
+      (d.format === 'md' ||
+        d.format === 'docx' ||
+        d.format === 'transcript' ||
+        d.format === 'json' ||
+        d.format === 'text')
     ) {
       const format = t(`details.format.${d.format}`);
       return d.via === 'webhook'

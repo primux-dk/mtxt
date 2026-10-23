@@ -37,3 +37,13 @@ export const isRecorderApiPath = (path: string) =>
   path === '/api/v1/recordings' ||
   path.startsWith('/api/v1/recordings/') ||
   path.startsWith('/api/v1/recorder/');
+
+/**
+ * The REST API's paths (docs/spec.md "API"), called with a personal API
+ * token. With an Authorization header the middleware lets these through to
+ * the route, which checks the token, its kind and its scope.
+ */
+export const isTokenApiPath = (path: string) =>
+  path === '/api/v1/meetings' ||
+  path === '/api/v1/search' ||
+  /^\/api\/v1\/meetings\/[^/]+(\/transcript|\/recap|\/shares(\/[^/]+)?)?$/.test(path);

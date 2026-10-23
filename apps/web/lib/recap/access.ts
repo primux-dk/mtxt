@@ -24,9 +24,13 @@ export async function recapMeeting(user: SessionUser, meetingId: string, need: '
 }
 
 /** Reads a JSON body of at most `max` bytes; larger is 413, not JSON is 400. */
-export async function readJson(request: Request, max: number): Promise<Record<string, unknown>> {
+export async function readJson(
+  request: Request,
+  max: number,
+  tooLarge = 'The recap is too long to save.',
+): Promise<Record<string, unknown>> {
   const declared = Number(request.headers.get('content-length') ?? '0');
-  if (declared > max) throw new HttpError(413, 'too_large', 'The recap is too long to save.');
+  if (declared > max) throw new HttpError(413, 'too_large', tooLarge);
   const reader = request.body?.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -37,7 +41,7 @@ export async function readJson(request: Request, max: number): Promise<Record<st
       size += value.byteLength;
       if (size > max) {
         await reader.cancel().catch(() => {});
-        throw new HttpError(413, 'too_large', 'The recap is too long to save.');
+        throw new HttpError(413, 'too_large', tooLarge);
       }
       chunks.push(value);
     }

@@ -4,10 +4,10 @@ import { test as base, expect, type APIRequestContext, type APIResponse } from '
 import { parse } from 'yaml';
 
 /*
-  Every response the recorder API sends in the e2e run is checked against
-  packages/contract/openapi.yaml: the status must be documented for that
-  operation, and a JSON body must match its schema (Draft 2020-12, the
-  dialect OpenAPI 3.1 uses).
+  Every response the API sends in the e2e run, the recorder's and the REST
+  API's, is checked against packages/contract/openapi.yaml: the status must
+  be documented for that operation, and a JSON body must match its schema
+  (Draft 2020-12, the dialect OpenAPI 3.1 uses).
 */
 type Spec = {
   paths: Record<string, Record<string, { responses: Record<string, Response | { $ref: string }> }>>;
@@ -39,11 +39,25 @@ const templates = Object.keys(spec.paths).map((path) => ({
   pattern: new RegExp(`^${path.replace(/\{[^}]+\}/g, '[^/]+')}$`),
 }));
 
-/** Checks one response; returns the operation it matched, or null for a path outside the contract. */
-export async function checkContract(method: string, url: string, status: number, body: string) {
-  const path = new URL(url, 'http://x').pathname.replace(/^\/api\/v1/, '');
+/**
+ * Checks one response; returns the operation it matched, or null for a
+ * path outside the contract. A path in a form the Worker entry refuses
+ * (a trailing, doubled or encoded slash) is not one of the contract's.
+ * A JSON body is checked against its schema; any other body only for a
+ * media type the operation documents for that status.
+ */
+export async function checkContract(
+  method: string,
+  url: string,
+  status: number,
+  body: string,
+  contentType = 'application/json',
+) {
+  const raw = new URL(url, 'http://x').pathname;
+  if (/%2f/i.test(raw) || /\/{2,}/.test(raw) || /.\/$/.test(raw)) return null;
+  const path = raw.replace(/^\/api\/v1/, '');
   const template = templates.find((t) => t.pattern.test(path));
-  if (!template || !new URL(url, 'http://x').pathname.startsWith('/api/v1/')) return null;
+  if (!template || !raw.startsWith('/api/v1/')) return null;
   const operation = spec.paths[template.path]![method.toLowerCase()];
   expect(operation, `${method} ${template.path} is in the contract`).toBeTruthy();
   let response = operation!.responses[String(status)];
@@ -51,8 +65,16 @@ export async function checkContract(method: string, url: string, status: number,
   if (response && '$ref' in response) {
     response = spec.components.responses[response.$ref.split('/').pop()!]!;
   }
+  const media = contentType.split(';')[0]!.trim().toLowerCase();
+  if (body && media !== 'application/json') {
+    expect(
+      Object.keys(response?.content ?? {}),
+      `${method} ${template.path} ${status} documents ${media}`,
+    ).toContain(media);
+    return `${method.toUpperCase()} ${template.path} ${status}`;
+  }
   const schema = response?.content?.['application/json']?.schema;
-  if (schema) {
+  if (schema && body) {
     const validate = ajv.compile(rebase(schema) as object);
     const ok = validate(JSON.parse(body));
     expect(
@@ -83,13 +105,14 @@ export function contractChecked(request: APIRequestContext): APIRequestContext {
         response.url(),
         response.status(),
         await response.text(),
+        response.headers()['content-type'],
       );
       if (hit) seen.add(hit);
       return response;
     };
   return new Proxy(request, {
     get(target, key) {
-      if (key === 'get' || key === 'post' || key === 'put' || key === 'delete') {
+      if (key === 'get' || key === 'post' || key === 'put' || key === 'patch' || key === 'delete') {
         return wrap(key, target[key].bind(target));
       }
       const value = Reflect.get(target, key);
@@ -101,7 +124,13 @@ export function contractChecked(request: APIRequestContext): APIRequestContext {
 /** The same check for a raw fetch. */
 export async function checkFetch(method: string, response: globalThis.Response) {
   const text = await response.clone().text();
-  const hit = await checkContract(method, response.url, response.status, text);
+  const hit = await checkContract(
+    method,
+    response.url,
+    response.status,
+    text,
+    response.headers.get('content-type') ?? undefined,
+  );
   if (hit) seen.add(hit);
 }
 
@@ -127,6 +156,7 @@ export const test = base.extend({
               response.url(),
               response.status(),
               text,
+              response.headers()['content-type'],
             );
             if (hit) seen.add(hit);
           })

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronsUpDown, Laptop, LogOut } from 'lucide-react';
+import { ChevronsUpDown, KeyRound, Laptop, LogOut } from 'lucide-react';
 import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Avatar } from '@/components/ui/avatar';
@@ -10,13 +10,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ApiTokensDialog } from './api-tokens-dialog';
 import { RecordersDialog } from './recorders-dialog';
 
 /**
- * The signed-in user as one row, a button that opens a menu with Recorders and
- * Sign out. The sidebar and the mobile Sheet render the same menu. Enter or
+ * The signed-in user as one row, a button that opens a menu with Recorders,
+ * API tokens and Sign out. The sidebar and the mobile Sheet render the same menu. Enter or
  * Space opens it, arrows move, Escape closes it and focus returns to the row;
- * Recorders returns focus there when its dialog closes (behaviour.md rule 11).
+ * Recorders and API tokens return focus there when their dialogs close
+ * (behaviour.md rule 11).
  */
 export function UserMenu({
   user,
@@ -30,7 +32,9 @@ export function UserMenu({
 }) {
   const t = useTranslations('auth');
   const r = useTranslations('recorders');
+  const a = useTranslations('apiTokens');
   const [recorders, setRecorders] = useState(false);
+  const [apiTokens, setApiTokens] = useState(false);
   const [, startTransition] = useTransition();
   const row = useRef<HTMLButtonElement>(null);
 
@@ -70,6 +74,10 @@ export function UserMenu({
             <Laptop aria-hidden="true" />
             {r('open')}
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setApiTokens(true)}>
+            <KeyRound aria-hidden="true" />
+            {a('open')}
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => startTransition(() => signOut())}>
             <LogOut aria-hidden="true" />
             {t('signOut')}
@@ -77,6 +85,7 @@ export function UserMenu({
         </DropdownMenuContent>
       </DropdownMenu>
       <RecordersDialog open={recorders} onOpenChange={setRecorders} returnFocusTo={row} />
+      <ApiTokensDialog open={apiTokens} onOpenChange={setApiTokens} returnFocusTo={row} />
     </>
   );
 }

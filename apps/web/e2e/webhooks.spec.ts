@@ -257,7 +257,12 @@ test('keyboard only: add an endpoint, copy nothing, delete it, and focus lands w
   await page.keyboard.press('Enter');
   const shown = page.getByRole('dialog', { name: 'Copy the signing secret' });
   await expect(shown.getByLabel('Signing secret')).toBeFocused();
-  await page.keyboard.press('Escape');
+  // The secret can take focus before the add's transition ends, and the dialog
+  // ignores Escape while it is pending: press it again until the dialog closes.
+  await expect(async () => {
+    if (await shown.isVisible()) await page.keyboard.press('Escape');
+    await expect(shown).toBeHidden({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
   await expect(add).toBeFocused();
   // The settings form was not submitted along the way.
   await expect(page.getByText('Settings saved.')).toHaveCount(0);

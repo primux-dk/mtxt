@@ -203,6 +203,7 @@ describe('recorder connection', () => {
         email: 'mette.lund@example.com',
         isAdmin: false,
         recorderTokenId: expect.any(String),
+        token: { id: expect.any(String), kind: 'recorder', scope: null, name: 'Mac' },
       });
     });
 

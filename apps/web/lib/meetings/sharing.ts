@@ -1,7 +1,18 @@
 import 'server-only';
 import { and, eq, notExists, sql } from 'drizzle-orm';
-import { auditStatement, schema, type Db, type Meeting, type Visibility } from '@mtxt/adapters';
+import {
+  auditStatement,
+  schema,
+  VISIBILITIES,
+  type Db,
+  type Meeting,
+  type QueueAdapter,
+  type ViaApi,
+  type Visibility,
+} from '@mtxt/adapters';
 import { HttpError } from '../http-error';
+import { widens } from '../webhooks/rules';
+import { queueMeetingEventQuietly } from '../webhooks/store';
 
 const m = schema.meetings;
 const s = schema.meetingShares;
@@ -29,6 +40,7 @@ export async function changeVisibility(
   installId: string,
   meeting: Pick<Meeting, 'id' | 'ownerId' | 'title' | 'visibility'>,
   visibility: Visibility,
+  via?: ViaApi | null,
 ): Promise<'unchanged' | 'changed'> {
   if (meeting.visibility === visibility) return 'unchanged';
   const removed =
@@ -65,6 +77,7 @@ export async function changeVisibility(
           before: meeting.visibility,
           after: visibility,
           ...(removed ? { sharesRemoved: removed } : {}),
+          ...via,
         },
       },
       and(isMeeting(installId, meeting), eq(m.visibility, visibility)),
@@ -92,6 +105,7 @@ export async function changeShare(
   meeting: Pick<Meeting, 'id' | 'ownerId' | 'title'>,
   userId: string,
   shared: boolean,
+  via?: ViaApi | null,
 ): Promise<'unchanged' | 'changed'> {
   if (userId === meeting.ownerId)
     throw new HttpError(400, 'invalid_request', 'The owner already has it.');
@@ -111,7 +125,7 @@ export async function changeShare(
         meetingId: meeting.id,
         meetingTitle: meeting.title,
         action: 'shared',
-        details: { before, after },
+        details: { before, after, ...via },
       },
       onlyIf,
     );
@@ -149,4 +163,49 @@ export async function changeShare(
     audit(isMeeting(installId, meeting)),
   ]);
   return 'changed';
+}
+
+type Changer = { db: Db; installId: string; queue: QueueAdapter };
+
+/**
+ * The owner's visibility change as the library and the API make it: the
+ * change with its audit row, then `meeting.shared` when access widens and
+ * the meeting may be sent now (lib/webhooks/rules.ts).
+ */
+export async function applyVisibility(
+  { db, installId, queue }: Changer,
+  meeting: Pick<Meeting, 'id' | 'ownerId' | 'title' | 'visibility'>,
+  visibility: Visibility,
+  via?: ViaApi | null,
+): Promise<'unchanged' | 'changed'> {
+  if (!VISIBILITIES.includes(visibility))
+    throw new HttpError(400, 'invalid_request', 'Not a visibility.');
+  const changed = await changeVisibility(db, installId, meeting, visibility, via);
+  if (changed === 'changed' && widens(meeting.visibility, visibility)) {
+    await queueMeetingEventQuietly(
+      { db, installId, queue },
+      { event: 'meeting.shared', meetingId: meeting.id },
+    );
+  }
+  return changed;
+}
+
+/** The owner adds or removes a reader; an added reader widens access and sends `meeting.shared`. */
+export async function applyShare(
+  { db, installId, queue }: Changer,
+  meeting: Pick<Meeting, 'id' | 'ownerId' | 'title' | 'visibility'>,
+  userId: string,
+  shared: boolean,
+  via?: ViaApi | null,
+): Promise<'unchanged' | 'changed'> {
+  if (shared && meeting.visibility !== 'shared')
+    throw new HttpError(400, 'invalid_request', 'Set the meeting to Shared first.');
+  const changed = await changeShare(db, installId, meeting, userId, shared, via);
+  if (changed === 'changed' && shared) {
+    await queueMeetingEventQuietly(
+      { db, installId, queue },
+      { event: 'meeting.shared', meetingId: meeting.id },
+    );
+  }
+  return changed;
 }

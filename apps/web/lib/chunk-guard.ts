@@ -147,12 +147,26 @@ export const RECAP_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 const RECAP_SAVE_PATH = /^\/api\/v1\/meetings\/[^/]+\/recap$/;
 const RECAP_IMAGE_PATH = /^\/api\/v1\/meetings\/[^/]+\/recap\/images$/;
 
+/*
+  The REST API's two other bodies (packet 16): a meeting's PATCH (title,
+  visibility, keep) at 8 KiB and a share at 4 KiB, bounded here for the
+  same reason.
+*/
+export const MEETING_PATCH_MAX_BYTES = 8 * 1024;
+export const SHARE_MAX_BYTES = 4 * 1024;
+const MEETING_PATH = /^\/api\/v1\/meetings\/[^/]+$/;
+const SHARES_PATH = /^\/api\/v1\/meetings\/[^/]+\/shares$/;
+
 function recapBound(request: Request) {
   const path = guardPath(new URL(request.url).pathname);
   if (request.method === 'PUT' && RECAP_SAVE_PATH.test(path))
     return { max: RECAP_SAVE_MAX_BYTES, what: 'A recap save' };
   if (request.method === 'POST' && RECAP_IMAGE_PATH.test(path))
     return { max: RECAP_IMAGE_MAX_BYTES, what: 'An image' };
+  if (request.method === 'PATCH' && MEETING_PATH.test(path))
+    return { max: MEETING_PATCH_MAX_BYTES, what: 'A meeting change' };
+  if (request.method === 'POST' && SHARES_PATH.test(path))
+    return { max: SHARE_MAX_BYTES, what: 'A share' };
   return null;
 }
 

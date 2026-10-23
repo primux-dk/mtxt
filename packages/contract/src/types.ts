@@ -158,10 +158,394 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/meetings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The meetings the token's user may read, newest first, a page at a time.
+         * @description `view` picks the set: `all` (default) is every meeting the user may
+         *     read (their own, archived ones included; company-wide ones; shared
+         *     ones that name them), `mine` their own not archived, `shared` the
+         *     ones shared with them, `company` the company-wide ones, `archived`
+         *     their own archived ones. `mine` and `archived` also show a meeting
+         *     retention has emptied, with `deleted_at` set; nothing can be fetched
+         *     from it. `q` searches titles, transcripts and recaps (the order stays
+         *     newest first; `GET /search` ranks by match). Writes no audit row.
+         */
+        get: operations["listMeetings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One meeting, with its recordings, transcript and recap state.
+         * @description `shares` lists the readers for the meeting's owner and is null for
+         *     anyone else. Served with 200, it is an `opened` audit row with
+         *     `via: api` (at most one per user, meeting and hour).
+         */
+        get: operations["getMeeting"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * The owner sets the title, the visibility or the keep flag. Needs `read_write`.
+         * @description Each field sets a value, so sending the same body twice changes
+         *     nothing the second time. Leaving `shared` removes every reader;
+         *     `private` also takes back the owner's consent to send the meeting to
+         *     connected systems. A visibility change is a `visibility_changed`
+         *     audit row with `via: api`. Answers with the meeting as it is now.
+         */
+        patch: operations["updateMeeting"];
+        trace?: never;
+    };
+    "/meetings/{id}/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The meeting's transcript, as JSON or plain text.
+         * @description The primary recording's transcript, else the newest one. JSON (the
+         *     default) is the shape a webhook's transcript link gives: language,
+         *     speakers by the linked colleague's name or their label, and segments
+         *     in time order. `format=text` is one line per segment,
+         *     `[h:mm:ss] Name: text`. Served with 200, it is an `exported` audit
+         *     row with the format and `via: api`.
+         */
+        get: operations["getTranscript"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{id}/recap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The recap's current version, as JSON, markdown or Word.
+         * @description `json` (the default) gives the version, the markdown body and the
+         *     decisions block's items. `markdown` is the stored body, `docx` the
+         *     Word file the library's export button gives. Served with 200, it is
+         *     an `exported` audit row with the format and `via: api`.
+         */
+        get: operations["getRecap"];
+        /**
+         * The owner saves a new version of the recap on the version it was made from. Needs `read_write`.
+         * @description Read the recap first (`GET` with `format=json`), change `body_md`, and
+         *     send it with `base_version_id` set to the version you read. A save
+         *     whose base is no longer the current version is 409 with the version
+         *     that is current: read again, merge, and save on that. The server may
+         *     store slightly different text (a mention of someone outside the
+         *     install becomes plain text, an image from elsewhere its alt text);
+         *     the answer carries what it stored. Also the library editor's own
+         *     save, with the session cookie. A save is not an audit row; the
+         *     version names its author.
+         */
+        put: operations["saveRecap"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The owner adds a reader, by user id or address. Needs `read_write`.
+         * @description The meeting must be `shared` first (`PATCH` its visibility). Adding
+         *     someone who already reads it changes nothing. A change is a `shared`
+         *     audit row with `via: api`. Answers with every reader.
+         */
+        post: operations["addShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/meetings/{id}/shares/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+                /** @description The reader's user id, from `shares` in `GET /meetings/{id}`. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * The owner removes a reader. Needs `read_write`.
+         * @description Removing someone who does not read it changes nothing and is 204 too. A change is a `shared` audit row with `via: api`.
+         */
+        delete: operations["removeShare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Titles, transcripts and recaps of the meetings the user may read, best match first.
+         * @description A meeting found by its title has `match` `title` and no snippet. One
+         *     found in its recap or transcript has a snippet of its best place, as
+         *     parts of plain text with the matched words marked `hit`; a
+         *     transcript hit has the second it starts at. Writes no audit row.
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description `private`: the owner only. `shared`: the owner and the named readers. `company`: everyone in the install.
+         * @enum {string}
+         */
+        Visibility: "private" | "shared" | "company";
+        /**
+         * @description From the primary recording, else the newest. `none` when there is no recording.
+         * @enum {string}
+         */
+        MeetingState: "ready" | "transcribing" | "uploading" | "failed" | "none";
+        Person: {
+            id: string;
+            name: string;
+            email: string;
+        };
+        NamedUser: {
+            id: string;
+            name: string;
+        };
+        /** @description A meeting in a list or a search result. */
+        MeetingSummary: components["schemas"]["MeetingFields"];
+        /** @description What MeetingSummary and MeetingDetail share. */
+        MeetingFields: {
+            id: string;
+            title: string;
+            /** Format: date-time */
+            started_at: string;
+            visibility: components["schemas"]["Visibility"];
+            /**
+             * @description `owner` may write (with a `read_write` token); `reader` only reads.
+             * @enum {string}
+             */
+            access: "owner" | "reader";
+            owner: components["schemas"]["Person"];
+            state: components["schemas"]["MeetingState"];
+            /** @description Seconds, from the primary or newest recording; null without one. */
+            duration_s: number | null;
+            archived: boolean;
+            /** @description Retention leaves the meeting alone. */
+            keep: boolean;
+            /**
+             * Format: date-time
+             * @description Set when retention has deleted the audio and transcript; only in the owner's `mine` and `archived` views.
+             */
+            deleted_at: string | null;
+            /** @description Who spoke, in speaking order: the linked colleague's name, else the label. */
+            speakers: string[];
+            has_transcript: boolean;
+            /** @description The recap has a version to fetch. */
+            has_recap: boolean;
+        };
+        MeetingList: {
+            meetings: components["schemas"]["MeetingSummary"][];
+            /** @description Null on the last page. */
+            next_cursor: string | null;
+        };
+        RecordingSummary: {
+            id: string;
+            status: components["schemas"]["RecordingStatus"];
+            source: components["schemas"]["RecordingSource"];
+            duration_s: number;
+            is_primary: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            confirmed_at: string | null;
+        };
+        RecapVersion: {
+            /** @description The `base_version_id` of a save made on this version. */
+            id: string;
+            number: number;
+            /** @description Null for a version the AI wrote. */
+            author: components["schemas"]["NamedUser"] | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description `restored:<n>` for a restore, `chunked:<parts>` for a draft made from summaries; else null. */
+            note: string | null;
+        };
+        /**
+         * @description `drafting` while the AI writes, `ready` with a version, `failed` when the last draft failed.
+         * @enum {string}
+         */
+        RecapStatus: "drafting" | "ready" | "failed";
+        MeetingDetail: components["schemas"]["MeetingFields"] & {
+            /** @description Primary first, then newest first. */
+            recordings: components["schemas"]["RecordingSummary"][];
+            /** @description The primary recording's transcript, else the newest; null before transcription starts. */
+            transcript: {
+                /** @enum {string} */
+                status: "pending" | "done" | "failed";
+                language: string;
+            } | null;
+            recap: {
+                status: components["schemas"]["RecapStatus"];
+                version: components["schemas"]["RecapVersion"] | null;
+            } | null;
+            /** @description The readers, for the owner; null for anyone else. */
+            shares: components["schemas"]["Person"][] | null;
+        };
+        MeetingUpdate: {
+            /** @description Trimmed before it is stored. */
+            title?: string;
+            visibility?: components["schemas"]["Visibility"];
+            keep?: boolean;
+        };
+        Transcript: {
+            meeting_id: string;
+            /** @description ISO 639-1 where one exists, as the provider detected or the install set. */
+            language: string;
+            /** @description `id` is the speaker's id in this meeting; `name` the linked colleague's name, else the label ("Speaker 1"). */
+            speakers: components["schemas"]["NamedUser"][];
+            /** @description In time order. */
+            segments: {
+                start_ms: number;
+                end_ms: number;
+                speaker_id: string | null;
+                text: string;
+            }[];
+        };
+        Decision: {
+            position: number;
+            text: string;
+            done: boolean;
+            /** @description The colleague the item first mentions, if any. */
+            owner: components["schemas"]["NamedUser"] | null;
+        };
+        Recap: {
+            meeting_id: string;
+            status: components["schemas"]["RecapStatus"];
+            version: components["schemas"]["RecapVersion"];
+            /**
+             * @description Markdown. A callout is a GitHub alert, a toggle `<details>`, the
+             *     table of contents `<!-- toc -->`, the decisions block a task list
+             *     between `<!-- decisions -->` and `<!-- /decisions -->`, a mention
+             *     `[@Name](mtxt:user/<id>)` or `mtxt:speaker/<id>`.
+             */
+            body_md: string;
+            /** @description The decisions block's items, in order. */
+            decisions: components["schemas"]["Decision"][];
+        };
+        RecapSave: {
+            /** @description The version the text was made from; null only for a recap with no version yet. */
+            base_version_id: string | null;
+            body_md: string;
+        };
+        RecapSaved: {
+            version: components["schemas"]["RecapVersion"];
+            /** @description The text as stored. Take it when it differs from what was sent. */
+            body_md: string;
+        };
+        RecapConflict: {
+            error: components["schemas"]["ErrorBody"];
+            current: components["schemas"]["RecapVersion"] | null;
+        };
+        TooLarge: {
+            error: components["schemas"]["ErrorBody"];
+            /** @enum {string} */
+            reason?: "recap_too_long";
+        };
+        /** @description Exactly one of `user_id` or `email`. */
+        ShareRequest: {
+            user_id: string;
+        } | {
+            /** @description The colleague's address in the install, matched without regard to ASCII case. */
+            email: string;
+        };
+        ShareList: {
+            shares: components["schemas"]["Person"][];
+        };
+        SnippetPart: {
+            text: string;
+            /** @description One of the matched words. */
+            hit: boolean;
+        };
+        SearchResult: {
+            meeting: components["schemas"]["MeetingSummary"];
+            /**
+             * @description Where the best match is.
+             * @enum {string}
+             */
+            match: "title" | "recap" | "transcript";
+            /** @description The text around the best match, in parts; null for a title match. */
+            snippet: components["schemas"]["SnippetPart"][] | null;
+            /** @description For a transcript match, the second its segment starts at. */
+            start_s: number | null;
+        };
+        SearchResults: {
+            results: components["schemas"]["SearchResult"][];
+            next_cursor: string | null;
+        };
         /**
          * @description Server-side state of a recording. The recorder's own states (Recording,
          *     Uploading, Pending, Warn, AskUser, Confirmed, Deleted) are local and not
@@ -263,12 +647,13 @@ export interface components {
         };
         ErrorBody: {
             /**
-             * @description Stable machine-readable code. v0.1 uses `unauthorized`,
+             * @description Stable machine-readable code. The API uses `unauthorized`,
              *     `forbidden`, `not_found`, `invalid_request`, `too_large`,
              *     `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
              *     `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
-             *     `unsupported_media_type`, `rate_limited`, `expired`, `denied` and
-             *     `internal`.
+             *     `unsupported_media_type`, `rate_limited`, `expired`, `denied`,
+             *     `insufficient_scope`, `conflict` and `internal`. A client treats
+             *     an unknown code by its HTTP status.
              */
             code: string;
             /** @description English text for logs. The recorder shows its own localised message per code. */
@@ -330,6 +715,73 @@ export interface components {
         };
     };
     responses: {
+        /** @description The `If-None-Match` ETag still matches. No body. */
+        NotModified: {
+            headers: {
+                ETag: components["headers"]["ETag"];
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description A recorder's token on the REST API (`forbidden`). */
+        ApiForbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description `insufficient_scope`: the token's scope is `read`. `forbidden`: a
+         *     recorder's token, or the user reads the meeting but does not own it.
+         */
+        ApiOwnerOnly: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No meeting with this id that the user may read (`not_found`). */
+        MeetingNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No meeting with this id that the user may read, or a colleague who is not a user of this install, whether unknown or another install's (`not_found`, the same answer for both). */
+        ShareNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The body is larger than the call takes (`too_large`). */
+        ApiTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Over 60 requests this minute for the token (`rate_limited`). Wait `Retry-After` seconds. */
+        ApiRateLimited: {
+            headers: {
+                /** @description Seconds until the token's minute ends. */
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["RateLimited"];
+            };
+        };
         /** @description The request is malformed. */
         BadRequest: {
             headers: {
@@ -357,7 +809,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description The caller may see the meeting but does not own it. Only the owner uploads (`forbidden`). */
+        /** @description The caller may see the meeting but does not own it, since only the owner uploads; or the bearer token is a personal API token, which the recorder's paths refuse (`forbidden`). */
         Forbidden: {
             headers: {
                 [name: string]: unknown;
@@ -377,10 +829,24 @@ export interface components {
         };
     };
     parameters: {
+        MeetingId: string;
+        /** @description `next_cursor` from the previous page, with the same other parameters. Opaque. */
+        Cursor: string;
+        /** @description Items per page. */
+        Limit: number;
+        /** @description The `ETag` of an earlier answer; 304 when the answer would be the same. */
+        IfNoneMatch: string;
         RecordingId: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description A strong validator over the body. Send it as `If-None-Match`. */
+        ETag: string;
+        /** @description Requests a token may make per minute (60). */
+        RateLimitLimit: number;
+        /** @description Requests left in this token's current minute. */
+        RateLimitRemaining: number;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -471,6 +937,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             /** @description With a bearer token, `{id}` is not the calling token; with the session, no recorder token with this id belongs to the caller (`not_found`). */
             404: {
                 headers: {
@@ -692,7 +1159,398 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    listMeetings: {
+        parameters: {
+            query?: {
+                view?: "all" | "mine" | "shared" | "company" | "archived";
+                /** @description Words to find in titles, transcripts and recaps, at most 200 characters. */
+                q?: string;
+                /** @description `transcribing` also covers meetings still uploading. */
+                status?: "ready" | "transcribing" | "failed";
+                /** @description Meetings that started at or after this time (RFC 3339, or a date taken as UTC midnight). */
+                since?: string;
+                /** @description `next_cursor` from the previous page, with the same other parameters. Opaque. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Items per page. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: {
+                /** @description The `ETag` of an earlier answer; 304 when the answer would be the same. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of meetings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-RateLimit-Limit": components["headers"]["RateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["RateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingList"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiForbidden"];
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    getMeeting: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `ETag` of an earlier answer; 304 when the answer would be the same. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The meeting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-RateLimit-Limit": components["headers"]["RateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["RateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiForbidden"];
+            404: components["responses"]["MeetingNotFound"];
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    updateMeeting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeetingUpdate"];
+            };
+        };
+        responses: {
+            /** @description The meeting after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiOwnerOnly"];
+            404: components["responses"]["MeetingNotFound"];
+            /** @description The visibility changed meanwhile (`conflict`). Read the meeting and try again. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["ApiTooLarge"];
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    getTranscript: {
+        parameters: {
+            query?: {
+                format?: "json" | "text";
+            };
+            header?: {
+                /** @description The `ETag` of an earlier answer; 304 when the answer would be the same. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The transcript. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-RateLimit-Limit": components["headers"]["RateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["RateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Transcript"];
+                    "text/plain": string;
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiForbidden"];
+            /** @description No such meeting the user may read, or it has no finished transcript yet (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    getRecap: {
+        parameters: {
+            query?: {
+                format?: "json" | "markdown" | "docx";
+            };
+            header?: {
+                /** @description The `ETag` of an earlier answer; 304 when the answer would be the same. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recap. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-RateLimit-Limit": components["headers"]["RateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["RateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recap"];
+                    "text/markdown": string;
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiForbidden"];
+            /** @description No such meeting the user may read, or its recap has no version yet (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    saveRecap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecapSave"];
+            };
+        };
+        responses: {
+            /** @description Saved as a new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecapSaved"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiOwnerOnly"];
+            /** @description No such meeting the user may read, or it has no recap yet (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The base is no longer the current version (`conflict`); `current` is the version that is. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecapConflict"];
+                };
+            };
+            /**
+             * @description The body is over 512 KiB (`too_large`), or the recap over 500,000
+             *     characters (`too_large` with `reason` `recap_too_long`).
+             */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TooLarge"];
+                };
+            };
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    addShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareRequest"];
+            };
+        };
+        responses: {
+            /** @description The readers now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareList"];
+                };
+            };
+            /** @description A bad body, the owner themselves, or a meeting that is not `shared` (`invalid_request`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiOwnerOnly"];
+            404: components["responses"]["ShareNotFound"];
+            413: components["responses"]["ApiTooLarge"];
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    removeShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["MeetingId"];
+                /** @description The reader's user id, from `shares` in `GET /meetings/{id}`. */
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not a reader now. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The owner themselves (`invalid_request`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiOwnerOnly"];
+            404: components["responses"]["ShareNotFound"];
+            429: components["responses"]["ApiRateLimited"];
+            500: components["responses"]["Internal"];
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description `next_cursor` from the previous page, with the same other parameters. Opaque. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Items per page. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: {
+                /** @description The `ETag` of an earlier answer; 304 when the answer would be the same. */
+                "If-None-Match"?: components["parameters"]["IfNoneMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of results. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    "X-RateLimit-Limit": components["headers"]["RateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["RateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            304: components["responses"]["NotModified"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["ApiForbidden"];
+            429: components["responses"]["ApiRateLimited"];
             500: components["responses"]["Internal"];
         };
     };

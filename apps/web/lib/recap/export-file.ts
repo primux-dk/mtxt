@@ -45,6 +45,8 @@ export async function recapFile(
     bytes = await recapDocx({
       doc,
       title: meeting.title,
+      // The version's time, so the same version gives the same bytes and the same ETag.
+      at: recap.current.createdAt,
       subtitle: new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(
         meeting.startedAt,
       ),
@@ -63,12 +65,11 @@ export async function recapFile(
       },
     });
   }
-  return new Response(bytes, {
-    headers: {
-      'content-type': EXPORT_TYPES[format],
-      'content-disposition': attachment(exportFileName(meeting.title, meeting.startedAt, format)),
-      'x-content-type-options': 'nosniff',
-      'cache-control': 'private, no-store',
-    },
+  const headers = new Headers({
+    'content-type': EXPORT_TYPES[format],
+    'content-disposition': attachment(exportFileName(meeting.title, meeting.startedAt, format)),
+    'x-content-type-options': 'nosniff',
+    'cache-control': 'private, no-store',
   });
+  return new Response(bytes, { headers });
 }

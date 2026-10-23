@@ -1,6 +1,7 @@
 /**
- * The recorder-to-server contract. `types.ts` is generated from `openapi.yaml`
- * with `pnpm --filter @mtxt/contract generate`; never edit it by hand.
+ * The recorder-to-server contract and the REST API. `types.ts` is generated
+ * from `openapi.yaml` with `pnpm --filter @mtxt/contract generate`; never
+ * edit it by hand.
  */
 export type { paths, components, operations } from './types';
 
@@ -36,13 +37,27 @@ export type RecorderToken = Schemas['RecorderToken'];
 export type RecorderTokenPending = Schemas['RecorderTokenPending'];
 export type RateLimited = Schemas['RateLimited'];
 
+/** The REST API's shapes (openapi.yaml, the `api` tag). */
+export type MeetingSummary = Schemas['MeetingSummary'];
+export type MeetingList = Schemas['MeetingList'];
+export type MeetingDetail = Schemas['MeetingDetail'];
+export type MeetingUpdate = Schemas['MeetingUpdate'];
+export type Transcript = Schemas['Transcript'];
+export type Recap = Schemas['Recap'];
+export type RecapVersion = Schemas['RecapVersion'];
+export type RecapSave = Schemas['RecapSave'];
+export type RecapSaved = Schemas['RecapSaved'];
+export type ShareRequest = Schemas['ShareRequest'];
+export type ShareList = Schemas['ShareList'];
+export type SearchResults = Schemas['SearchResults'];
+
 /** Every chunk but the last is this size. Matches `chunk_size_bytes` in v0.1. */
 export const CHUNK_SIZE_BYTES = 8 * 1024 * 1024;
 
 /** The largest file v0.1 accepts: 2 GB, 256 chunks. */
 export const MAX_RECORDING_BYTES = 2 * 1024 * 1024 * 1024;
 
-/** The error codes v0.1 sends in `error.code` (openapi.yaml ErrorBody). */
+/** The error codes the API sends in `error.code` (openapi.yaml ErrorBody). */
 export const ERROR_CODES = [
   'unauthorized',
   'forbidden',
@@ -62,6 +77,8 @@ export const ERROR_CODES = [
   'expired',
   'denied',
   'internal',
+  'insufficient_scope',
+  'conflict',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

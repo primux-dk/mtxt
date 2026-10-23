@@ -51,6 +51,8 @@ export const AUDIT_ACTIONS = [
   'recorder_connected',
   'recorder_disconnected',
   'webhook_sent',
+  'api_token_created',
+  'api_token_revoked',
 ] as const;
 export const IDENTITY_PROVIDERS = ['entra', 'google'] as const;
 export const STT_PROVIDERS = [
@@ -70,6 +72,10 @@ export const RECAP_STATUSES = ['drafting', 'ready', 'failed'] as const;
 export const TRANSCRIPT_STATUSES = ['pending', 'done', 'failed'] as const;
 /** A recorder grant: approved on /connect and waiting for the poll, cancelled there, or exchanged for a token. */
 export const RECORDER_GRANT_STATUSES = ['approved', 'denied', 'redeemed'] as const;
+/** A bearer token is a desktop recorder's, or a personal API token (docs/spec.md "API"). */
+export const TOKEN_KINDS = ['recorder', 'api'] as const;
+/** What a personal API token may do: read, or read and write. */
+export const API_TOKEN_SCOPES = ['read', 'read_write'] as const;
 /** The events an endpoint can take (docs/spec.md "Webhooks"). `webhook.test` is sent only by "Send test event". */
 export const WEBHOOK_EVENTS = [
   'meeting.transcribed',
@@ -640,9 +646,12 @@ export const storageCleanup = sqliteTable(
 );
 
 /**
- * A desktop recorder's bearer token (docs/spec.md "Recorder connection").
- * Only the SHA-256 of the token is stored, never the token. Bound to one
- * user and one device name; revoked by Disconnect or the recorder itself.
+ * A bearer token: a desktop recorder's (docs/spec.md "Recorder connection")
+ * or a personal API token (docs/spec.md "API"), told apart by `kind`. Only
+ * the SHA-256 of the token is stored, never the token. Bound to one user;
+ * a recorder's to one device name, an API token to the name its user gave
+ * it and a scope. `kind` and `scope` are checked by the app, not by a
+ * CHECK, so migration 0010 only adds columns.
  */
 export const recorderTokens = sqliteTable(
   'recorder_tokens',
@@ -652,6 +661,7 @@ export const recorderTokens = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
+    /** The recorder's device name, or the API token's name. */
     deviceName: text('device_name').notNull(),
     /** Lower-case hex SHA-256 of the whole token, `mtxt_` included. */
     tokenHash: text('token_hash').notNull(),
@@ -660,6 +670,12 @@ export const recorderTokens = sqliteTable(
     lastUsedAt: timestamp('last_used_at'),
     expiresAt: timestamp('expires_at').notNull(),
     revokedAt: timestamp('revoked_at'),
+    kind: text('kind', { enum: TOKEN_KINDS }).notNull().default('recorder'),
+    /** An API token's scope; null for a recorder. */
+    scope: text('scope', { enum: API_TOKEN_SCOPES }),
+    /** The API rate limit's window: when the current minute began, and the requests in it. */
+    rateWindowAt: timestamp('rate_window_at'),
+    rateCount: integer('rate_count').notNull().default(0),
   },
   (t) => [
     uniqueIndex('recorder_tokens_install_hash').on(t.installId, t.tokenHash),
@@ -792,6 +808,8 @@ export type Decision = typeof decisions.$inferSelect;
 export type RecorderToken = typeof recorderTokens.$inferSelect;
 export type RecorderGrant = typeof recorderGrants.$inferSelect;
 export type RecorderGrantStatus = (typeof RECORDER_GRANT_STATUSES)[number];
+export type TokenKind = (typeof TOKEN_KINDS)[number];
+export type ApiTokenScope = (typeof API_TOKEN_SCOPES)[number];
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 export type WebhookAutoSend = (typeof WEBHOOK_AUTO_SEND)[number];
 export type WebhookDeliveryStatus = (typeof WEBHOOK_DELIVERY_STATUSES)[number];

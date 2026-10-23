@@ -164,6 +164,19 @@ try {
   query(
     `INSERT INTO audit_events (id, install_id, user_id, action, details, at) VALUES ('a3', 'dev', 'u1', 'webhook_sent', '{"endpoint":"Alex"}', 3000)`,
   );
+  // Packet 16 (0010) rebuilds audit_events for the API token actions and adds kind and scope.
+  const kept = query(`SELECT id FROM audit_events ORDER BY id`).map((r) => r.id);
+  if (JSON.stringify(kept) !== JSON.stringify(['a1', 'a2', 'a3']))
+    throw new Error('The audit rows did not survive the API token rebuild.');
+  query(
+    `INSERT INTO audit_events (id, install_id, user_id, action, details, at) VALUES ('a4', 'dev', 'u1', 'api_token_created', '{"name":"Alex","scope":"read"}', 4000)`,
+  );
+  query(
+    `INSERT INTO recorder_tokens (id, install_id, user_id, device_name, token_hash, expires_at) VALUES ('t1', 'dev', 'u1', 'Mac', 'h1', 9999999999999)`,
+  );
+  const token = query(`SELECT kind, scope, rate_count FROM recorder_tokens WHERE id = 't1'`)[0];
+  if (token?.kind !== 'recorder' || token.scope !== null || token.rate_count !== 0)
+    throw new Error('A recorder token does not default to kind recorder.');
   const auto = query(`SELECT webhook_auto_send FROM settings LIMIT 1`)[0];
   if (auto && auto.webhook_auto_send !== 'off') throw new Error('Send automatically is not off.');
   console.log('D1 upgrade check passed.');

@@ -119,3 +119,40 @@ export function pollAllowed(
     retryAfter: Math.max(1, Math.ceil((lastPollAt + POLL_INTERVAL_MS - now) / 1000)),
   };
 }
+
+/*
+  Personal API tokens (docs/spec.md "API") have the same shape and hash as
+  a recorder's token and live in the same table, told apart by `kind`.
+*/
+
+/** An API token's name: the same rules as a device name, 1 to 64 characters. */
+export const API_TOKEN_NAME_MAX = DEVICE_NAME_MAX;
+/** Working API tokens per user. */
+export const MAX_API_TOKENS = 25;
+/** The lifetimes the create dialog offers, in days; a year is the default. */
+export const API_TOKEN_DAYS = [30, 90, 365] as const;
+export const API_TOKEN_DEFAULT_DAYS = 365;
+/** Requests per token per minute window. */
+export const API_RATE_LIMIT = 60;
+export const API_RATE_WINDOW_MS = 60 * 1000;
+
+/**
+ * Whether one more request fits the token's window: a fixed minute from
+ * the window's first request. `retryAfter` is whole seconds until the
+ * window ends, at least 1; `remaining` is what is left after this request.
+ */
+export function rateAllowed(
+  window: { at: number | null; count: number },
+  now: number,
+): { ok: true; fresh: boolean; remaining: number } | { ok: false; retryAfter: number } {
+  if (window.at === null || now - window.at >= API_RATE_WINDOW_MS) {
+    return { ok: true, fresh: true, remaining: API_RATE_LIMIT - 1 };
+  }
+  if (window.count < API_RATE_LIMIT) {
+    return { ok: true, fresh: false, remaining: API_RATE_LIMIT - window.count - 1 };
+  }
+  return {
+    ok: false,
+    retryAfter: Math.max(1, Math.ceil((window.at + API_RATE_WINDOW_MS - now) / 1000)),
+  };
+}
