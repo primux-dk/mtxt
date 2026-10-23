@@ -8,24 +8,49 @@ export interface TranscribeJob {
   type: 'transcribe';
   recording_id: string;
   install_id: string;
+  /** A delayed check on an async provider's job, in case its webhook never comes. */
+  poll?: boolean;
 }
 
+/** `transcript_id` is the idempotency key: the consumer takes one recap job per transcript. */
 export interface RecapJob {
   type: 'recap';
   meeting_id: string;
+  transcript_id: string;
   install_id: string;
 }
 
-export type Job = TranscribeJob | RecapJob;
+/** Queues the recordings that waited for a provider, 100 at a time, after `after` (a recording id). */
+export interface DrainTranscriptionsJob {
+  type: 'drain_transcriptions';
+  install_id: string;
+  after?: string;
+}
+
+export type Job = TranscribeJob | RecapJob | DrainTranscriptionsJob;
 export type JobType = Job['type'];
-export const JOB_TYPES = ['transcribe', 'recap'] as const satisfies readonly JobType[];
+export const JOB_TYPES = [
+  'transcribe',
+  'recap',
+  'drain_transcriptions',
+] as const satisfies readonly JobType[];
 
 export function isJob(value: unknown): value is Job {
   if (typeof value !== 'object' || value === null) return false;
   const job = value as Record<string, unknown>;
   if (typeof job.install_id !== 'string') return false;
-  if (job.type === 'transcribe') return typeof job.recording_id === 'string';
-  if (job.type === 'recap') return typeof job.meeting_id === 'string';
+  if (job.type === 'transcribe') {
+    return (
+      typeof job.recording_id === 'string' &&
+      (job.poll === undefined || typeof job.poll === 'boolean')
+    );
+  }
+  if (job.type === 'recap') {
+    return typeof job.meeting_id === 'string' && typeof job.transcript_id === 'string';
+  }
+  if (job.type === 'drain_transcriptions') {
+    return job.after === undefined || typeof job.after === 'string';
+  }
   return false;
 }
 

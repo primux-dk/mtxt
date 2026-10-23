@@ -56,6 +56,7 @@ describe('schema', () => {
       'keyterms',
       'meeting_shares',
       'meetings',
+      'recap_jobs_seen',
       'recap_versions',
       'recaps',
       'recordings',
@@ -161,7 +162,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0004 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0005 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -189,6 +190,7 @@ describe('schema', () => {
       '0002_identity_hardening.sql',
       '0003_capture.sql',
       '0004_transcription.sql',
+      '0005_transcription_claims.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);

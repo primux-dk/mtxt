@@ -256,15 +256,46 @@ export const transcripts = sqliteTable(
     providerJobId: text('provider_job_id'),
     /** A second provider's transcript for the comparison tool. Never shown in the app. */
     isComparison: bool('is_comparison').notNull().default(false),
+    /**
+     * The job delivery that holds the row: set by one conditional UPDATE, so
+     * two deliveries never both submit. Every later write by the job names
+     * `claim_token`. A claim older than the lease may be taken over.
+     */
+    claimedAt: timestamp('claimed_at'),
+    claimToken: text('claim_token'),
+    /**
+     * Where the provider's raw result lives in storage
+     * (`transcripts/{install}/{recording}/{provider}.json`). `raw_json` is no
+     * longer written beyond `{}`: a full result can pass D1's 2 MB value limit.
+     */
+    rawPath: text('raw_path'),
+    /** Set in the completion batch, once; the recap job goes out only when this call set it. */
+    recapEnqueuedAt: timestamp('recap_enqueued_at'),
   },
   (t) => [
     /** One server transcript per recording; the live preview is never stored. Comparisons sit beside it. */
     uniqueIndex('transcripts_recording')
       .on(t.recordingId)
       .where(sql`"is_comparison" = 0`),
-    /** The same provider job never makes two rows (a replayed webhook, a retried job). */
-    uniqueIndex('transcripts_provider_job').on(t.provider, t.providerJobId),
+    /** The same provider job never makes two rows in an install (a replayed webhook, a retried job). */
+    uniqueIndex('transcripts_install_provider_job').on(t.installId, t.provider, t.providerJobId),
   ],
+);
+
+/**
+ * Recap jobs the consumer has taken, by transcript: a redelivered or
+ * duplicated recap message for the same transcript is skipped.
+ */
+export const recapJobsSeen = sqliteTable(
+  'recap_jobs_seen',
+  {
+    transcriptId: text('transcript_id')
+      .notNull()
+      .references(() => transcripts.id, { onDelete: 'cascade' }),
+    installId: installId(),
+    seenAt: createdAt('seen_at'),
+  },
+  (t) => [primaryKey({ columns: [t.transcriptId] })],
 );
 
 /** A label can link to a directory user; externals stay plain labels. */

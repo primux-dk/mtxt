@@ -36,6 +36,13 @@
       "when": 1792710332660,
       "tag": "0004_transcription",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792714230563,
+      "tag": "0005_transcription_claims",
+      "breakpoints": true
     }
   ]
 }

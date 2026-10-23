@@ -112,8 +112,11 @@ recordings       id, meeting_id, uploaded_by, source (desktop|browser|upload|tea
                  created_at, confirmed_at, delete_audio_at
                  -- sha256 '' and size_bytes 0 while a browser recording is still being made
 transcripts      id, recording_id, provider, model, language, raw_json, created_at,
-                 status (pending|done|failed), provider_job_id (nullable), is_comparison (bool)
-                 -- one non-comparison row per recording; (provider, provider_job_id) unique
+                 status (pending|done|failed), provider_job_id (nullable), is_comparison (bool),
+                 claimed_at, claim_token, raw_path, recap_enqueued_at
+                 -- one non-comparison row per recording; (install_id, provider, provider_job_id) unique
+                 -- raw_path: the provider's raw result in storage; raw_json is no longer written
+recap_jobs_seen  transcript_id, install_id, seen_at       -- one recap job taken per transcript
 segments         id, transcript_id, speaker_id, start_ms, end_ms, text
 speakers         id, meeting_id, label, user_id (nullable), speaker_index (nullable)
                  -- a label can link to a directory user; one row per provider speaker number per meeting

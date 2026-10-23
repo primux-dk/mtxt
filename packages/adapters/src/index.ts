@@ -3,7 +3,14 @@ export type * from './queue';
 export type * from './uploads';
 export type * from './speech';
 export { isJob, JOB_TYPES, routeJobs } from './jobs';
-export type { Job, JobType, JobHandlers, RecapJob, TranscribeJob } from './jobs';
+export type {
+  DrainTranscriptionsJob,
+  Job,
+  JobType,
+  JobHandlers,
+  RecapJob,
+  TranscribeJob,
+} from './jobs';
 export { createDb, schema, type Db } from './db';
 export { DEFAULT_SETTINGS } from './db/defaults';
 export { seedSql } from './db/seed';
