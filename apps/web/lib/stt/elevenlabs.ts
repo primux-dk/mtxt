@@ -139,7 +139,8 @@ export const iso1 = (code: string | null | undefined) => {
  * they first speak (`speaker_0`, `speaker_1`... as Scribe names them, which
  * need not start at 0). A segment is a run of one speaker's words with no
  * pause over 1.2 s; the spacing tokens between words are kept, so the text
- * reads as Scribe wrote it. Audio events are left out.
+ * reads as Scribe wrote it. Audio events are left out. The answer's `text` is
+ * used only when it has no tokens at all.
  */
 export function mapElevenLabs(json: ElTranscript, requestedLanguage: string): SttResult {
   const index = new Map<string, number>();
@@ -186,7 +187,9 @@ export function mapElevenLabs(json: ElTranscript, requestedLanguage: string): St
     });
   }
   close();
-  if (!segments.length && json.text?.trim()) {
+  // Only an answer with no tokens at all falls back to its text: one with tokens
+  // but no words (audio events only) has no speech, whatever `text` says.
+  if (!json.words?.length && json.text?.trim()) {
     segments.push({
       startMs: 0,
       endMs: ms(json.audio_duration_secs),

@@ -102,10 +102,30 @@ describe('ElevenLabs mapper', () => {
     expect(out.language).toBe('en');
   });
 
-  it('keeps text without words as one segment, and no speech as none', () => {
+  it('keeps text without tokens as one segment, and audio events alone or no speech as none', () => {
     const plain = mapElevenLabs({ text: 'Hej', audio_duration_secs: 2.5 }, 'da');
     expect(plain.segments).toEqual([{ startMs: 0, endMs: 2500, text: 'Hej', speaker: 0 }]);
     expect(plain.language).toBe('da');
+    // Audio events and no words: no speech, even though `text` carries the event.
+    const events = mapElevenLabs(
+      {
+        text: '(laughter)',
+        audio_duration_secs: 3,
+        words: [
+          {
+            text: '(laughter)',
+            start: 0.2,
+            end: 1.4,
+            type: 'audio_event',
+            speaker_id: 'speaker_0',
+          },
+        ],
+      },
+      'da',
+    );
+    expect(events.segments).toEqual([]);
+    expect(events.speakers).toEqual([]);
+    expect(events.words).toBeUndefined();
     const empty = mapElevenLabs({ text: '', words: [] }, 'auto');
     expect(empty.segments).toEqual([]);
     expect(empty.speakers).toEqual([]);
