@@ -191,4 +191,93 @@ describe('retentionBatch', () => {
     expect(t.deleted).toEqual([4, 3, 2, 1, 0].map((i) => `recordings/test/b${i}/b${i}-r.webm`));
     expect((await t.run(2)).meetings).toBe(0);
   });
+
+  it('a Keep set while the batch runs wins: the second meeting keeps its audio and its row', async () => {
+    const t = setup();
+    for (const id of ['first', 'second']) {
+      t.f.meeting(id, { owner: 'owner', startedAt: ago(id === 'first' ? 401 : 400) });
+      t.f.recording(`${id}-r`, id);
+    }
+    // The reviewer's sequence: Keep lands on "second" while the first object deletion is awaited.
+    const deleted: string[] = [];
+    const storage = {
+      delete: async (keys: string | string[]) => {
+        deleted.push(...[keys].flat());
+        t.sqlite.exec("UPDATE meetings SET keep = 1 WHERE id = 'second'");
+      },
+    };
+    const result = await retentionBatch({ db: t.db, storage, installId: INSTALL }, SETTINGS, NOW);
+    expect(result.meetings).toBe(2);
+    expect(deleted).toEqual(['recordings/test/first/first-r.webm']);
+    expect(t.recording('second')).toEqual({
+      storage_path: 'recordings/test/second/second-r.webm',
+      delete_audio_at: null,
+    });
+    expect(t.meeting('second')?.deleted_at).toBeNull();
+    expect(t.meeting('first')?.deleted_at).toBe(NOW.getTime());
+    expect(result.skipped).toEqual([{ id: 'second', reason: 'changed' }]);
+  });
+
+  it('a Keep set before the transcript batch keeps every transcript row', async () => {
+    const t = setup();
+    await t.full('kept-late', 400);
+    const storage = {
+      delete: async () => {
+        // The audio went; then the owner pressed Keep before the transcript batch.
+        t.sqlite.exec("UPDATE meetings SET keep = 1 WHERE id = 'kept-late'");
+      },
+    };
+    await retentionBatch({ db: t.db, storage, installId: INSTALL }, SETTINGS, NOW);
+    for (const table of [
+      'segments',
+      'transcripts',
+      'recaps',
+      'recap_versions',
+      'decisions',
+      'meeting_search',
+    ]) {
+      expect(t.count(table, 'kept-late'), table).toBeGreaterThan(0);
+    }
+    expect(t.meeting('kept-late')?.deleted_at).toBeNull();
+  });
+
+  it('puts the audio paths back when storage refuses, so the next try finds them', async () => {
+    const t = setup();
+    t.f.meeting('m', { owner: 'owner', startedAt: ago(40) });
+    t.f.recording('m-r', 'm');
+    const storage = { delete: async () => Promise.reject(new Error('R2 down')) };
+    await expect(
+      retentionBatch({ db: t.db, storage, installId: INSTALL }, SETTINGS, NOW),
+    ).rejects.toThrow('R2 down');
+    expect(t.recording('m')).toEqual({
+      storage_path: 'recordings/test/m/m-r.webm',
+      delete_audio_at: null,
+    });
+    expect((await t.run()).audioDeleted).toBe(1);
+  });
+
+  it('lists the meetings it leaves alone, with the reason', async () => {
+    const t = setup();
+    await t.full('kept', 400, true);
+    t.f.meeting('uploading', { owner: 'owner', startedAt: ago(400) });
+    t.f.recording('uploading-r', 'uploading', { status: 'uploading' });
+    await t.full('mixed', 400);
+    t.sqlite.exec(
+      "INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('foreign-s', 'other', 'mixed', 'X')",
+    );
+    await t.full('recent', 10, true);
+    const result = await retentionBatch(
+      { db: t.db, storage: { delete: async () => {} }, installId: INSTALL },
+      SETTINGS,
+      NOW,
+      100,
+      { reportSkips: true },
+    );
+    expect(result.meetings).toBe(0);
+    expect(result.skipped.sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: 'kept', reason: 'keep' },
+      { id: 'mixed', reason: 'foreign_rows' },
+      { id: 'uploading', reason: 'open_upload' },
+    ]);
+  });
 });

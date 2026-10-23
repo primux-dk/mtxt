@@ -39,6 +39,8 @@ export interface RetentionJob {
   install_id: string;
   /** Epoch milliseconds. */
   now: number;
+  /** 0 for the cron's job, then 1, 2, ... for the batches it queues. */
+  batch?: number;
 }
 
 export type Job = TranscribeJob | RecapJob | DrainTranscriptionsJob | RetentionJob;

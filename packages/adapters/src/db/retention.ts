@@ -1,10 +1,10 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import type { StorageAdapter } from '../storage';
 import type { Db } from './index';
 import { foreignRowsSql } from './integrity';
 import * as schema from './schema';
 import type { Settings } from './schema';
-import { dropFromSearchStatement } from './search';
+import { meetingKey, meetingSearch } from './search';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 /** A deletion is announced on the meeting page this long ahead (behaviour.md rule 3). */
@@ -63,37 +63,48 @@ export function retentionNotice(
   return { kind, at, overdue: at.getTime() <= now.getTime() };
 }
 
+/** Why a meeting past a deadline was left alone. `changed` means it stopped qualifying between selection and deletion, for example a Keep. */
+export type RetentionSkipReason = 'keep' | 'open_upload' | 'foreign_rows' | 'changed';
+
 export interface RetentionResult {
-  /** Meetings this batch looked at. */
+  /** Meetings this batch selected. */
   meetings: number;
   audioDeleted: number;
   textDeleted: number;
   /** Meetings whose audio and transcript are both gone, now marked deleted. */
   markedDeleted: number;
+  /** Meetings past a deadline that were left alone, with the reason; ids only. */
+  skipped: { id: string; reason: RetentionSkipReason }[];
   /** The batch was full: queue another. */
   more: boolean;
 }
+
+/** The most skipped meetings one report lists. */
+export const RETENTION_SKIPS_LISTED = 1000;
 
 /**
  * One batch of retention for one install, as of `now`. Picks up to `limit`
  * meetings without `keep` that have something past its deadline:
  *
- * - audio past `retention_audio_days`: the objects go from storage, then
- *   `storage_path` is cleared and `delete_audio_at` records when;
- * - past `retention_transcript_days`: segments, transcripts, recaps (and
- *   their docx), versions and decisions, and their search rows;
+ * - audio past `retention_audio_days`: `storage_path` is cleared and
+ *   `delete_audio_at` records when, then the objects go from storage;
+ * - past `retention_transcript_days`: segments, transcripts, recaps,
+ *   versions, decisions and their search rows, then the recaps' docx;
  * - past both: the meeting keeps its row, with `deleted_at` set.
  *
- * A meeting with an upload still open, or with rows of another install
- * under it, is left for a later night. Every meeting it touches leaves the
- * selection, so batches end. Storage goes before rows, so a failure leaves
- * rows to try again, never orphaned audio.
+ * Every write carries the whole eligibility in its WHERE (no `keep`, not
+ * deleted, the deadline passed, no upload open, no rows of another install),
+ * so a Keep set after selection wins. Storage is deleted only for the rows
+ * that write changed; if the audio delete fails, the paths are put back
+ * for the next try. With `reportSkips`, the meetings past a deadline that
+ * are left alone are listed with the reason.
  */
 export async function retentionBatch(
   ctx: { db: Db; storage: Pick<StorageAdapter, 'delete'>; installId: string },
   settings: RetentionSettings,
   now: Date,
   limit = RETENTION_BATCH,
+  options: { reportSkips?: boolean } = {},
 ): Promise<RetentionResult> {
   const { db, storage, installId } = ctx;
   const t = now.getTime();
@@ -101,22 +112,30 @@ export async function retentionBatch(
   const textCutoff = t - settings.retentionTranscriptDays * DAY_MS;
   const bothCutoff = Math.min(audioCutoff, textCutoff);
 
+  const uploading = (meeting: SQL) => sql`exists (select 1 from recordings u
+    where u.install_id = ${installId} and u.meeting_id = ${meeting} and u.status = 'uploading')`;
+  /** The meeting may lose what falls due at `cutoff`, checked inside the statement that deletes. */
+  const eligible = (meetingId: string, cutoff: number) => sql`exists (select 1 from meetings g
+    where g.id = ${meetingId} and g.install_id = ${installId} and g.keep = 0
+      and g.deleted_at is null and g.started_at <= ${cutoff}
+      and not ${uploading(sql`g.id`)}
+      and ${foreignRowsSql(installId, sql`g.id`)} = 0)`;
+
   const hasAudio = sql`exists (select 1 from recordings r where r.install_id = ${installId}
     and r.meeting_id = m.id and r.storage_path != '')`;
   const hasText = sql`(exists (select 1 from transcripts tr join recordings r on r.id = tr.recording_id
       where tr.install_id = ${installId} and r.install_id = ${installId} and r.meeting_id = m.id)
     or exists (select 1 from recaps c where c.install_id = ${installId} and c.meeting_id = m.id))`;
+  const due = sql`m.install_id = ${installId} and m.deleted_at is null
+      and m.started_at <= ${Math.max(audioCutoff, textCutoff)}
+      and ((m.started_at <= ${audioCutoff} and ${hasAudio})
+        or (m.started_at <= ${textCutoff} and ${hasText})
+        or m.started_at <= ${bothCutoff})`;
 
   const picked = await db.all<{ id: string; started_at: number; audio: number; text: number }>(sql`
     select m.id, m.started_at, ${hasAudio} as audio, ${hasText} as text
     from meetings m
-    where m.install_id = ${installId} and m.keep = 0 and m.deleted_at is null
-      and m.started_at <= ${Math.max(audioCutoff, textCutoff)}
-      and ((m.started_at <= ${audioCutoff} and ${hasAudio})
-        or (m.started_at <= ${textCutoff} and ${hasText})
-        or m.started_at <= ${bothCutoff})
-      and not exists (select 1 from recordings r where r.install_id = ${installId}
-        and r.meeting_id = m.id and r.status = 'uploading')
+    where ${due} and m.keep = 0 and not ${uploading(sql`m.id`)}
       and ${foreignRowsSql(installId, sql`m.id`)} = 0
     order by m.started_at, m.id
     limit ${limit}`);
@@ -126,28 +145,63 @@ export async function retentionBatch(
     audioDeleted: 0,
     textDeleted: 0,
     markedDeleted: 0,
+    skipped: [],
     more: picked.length === limit,
   };
 
+  if (options.reportSkips) {
+    result.skipped = await db.all<{ id: string; reason: RetentionSkipReason }>(sql`
+      select m.id, case when m.keep = 1 then 'keep'
+        when ${uploading(sql`m.id`)} then 'open_upload' else 'foreign_rows' end as reason
+      from meetings m
+      where ${due} and (m.keep = 1 or ${uploading(sql`m.id`)}
+        or ${foreignRowsSql(installId, sql`m.id`)} > 0)
+      order by m.started_at, m.id
+      limit ${RETENTION_SKIPS_LISTED}`);
+  }
+
   for (const meeting of picked) {
     const started = Number(meeting.started_at);
+    let touched = false;
+
     if (started <= audioCutoff && Number(meeting.audio)) {
       const recs = await db.all<{ id: string; storage_path: string }>(sql`
         select id, storage_path from recordings
         where install_id = ${installId} and meeting_id = ${meeting.id} and storage_path != ''`);
-      if (recs.length) {
-        await storage.delete(recs.map((r) => r.storage_path));
-        await db.run(sql`update recordings set storage_path = '', delete_audio_at = ${t}
-          where install_id = ${installId} and meeting_id = ${meeting.id} and storage_path != ''`);
+      const path = new Map(recs.map((r) => [r.id, r.storage_path]));
+      const claimed = recs.length
+        ? await db.all<{
+            id: string;
+          }>(sql`update recordings set storage_path = '', delete_audio_at = ${t}
+            where install_id = ${installId} and meeting_id = ${meeting.id} and storage_path != ''
+              and id in (${sql.join(
+                recs.map((r) => sql`${r.id}`),
+                sql`, `,
+              )})
+              and ${eligible(meeting.id, audioCutoff)}
+            returning id`)
+        : [];
+      if (claimed.length) {
+        try {
+          await storage.delete(claimed.map((r) => path.get(r.id)!));
+        } catch (error) {
+          // The objects may still be there: put the paths back, so the retry finds them.
+          for (const r of claimed) {
+            await db.run(sql`update recordings set storage_path = ${path.get(r.id)!}, delete_audio_at = null
+              where install_id = ${installId} and id = ${r.id} and storage_path = ''`);
+          }
+          throw error;
+        }
         result.audioDeleted++;
+        touched = true;
       }
     }
 
     if (started <= textCutoff && Number(meeting.text)) {
-      const docx = await db.all<{ docx_path: string }>(sql`
-        select docx_path from recaps where install_id = ${installId}
+      const docx = await db.all<{ id: string; docx_path: string }>(sql`
+        select id, docx_path from recaps where install_id = ${installId}
           and meeting_id = ${meeting.id} and docx_path is not null`);
-      if (docx.length) await storage.delete(docx.map((d) => d.docx_path));
+      const guard = eligible(meeting.id, textCutoff);
       const recs = db
         .select({ id: schema.recordings.id })
         .from(schema.recordings)
@@ -172,15 +226,19 @@ export async function retentionBatch(
         .where(
           and(eq(schema.recaps.installId, installId), eq(schema.recaps.meetingId, meeting.id)),
         );
-      await db.batch([
+      const [, , , gone, , dropped] = await db.batch([
         db
           .update(schema.recaps)
           .set({ currentVersionId: null })
-          .where(inArray(schema.recaps.id, caps)),
+          .where(and(inArray(schema.recaps.id, caps), guard)),
         db
           .delete(schema.decisions)
           .where(
-            and(eq(schema.decisions.installId, installId), inArray(schema.decisions.recapId, caps)),
+            and(
+              eq(schema.decisions.installId, installId),
+              inArray(schema.decisions.recapId, caps),
+              guard,
+            ),
           ),
         db
           .delete(schema.recapVersions)
@@ -188,19 +246,26 @@ export async function retentionBatch(
             and(
               eq(schema.recapVersions.installId, installId),
               inArray(schema.recapVersions.recapId, caps),
+              guard,
             ),
           ),
         db
           .delete(schema.recaps)
           .where(
-            and(eq(schema.recaps.installId, installId), eq(schema.recaps.meetingId, meeting.id)),
-          ),
+            and(
+              eq(schema.recaps.installId, installId),
+              eq(schema.recaps.meetingId, meeting.id),
+              guard,
+            ),
+          )
+          .returning({ id: schema.recaps.id }),
         db
           .delete(schema.segments)
           .where(
             and(
               eq(schema.segments.installId, installId),
               inArray(schema.segments.transcriptId, trs),
+              guard,
             ),
           ),
         db
@@ -209,18 +274,47 @@ export async function retentionBatch(
             and(
               eq(schema.transcripts.installId, installId),
               inArray(schema.transcripts.recordingId, recs),
+              guard,
+            ),
+          )
+          .returning({ id: schema.transcripts.id }),
+        db
+          .delete(meetingSearch)
+          .where(
+            and(
+              sql`meeting_search match ${`meeting_key : "${meetingKey(meeting.id)}"`}`,
+              eq(meetingSearch.installId, installId),
+              inArray(meetingSearch.kind, ['segment', 'recap']),
+              guard,
             ),
           ),
-        dropFromSearchStatement(db, installId, meeting.id, ['segment', 'recap']),
       ]);
-      result.textDeleted++;
+      const goneIds = new Set(gone.map((r) => r.id));
+      // The docx of the recaps that went; an export can be made again, so a failure here is logged, not retried.
+      const keys = docx.filter((d) => goneIds.has(d.id)).map((d) => d.docx_path);
+      if (keys.length) {
+        await storage.delete(keys).catch((error) => {
+          console.error('Retention could not delete export objects', keys, error);
+        });
+      }
+      if (gone.length || dropped.length) {
+        result.textDeleted++;
+        touched = true;
+      }
     }
 
     if (started <= bothCutoff) {
-      await db.run(sql`update meetings set deleted_at = ${t}
-        where install_id = ${installId} and id = ${meeting.id} and deleted_at is null`);
-      result.markedDeleted++;
+      const marked = await db.all<{ id: string }>(sql`update meetings set deleted_at = ${t}
+        where install_id = ${installId} and id = ${meeting.id} and deleted_at is null
+          and ${eligible(meeting.id, bothCutoff)}
+        returning id`);
+      if (marked.length) {
+        result.markedDeleted++;
+        touched = true;
+      }
     }
+
+    if (!touched) result.skipped.push({ id: meeting.id, reason: 'changed' });
   }
   return result;
 }

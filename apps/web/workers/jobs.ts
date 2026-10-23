@@ -84,13 +84,35 @@ export const handleJobs = routeJobs<CloudflareEnv>({
 export async function runRetention(job: RetentionJob, env: CloudflareEnv) {
   const { db, storage, queue, installId } = cloudflareAdapters(env);
   const settings = await readSettings(db, installId);
-  const result = await retentionBatch({ db, storage, installId }, settings, new Date(job.now));
+  const batch = job.batch ?? 0;
+  // The night's first batch lists what is past a deadline and left alone; later ones add what changed meanwhile.
+  const result = await retentionBatch(
+    { db, storage, installId },
+    settings,
+    new Date(job.now),
+    undefined,
+    {
+      reportSkips: batch === 0,
+    },
+  );
+  for (const skip of result.skipped) console.info(`Retention skipped ${skip.id}: ${skip.reason}`);
+  const skips = Object.entries(
+    result.skipped.reduce<Record<string, number>>(
+      (n, s) => ({ ...n, [s.reason]: (n[s.reason] ?? 0) + 1 }),
+      {},
+    ),
+  )
+    .map(([reason, n]) => `${n} ${reason}`)
+    .join(', ');
   console.log(
-    `Retention as of ${new Date(job.now).toISOString()}: ${result.meetings} meetings, ` +
-      `${result.audioDeleted} audio, ${result.textDeleted} transcripts, ${result.markedDeleted} marked deleted` +
+    `Retention as of ${new Date(job.now).toISOString()}, batch ${batch}: ${result.meetings} meetings, ` +
+      `${result.audioDeleted} audio, ${result.textDeleted} transcripts, ${result.markedDeleted} marked deleted, ` +
+      `skipped ${skips || 'none'}` +
       (result.more ? '; queueing the next batch' : ''),
   );
-  if (result.more) await queue.send({ type: 'retention', install_id: installId, now: job.now });
+  if (result.more) {
+    await queue.send({ type: 'retention', install_id: installId, now: job.now, batch: batch + 1 });
+  }
 }
 
 /**

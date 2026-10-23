@@ -101,7 +101,9 @@ export {
   retentionBatch,
   retentionDeadlines,
   retentionNotice,
+  RETENTION_SKIPS_LISTED,
   type RetentionNotice,
+  type RetentionSkipReason,
   type RetentionResult,
 } from './db/retention';
 export {
