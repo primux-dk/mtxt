@@ -473,17 +473,6 @@ export function SettingsForm({
                 />
               </Field>
             )}
-            {stt === 'elevenlabs' && (
-              <Field id="sttRegion" label={t('stt.region')} error={errors.sttRegion}>
-                <select
-                  {...select('sttRegion')}
-                  defaultValue={values.sttProvider === 'elevenlabs' ? values.sttRegion : ''}
-                >
-                  <option value="">{t('stt.regionDefault')}</option>
-                  <option value="eu">{t('stt.regionEu')}</option>
-                </select>
-              </Field>
-            )}
             <Field
               id="aiGatewayId"
               label={tAll('stt.gateway.field')}

@@ -40,9 +40,12 @@ export const TRANSCRIPTION_LANGUAGES = [
 ] as const;
 /** Providers that need an API key. Workers AI uses the Worker's own binding; local models run on the install. */
 export const STT_NEEDS_KEY: readonly SttProvider[] = ['assemblyai', 'azure', 'elevenlabs'];
-export const ELEVENLABS_REGIONS = ['', 'eu'] as const;
 /** The providers this build transcribes with (lib/stt AVAILABLE_PROVIDERS); the rest are refused at save. */
-export const STT_AVAILABLE: readonly SttProvider[] = ['assemblyai', 'workers-ai-whisper'];
+export const STT_AVAILABLE: readonly SttProvider[] = [
+  'assemblyai',
+  'elevenlabs',
+  'workers-ai-whisper',
+];
 /** A Cloudflare AI Gateway id: letters, digits, - and _. */
 const GATEWAY_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
@@ -227,10 +230,8 @@ export function validateSettings(
       if (!region) errors.sttRegion = { code: 'required' };
       else if (!AZURE_REGION.test(region)) errors.sttRegion = { code: 'regionFormat' };
       else sttRegion = region;
-    } else if (sttProvider === 'elevenlabs') {
-      if (!oneOf(ELEVENLABS_REGIONS, region)) errors.sttRegion = { code: 'invalid' };
-      else sttRegion = region || null;
     }
+    // ElevenLabs takes no region: its EU residency endpoint is Enterprise-only (packet 11).
   }
 
   const aiGatewayId = text('aiGatewayId');

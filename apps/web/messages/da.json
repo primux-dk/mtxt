@@ -484,8 +484,6 @@
       "local": "Lokal {model}",
       "apiKey": "API-nøgle",
       "region": "Region",
-      "regionEu": "EU",
-      "regionDefault": "Udbyderens standard",
       "regionHelp": "Azure viser sine tilgængelige regioner.",
       "language": "Standardsprog for transskription",
       "autoDetect": "Find sproget automatisk",
@@ -575,6 +573,8 @@
       "step2": "{provider} modtager lyd og nøgleord direkte på sit EU-endpoint, ikke gennem AI Gateway, som ikke understøtter den. Den sender tekst og talere tilbage.",
       "step2WorkersAi": "{provider} kører på Workers AI i virksomhedens egen Cloudflare-konto. Lyd og nøgleord sendes til den gennem AI Gateway. Den sender tekst uden talere tilbage.",
       "step2WorkersAiDirect": "{provider} kører på Workers AI i virksomhedens egen Cloudflare-konto. Der er ikke angivet et AI Gateway-ID, så lyd og nøgleord sendes direkte til den. Den sender tekst uden talere tilbage.",
+      "step2ElevenLabs": "{provider} modtager lyd og nøgleord gennem AI Gateway i virksomhedens Cloudflare-konto. Den sender tekst og talere tilbage. På en selvbetjent ElevenLabs-plan behandler ElevenLabs lyden i USA og gemmer den i sin forespørgselshistorik; EU-dataophold og ingen opbevaring kræver Enterprise.",
+      "step2ElevenLabsDirect": "Der er ikke angivet et AI Gateway-ID, så {provider} modtager lyd og nøgleord direkte. Den sender tekst og talere tilbage. På en selvbetjent ElevenLabs-plan behandler ElevenLabs lyden i USA og gemmer den i sin forespørgselshistorik; EU-dataophold og ingen opbevaring kræver Enterprise.",
       "step2Unavailable": "{provider} findes ikke i denne version, så der sendes ingen lyd til den. Vælg en udbyder, som denne version transskriberer med.",
       "step2None": "Der er ikke valgt en udbyder af tale til tekst endnu. Lyden gemmes, og transskriptionen venter, til der er valgt en.",
       "step3": "{provider} skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
@@ -705,10 +705,10 @@
     "retry": "Prøv igen"
   },
   "stt": {
-    "supported": "Denne version transskriberer med {providers}. AssemblyAI kører Universal-3.5 Pro, og Universal-2 for et sprog, Universal-3.5 Pro ikke har. De andre udbydere på listen kommer senere.",
+    "supported": "Denne version transskriberer med {providers}. AssemblyAI kører Universal-3.5 Pro, og Universal-2 for et sprog, Universal-3.5 Pro ikke har. ElevenLabs kører Scribe v2. De andre udbydere på listen kommer senere.",
     "gateway": {
       "field": "AI Gateway-id",
-      "help": "Forespørgsler til Workers AI og til referatmodellen går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde dem direkte."
+      "help": "Forespørgsler til ElevenLabs, Workers AI og referatmodellen går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde dem direkte."
     },
     "drainFailed": "Indstillingerne blev gemt, men de optagelser, der venter på en udbyder, blev ikke sat i kø. Gem igen for at sætte dem i kø."
   },

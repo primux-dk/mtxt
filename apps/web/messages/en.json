@@ -484,8 +484,6 @@
       "local": "Local {model}",
       "apiKey": "API key",
       "region": "Region",
-      "regionEu": "EU",
-      "regionDefault": "Provider default",
       "regionHelp": "Azure lists its available regions.",
       "language": "Default transcription language",
       "autoDetect": "Detect automatically",
@@ -575,6 +573,8 @@
       "step2": "{provider} receives audio and keyterms directly at its EU endpoint, not through AI Gateway, which does not support it. It returns text and speakers.",
       "step2WorkersAi": "{provider} runs on Workers AI in the company's own Cloudflare account. Audio and keyterms go to it through AI Gateway. It returns text without speakers.",
       "step2WorkersAiDirect": "{provider} runs on Workers AI in the company's own Cloudflare account. No AI Gateway ID is set, so audio and keyterms go to it directly. It returns text without speakers.",
+      "step2ElevenLabs": "{provider} receives audio and keyterms through AI Gateway in the company's Cloudflare account. It returns text and speakers. On a self-serve ElevenLabs plan, ElevenLabs processes the audio in the US and keeps it in its request history; EU residency and zero retention are Enterprise-only.",
+      "step2ElevenLabsDirect": "No AI Gateway ID is set, so {provider} receives audio and keyterms directly. It returns text and speakers. On a self-serve ElevenLabs plan, ElevenLabs processes the audio in the US and keeps it in its request history; EU residency and zero retention are Enterprise-only.",
       "step2Unavailable": "{provider} is not available in this version, so no audio goes to it. Choose a provider this version transcribes with.",
       "step2None": "No speech-to-text provider is chosen yet. Audio is stored, and transcription waits until one is chosen.",
       "step3": "{provider} writes the recap from the transcript, and the requests go through AI Gateway. Meeting data is stored in D1.",
@@ -705,10 +705,10 @@
     "retry": "Try again"
   },
   "stt": {
-    "supported": "This version transcribes with {providers}. AssemblyAI runs Universal-3.5 Pro, and Universal-2 for a language Universal-3.5 Pro lacks. The other providers in the list arrive later.",
+    "supported": "This version transcribes with {providers}. AssemblyAI runs Universal-3.5 Pro, and Universal-2 for a language Universal-3.5 Pro lacks. ElevenLabs runs Scribe v2. The other providers in the list arrive later.",
     "gateway": {
       "field": "AI Gateway ID",
-      "help": "Workers AI requests and the recap model's go through this gateway in the company's Cloudflare account. Leave it empty to call them directly."
+      "help": "Requests to ElevenLabs, Workers AI and the recap model go through this gateway in the company's Cloudflare account. Leave it empty to call them directly."
     },
     "drainFailed": "The settings were saved, but the recordings that wait for a provider were not queued. Save again to queue them."
   },
