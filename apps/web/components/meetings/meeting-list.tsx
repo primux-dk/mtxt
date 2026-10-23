@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { LocalTime } from '@/components/local-time';
@@ -66,7 +67,13 @@ export async function MeetingList({ rows, restore }: { rows: LibraryRow[]; resto
         ) : (
           <li
             key={row.id}
-            className="grid grid-cols-[minmax(0,1fr)_130px_118px] items-center gap-4 border-b border-line-subtle p-5 last:border-b-0 max-shell:grid-cols-2 max-shell:gap-3 max-shell:p-4"
+            className={cn(
+              'grid items-center gap-4 border-b border-line-subtle p-5 last:border-b-0 max-shell:grid-cols-2 max-shell:gap-3 max-shell:p-4',
+              // Archived rows carry Restore beside the state, which 118 px does not hold.
+              restore
+                ? 'grid-cols-[minmax(0,1fr)_130px_auto]'
+                : 'grid-cols-[minmax(0,1fr)_130px_118px]',
+            )}
           >
             <div className="min-w-0 max-shell:col-span-2">
               <h3 className="text-base font-[550] tracking-[-0.015em] max-shell:text-[15px]">
