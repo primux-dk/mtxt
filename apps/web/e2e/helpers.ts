@@ -139,17 +139,22 @@ function localStore(kind: 'd1/miniflare-D1DatabaseObject' | 'r2/miniflare-R2Buck
 }
 
 /**
- * Opens a local store's SQLite file beside the running Worker. The Worker
- * writes it in WAL mode; a read or write that meets its lock waits for it
- * (busy timeout, 10 s) instead of failing with SQLITE_BUSY. Opening the file
- * costs milliseconds, where a `wrangler d1 execute` boots its own Miniflare
- * for about 1.6 s and blocks the test's event loop meanwhile.
+ * Opens a local store's SQLite file beside the running Worker: read-only for
+ * an assertion, writable only for a fixture that changes rows. The Worker
+ * writes the file in WAL mode; a read or write that meets its lock waits for
+ * it (busy timeout, 10 s) instead of failing with SQLITE_BUSY. Opening the
+ * file costs milliseconds, where a `wrangler d1 execute` boots its own
+ * Miniflare for about 1.6 s and blocks the test's event loop meanwhile.
  */
 export function withLocalStore<T>(
   kind: Parameters<typeof localStore>[0],
+  mode: 'read' | 'write',
   run: (db: DatabaseSync) => T,
 ): T {
-  const db = new DatabaseSync(localStore(kind), { timeout: 10_000 });
+  const db = new DatabaseSync(localStore(kind), {
+    readOnly: mode === 'read',
+    timeout: 10_000,
+  });
   try {
     return run(db);
   } finally {
@@ -159,13 +164,21 @@ export function withLocalStore<T>(
 
 /**
  * A statement on the e2e run's local D1, for checks the API rightly cannot
- * make, such as rows of another install. Foreign keys are on, as in D1.
- * Several statements run as one script and return no rows.
+ * make, such as rows of another install. A single SELECT (or WITH ... SELECT)
+ * opens the file read-only, so an assertion can never change the install;
+ * anything else is a fixture and opens it writable, with foreign keys on as
+ * in D1. Several statements run as one script and return no rows.
  */
 export function d1<T = Record<string, unknown>>(sql: string): T[] {
-  return withLocalStore('d1/miniflare-D1DatabaseObject', (db) => {
+  const script = sql.trim().replace(/;$/, '').includes(';');
+  if (!script && /^\s*(select|with)\b/i.test(sql)) {
+    return withLocalStore('d1/miniflare-D1DatabaseObject', 'read', (db) =>
+      db.prepare(sql).all(),
+    ) as T[];
+  }
+  return withLocalStore('d1/miniflare-D1DatabaseObject', 'write', (db) => {
     db.exec('PRAGMA foreign_keys = ON');
-    if (sql.trim().replace(/;$/, '').includes(';')) {
+    if (script) {
       db.exec(sql);
       return [];
     }

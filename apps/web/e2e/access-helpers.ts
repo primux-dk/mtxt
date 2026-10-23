@@ -42,6 +42,7 @@ export async function dropActions(page: Page) {
 export function r2Has(key: string): boolean {
   return withLocalStore(
     'r2/miniflare-R2BucketObject',
+    'read',
     (db) => db.prepare('select 1 from _mf_objects where key = ?').get(key) !== undefined,
   );
 }
