@@ -11,6 +11,7 @@ import {
   asUser,
   d1,
   DESKTOP,
+  expectFocusRing,
   PHONE,
   SESSION_HEADERS,
   settle,
@@ -228,6 +229,75 @@ test('a 2 KB URL fits the list, and a disabled endpoint gets nothing', async ({ 
   }
 });
 
+test('keyboard only: add an endpoint, copy nothing, delete it, and focus lands where it should', async ({
+  page,
+}) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto('/settings');
+  const section = webhooksSection(page);
+  const add = section.getByRole('button', { name: 'Add endpoint' });
+  await add.focus();
+  await expectFocusRing(add);
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Add endpoint' });
+  await expect(dialog.getByLabel('Label')).toBeFocused();
+  await page.keyboard.type('Tastatur');
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByLabel('URL')).toBeFocused();
+  await page.keyboard.type(receiverUrl);
+  // Space unticks the focused event; Enter in a field submits the dialog, not the settings form.
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Space');
+  await expect(dialog.getByRole('checkbox', { name: /Transcript ready/ })).not.toBeChecked();
+  await dialog.getByLabel('URL').focus();
+  await page.keyboard.press('Enter');
+  const shown = page.getByRole('dialog', { name: 'Copy the signing secret' });
+  await expect(shown.getByLabel('Signing secret')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(add).toBeFocused();
+  // The settings form was not submitted along the way.
+  await expect(page.getByText('Settings saved.')).toHaveCount(0);
+
+  const remove = section.getByRole('button', { name: 'Delete Tastatur' });
+  await remove.focus();
+  await page.keyboard.press('Enter');
+  const confirm = page.getByRole('dialog', { name: 'Delete this endpoint?' });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Delete' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Tastatur is deleted.')).toBeVisible();
+  await expect(add).toBeFocused();
+  expect(d1(`select id from webhook_endpoints where label = 'Tastatur'`)).toEqual([]);
+});
+
+test('rule 2: a refused Enable and Delete go back to what the server has', async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await page.goto('/settings');
+  const section = webhooksSection(page);
+  // Server actions post to the page's own URL; these never arrive.
+  await page.route('**/settings', (route) =>
+    route.request().method() === 'POST' ? route.abort() : route.continue(),
+  );
+  await section.getByRole('button', { name: 'Enable CRM' }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'The change was not saved' }),
+  ).toBeVisible();
+  await expect(section.getByRole('button', { name: 'Enable CRM' })).toBeVisible();
+  await section.getByRole('button', { name: 'Delete CRM' }).click();
+  await page
+    .getByRole('dialog', { name: 'Delete this endpoint?' })
+    .getByRole('button', { name: 'Delete' })
+    .click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'The endpoint could not be deleted' }),
+  ).toBeVisible();
+  await expect(section.getByTestId('webhook-endpoint').filter({ hasText: 'CRM' })).toBeVisible();
+  await page.unroute('**/settings');
+  expect(
+    d1<{ enabled: number }>(`select enabled from webhook_endpoints where label = 'CRM'`),
+  ).toEqual([{ enabled: 0 }]);
+});
+
 test('a company meeting goes out by itself after the transcript and after the recap, signed, without content', async ({
   request,
 }) => {
@@ -344,6 +414,9 @@ test('a private meeting is not sent until its owner sends it; a reader sees no a
   await page.setViewportSize(DESKTOP);
   await page.goto(`/meetings/${meetingId}`);
   await page.getByRole('button', { name: 'More actions' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Send to Alex' })).toBeVisible();
+  await settle(page);
+  await page.screenshot({ path: shot('webhook-send-menu-1280') });
   await page.getByRole('menuitem', { name: 'Send to Alex' }).click();
   await expect(page.getByTestId('webhook-sent')).toHaveText('Alex gets this meeting now.');
   await expect
