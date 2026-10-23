@@ -156,11 +156,24 @@ export {
   pollGrant,
   pruneRecorderRows,
   revokeRecorderToken,
+  revokeToken,
   type GrantInput,
   type PollResult,
   type RecorderConnection,
 } from './db/recorders';
 export {
+  createApiToken,
+  listApiTokens,
+  takeApiRequest,
+  type ApiTokenRow,
+  type RateResult,
+} from './db/api-tokens';
+export {
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_MS,
+  API_TOKEN_DAYS,
+  API_TOKEN_DEFAULT_DAYS,
+  API_TOKEN_NAME_MAX,
   bearerToken,
   CHALLENGE_PATTERN,
   cleanDeviceName,
@@ -168,6 +181,7 @@ export {
   GRANT_LIFETIME_MS,
   hashRecorderToken,
   LAST_USED_EVERY_MS,
+  MAX_API_TOKENS,
   MAX_PENDING_GRANTS,
   newRecorderToken,
   PAIRING_ALPHABET,
@@ -175,6 +189,7 @@ export {
   POLL_ADVICE_S,
   POLL_INTERVAL_MS,
   pollAllowed,
+  rateAllowed,
   RECORDER_TOKEN_PATTERN,
   s256,
   safeEqual,
@@ -183,6 +198,13 @@ export {
   verifierMatches,
   VERIFIER_PATTERN,
 } from './recorder-auth';
-export type { RecorderGrant, RecorderGrantStatus, RecorderToken } from './db/schema';
+export type {
+  ApiTokenScope,
+  RecorderGrant,
+  RecorderGrantStatus,
+  RecorderToken,
+  TokenKind,
+} from './db/schema';
+export { API_TOKEN_SCOPES, TOKEN_KINDS } from './db/schema';
 export { foldTitle } from './db/fold';
 export { backfillTitleKeys } from './db/title-keys';

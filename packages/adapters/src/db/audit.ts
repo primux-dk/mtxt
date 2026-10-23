@@ -6,13 +6,25 @@ import { auditEvents, meetings, type AuditAction, type Visibility } from './sche
 export const OPENED_WINDOW_MS = 60 * 60 * 1000;
 
 /** What `details` holds, per action. User ids, so a renamed colleague shows under the new name. */
+/** A row written for a call with a personal API token: `via: 'api'` and the token's name. */
+export interface ViaApi {
+  via: 'api';
+  token: string;
+}
+
 export type AuditDetails =
-  | { before: Visibility; after: Visibility; sharesRemoved?: number }
-  | { before: string[]; after: string[] }
+  | ({ before: Visibility; after: Visibility; sharesRemoved?: number } & Partial<ViaApi>)
+  | ({ before: string[]; after: string[] } & Partial<ViaApi>)
+  /** `opened` through the API. A page's `opened` has no details. */
+  | ViaApi
   /** `exported`: which file the reader took; `via: 'webhook'` when an endpoint fetched a link. */
   | { format: 'md' | 'docx' | 'transcript'; via?: 'webhook'; endpoint?: string | null }
+  /** `exported` through the API: the transcript as JSON or text, the recap as markdown, Word or JSON. */
+  | ({ format: 'md' | 'docx' | 'json' | 'transcript' | 'text' } & ViaApi)
   /** `webhook_sent`: the endpoint's label (null when it has none) and the event it took. */
-  | { endpoint: string | null; event: string };
+  | { endpoint: string | null; event: string }
+  /** `api_token_created` and `api_token_revoked`: the token's name and scope. */
+  | { name: string; scope: string | null };
 
 export interface AuditEventInput {
   userId: string;
@@ -27,7 +39,8 @@ export interface AuditEventInput {
 
 /**
  * The one way an audit row is written. `opened` is skipped when the same
- * user has an `opened` row on the same meeting inside OPENED_WINDOW_MS; the
+ * user has an `opened` row on the same meeting, by the same way (the page
+ * or `via: 'api'`), inside OPENED_WINDOW_MS; the
  * check and the insert are one statement. Every other action is always
  * written. Answers whether a row was written.
  */
@@ -43,6 +56,8 @@ export async function audit(db: Db, installId: string, event: AuditEventInput): 
     await db.run(sql`insert into audit_events (${columns}) values (${values})`);
     return true;
   }
+  // A page's opens and the API's are counted apart, so neither hides the other.
+  const via = (event.details && 'via' in event.details && event.details.via) || '';
   const rows = await db.all<{ id: string }>(sql`
     insert into audit_events (${columns})
     select ${values}
@@ -50,6 +65,7 @@ export async function audit(db: Db, installId: string, event: AuditEventInput): 
       select 1 from audit_events
       where install_id = ${installId} and meeting_id = ${event.meetingId}
         and user_id = ${event.userId} and action = 'opened' and at > ${at - OPENED_WINDOW_MS}
+        and coalesce(json_extract(details, '$.via'), '') = ${via}
     )
     returning id`);
   return rows.length > 0;
