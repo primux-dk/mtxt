@@ -22,9 +22,11 @@ describe('contract', () => {
     expect(checkedIn.endsWith(generated)).toBe(true);
   });
 
-  it('declares the four recorder endpoints', async () => {
+  it('declares the recorder endpoints', async () => {
     const spec = parse(await readFile(specUrl, 'utf8'));
     expect(Object.keys(spec.paths).sort()).toEqual([
+      '/recorder/token',
+      '/recorder/tokens/{id}',
       '/recordings',
       '/recordings/{id}',
       '/recordings/{id}/chunks/{n}',
@@ -36,6 +38,25 @@ describe('contract', () => {
     const spec = parse(await readFile(specUrl, 'utf8'));
     expect(spec.components.schemas.RecordingStatus.enum).toEqual([...RECORDING_STATUSES]);
     expect(spec.components.schemas.RecordingSource.enum).toEqual([...RECORDING_SOURCES]);
+  });
+
+  it('asks for a bearer token everywhere but the token poll', async () => {
+    const spec = parse(await readFile(specUrl, 'utf8'));
+    expect(spec.security).toEqual([{ bearerAuth: [] }, { sessionCookie: [] }]);
+    expect(spec.components.securitySchemes.bearerAuth).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+    });
+    expect(spec.paths['/recorder/token'].post.security).toEqual([]);
+    expect(Object.keys(spec.paths['/recorder/token'].post.responses).sort()).toEqual([
+      '200',
+      '202',
+      '400',
+      '410',
+      '413',
+      '429',
+      '500',
+    ]);
   });
 
   it('uses 8 MB chunks', () => {

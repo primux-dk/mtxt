@@ -31,6 +31,10 @@ export type ChunkReceipt = Schemas['ChunkReceipt'];
 export type Conflict = Schemas['Conflict'];
 export type Recording = Schemas['Recording'];
 export type ApiError = Schemas['Error'];
+export type RecorderTokenRequest = Schemas['RecorderTokenRequest'];
+export type RecorderToken = Schemas['RecorderToken'];
+export type RecorderTokenPending = Schemas['RecorderTokenPending'];
+export type RateLimited = Schemas['RateLimited'];
 
 /** Every chunk but the last is this size. Matches `chunk_size_bytes` in v0.1. */
 export const CHUNK_SIZE_BYTES = 8 * 1024 * 1024;
@@ -54,6 +58,9 @@ export const ERROR_CODES = [
   'session_expired',
   'busy',
   'unsupported_media_type',
+  'rate_limited',
+  'expired',
+  'denied',
   'internal',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

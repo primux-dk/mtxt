@@ -10,6 +10,13 @@ info:
     "Confirmed" means the server holds the whole file and its SHA-256 matches.
     Only then does the recorder start its 7-day local timer.
 
+    A desktop recorder connects first (docs/spec.md "Recorder connection"):
+    it opens `/connect?challenge=<S256 of a verifier>&name=<device name>` in
+    the browser, the user approves there with the company login, and the
+    recorder polls `POST /recorder/token` with the challenge and the verifier
+    until it receives a bearer token. Every other call carries that token as
+    `Authorization: Bearer <token>`.
+
     The recorder and the server share only this file and the types generated
     from it.
   license:
@@ -19,8 +26,110 @@ servers:
   - url: /api/v1
     description: Relative to the install's own hostname.
 security:
-  - companyLogin: []
+  - bearerAuth: []
+  - sessionCookie: []
 paths:
+  /recorder/token:
+    post:
+      operationId: pollRecorderToken
+      summary: Exchange an approved connection for a bearer token. Poll until 200 or 410.
+      description: |
+        The recorder opened `/connect?challenge=<challenge>&name=<device name>`
+        in the default browser and now polls here every 2 seconds (the 202's
+        `Retry-After`) with the challenge and the verifier it was made from.
+
+        - 202: no grant for this challenge yet; the user has not approved.
+          Keep polling. The recorder gives up after 10 minutes on its own and
+          says "Open the recorder and connect again" in its own words.
+        - 200: the token, once. Store it in the OS keychain. The server keeps
+          only its hash, so a lost response cannot be repeated: the next poll
+          is 410 and the recorder connects again.
+        - 410: `expired` (the grant passed its 10 minutes or was already
+          used) or `denied` (the user chose Cancel, or the verifier does not
+          hash to the challenge). Stop polling; connect again.
+        - 429: more than one poll a second for this grant; wait `Retry-After`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecorderTokenRequest'
+      responses:
+        '200':
+          description: Approved. The token, with what the recorder needs to brand itself.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecorderToken'
+        '202':
+          description: Not approved yet. Poll again after `Retry-After` seconds.
+          headers:
+            Retry-After:
+              description: Seconds to wait before the next poll (2).
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecorderTokenPending'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '410':
+          description: The grant expired, was used, was denied, or the verifier does not match (`expired`, `denied`). Stop polling.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: The body is over 4 KiB (`too_large`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: More than one poll a second for this grant (`rate_limited`).
+          headers:
+            Retry-After:
+              description: Seconds to wait.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /recorder/tokens/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The `token_id` from the token response.
+        schema:
+          type: string
+    delete:
+      operationId: revokeRecorderToken
+      summary: Disconnect a recorder. The token stops working at once.
+      description: |
+        The recorder disconnects itself with its own `token_id` (a "Sign out"
+        in the recorder). Any of the caller's own recorder tokens may be
+        revoked; revoking one already revoked is 204 again. After revoking its
+        own token the recorder deletes it from the keychain; every later call
+        with it is 401.
+      responses:
+        '204':
+          description: Revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No recorder token with this id belongs to the caller (`not_found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
   /recordings:
     post:
       operationId: createRecording
@@ -218,10 +327,19 @@ paths:
           $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
-    companyLogin:
+    bearerAuth:
       type: http
       scheme: bearer
-      description: An access token from the install's company login (OIDC). Defined in v0.2.
+      description: |
+        A desktop recorder's token from `POST /recorder/token`: `mtxt_` and 43
+        base64url characters, valid 180 days, bound to one user and one
+        device. A missing, unknown, expired or revoked token is 401 with code
+        `unauthorized`; the recorder then connects again.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Secure-authjs.session-token
+      description: The library's own session, for the browser recorder and upload in the library. Not for the desktop recorder.
   parameters:
     RecordingId:
       name: id
@@ -237,7 +355,7 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     Unauthorized:
-      description: No valid company login.
+      description: No valid company login, or a bearer token that is unknown, expired or revoked (`unauthorized`).
       content:
         application/json:
           schema:
@@ -478,7 +596,8 @@ components:
             `forbidden`, `not_found`, `invalid_request`, `too_large`,
             `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
             `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
-            `unsupported_media_type` and `internal`.
+            `unsupported_media_type`, `rate_limited`, `expired`, `denied` and
+            `internal`.
         message:
           type: string
           description: English text for logs. The recorder shows its own localised message per code.
@@ -489,3 +608,76 @@ components:
       properties:
         error:
           $ref: '#/components/schemas/ErrorBody'
+    RecorderTokenRequest:
+      type: object
+      required: [challenge, verifier]
+      properties:
+        challenge:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
+          description: The challenge in the `/connect` URL, base64url SHA-256 of the verifier without padding (RFC 7636 S256).
+        verifier:
+          type: string
+          pattern: '^[A-Za-z0-9._~-]{43,128}$'
+          description: The code verifier, kept by the recorder and never shown to the browser. 32 random bytes in base64url (43 characters).
+    RecorderToken:
+      type: object
+      additionalProperties: false
+      required: [token, token_id, expires_at, device_name, user, install]
+      properties:
+        token:
+          type: string
+          pattern: '^mtxt_[A-Za-z0-9_-]{43}$'
+          description: 'Send as `Authorization: Bearer <token>`. Shown once.'
+        token_id:
+          type: string
+          description: For `DELETE /recorder/tokens/{id}`.
+        expires_at:
+          type: string
+          format: date-time
+          description: 180 days after the token was issued.
+        device_name:
+          type: string
+          description: The device name the user approved, as the library lists it.
+        user:
+          type: object
+          additionalProperties: false
+          required: [name]
+          properties:
+            name:
+              type: string
+              description: The user's display name, for the recorder's footer.
+        install:
+          type: object
+          additionalProperties: false
+          required: [product_name, theme_accent, theme_primary]
+          description: The install's branding. The recorder reads it here at connect.
+          properties:
+            product_name:
+              type: string
+            theme_accent:
+              type: string
+              pattern: '^#[0-9a-fA-F]{6}$'
+              description: Accent colour.
+            theme_primary:
+              type: string
+              pattern: '^#[0-9a-fA-F]{6}$'
+              description: Button colour.
+    RecorderTokenPending:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending]
+    RateLimited:
+      type: object
+      additionalProperties: false
+      required: [error, retry_after]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+        retry_after:
+          type: integer
+          minimum: 1
