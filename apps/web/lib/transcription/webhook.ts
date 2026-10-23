@@ -8,6 +8,7 @@
 */
 import { and, eq } from 'drizzle-orm';
 import { open, schema, type Db, type QueueAdapter } from '@mtxt/adapters';
+import { WEBHOOK_MAX_BYTES } from '../chunk-guard';
 import { ASSEMBLYAI_WEBHOOK_HEADER } from '../stt/assemblyai';
 import { webhookWakes } from './state';
 
@@ -33,6 +34,15 @@ export async function secretMatches(given: string, expected: string): Promise<bo
 
 const json = (status: number, body: unknown) => Response.json(body, { status });
 
+/** AssemblyAI's webhook body: an object with a transcript id of at most 128 characters and a known status. */
+export function parseWebhook(body: unknown): { transcriptId: string; status: string } | null {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+  const { transcript_id: id, status } = body as Record<string, unknown>;
+  if (typeof id !== 'string' || id.length < 1 || id.length > 128) return null;
+  if (status !== 'completed' && status !== 'error') return null;
+  return { transcriptId: id, status };
+}
+
 export async function assemblyAiWebhook(request: Request, deps: WebhookDeps): Promise<Response> {
   const given = request.headers.get(ASSEMBLYAI_WEBHOOK_HEADER) ?? '';
   let expected: string | null = null;
@@ -47,22 +57,29 @@ export async function assemblyAiWebhook(request: Request, deps: WebhookDeps): Pr
     return json(401, { error: { code: 'unauthorized', message: 'Wrong webhook secret.' } });
   }
 
-  let body: { transcript_id?: unknown; status?: unknown };
+  // Only now, with the secret checked, is the body read; the Worker entry caps it at 64 KiB.
+  let body: unknown;
   try {
-    body = (await request.json()) as typeof body;
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > WEBHOOK_MAX_BYTES) {
+      return json(413, { error: { code: 'too_large', message: 'The body is too large.' } });
+    }
+    body = JSON.parse(text);
   } catch {
     return json(400, { error: { code: 'invalid_request', message: 'Send JSON.' } });
   }
-  if (typeof body.transcript_id !== 'string' || !body.transcript_id) {
-    return json(400, { error: { code: 'invalid_request', message: 'transcript_id is missing.' } });
+  const parsed = parseWebhook(body);
+  if (!parsed) {
+    return json(400, {
+      error: { code: 'invalid_request', message: 'Send transcript_id and status.' },
+    });
   }
-
   const t = schema.transcripts;
   const transcript = await deps.db.query.transcripts.findFirst({
     where: and(
       eq(t.installId, deps.installId),
       eq(t.provider, 'assemblyai'),
-      eq(t.providerJobId, body.transcript_id),
+      eq(t.providerJobId, parsed.transcriptId),
     ),
   });
   if (!webhookWakes(transcript)) return json(200, { ok: true, ignored: true });

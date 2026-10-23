@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE_BYTES } from '@mtxt/contract';
-import { limitChunkBody } from '../lib/chunk-guard';
+import { limitChunkBody, limitWebhookBody, WEBHOOK_MAX_BYTES } from '../lib/chunk-guard';
 
 /** A byte stream of `total` bytes that counts what it hands over, as workerd gives a body. */
 function byteBody(total: number) {
@@ -58,5 +58,37 @@ describe('limitChunkBody', () => {
     const result = limitChunkBody(other);
     expect(result).not.toBeInstanceOf(Response);
     expect((result as { request: Request }).request).toBe(other);
+  });
+});
+
+describe('limitWebhookBody', () => {
+  const hook = 'http://localhost/api/v1/webhooks/assemblyai';
+  const post = (body: ReadableStream<Uint8Array> | string, headers: Record<string, string> = {}) =>
+    new Request(hook, { method: 'POST', body, headers, duplex: 'half' } as RequestInit);
+
+  it('refuses a declared length over 64 KiB with 413, unread', async () => {
+    const { stream, meter } = byteBody(WEBHOOK_MAX_BYTES + 10);
+    const result = limitWebhookBody(
+      post(stream, { 'content-length': String(WEBHOOK_MAX_BYTES + 1) }),
+    );
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(413);
+    expect(meter.provided).toBe(0);
+  });
+
+  it('reads at most 64 KiB + 1 of a 9 MiB body with no declared length', async () => {
+    const { stream, meter } = byteBody(9 * 1024 * 1024);
+    const guarded = limitWebhookBody(post(stream));
+    if (guarded instanceof Response) throw new Error('refused early');
+    await expect(guarded.request.arrayBuffer()).rejects.toThrow();
+    expect(guarded.overrun()).toBeGreaterThan(WEBHOOK_MAX_BYTES);
+    expect(meter.provided).toBeLessThanOrEqual(WEBHOOK_MAX_BYTES + 1);
+  });
+
+  it('passes a small body whole', async () => {
+    const guarded = limitWebhookBody(post('{"transcript_id":"a","status":"completed"}'));
+    if (guarded instanceof Response) throw new Error('refused');
+    expect(await guarded.request.text()).toBe('{"transcript_id":"a","status":"completed"}');
+    expect(guarded.overrun()).toBeNull();
   });
 });

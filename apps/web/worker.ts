@@ -7,7 +7,13 @@ import { cloudflareConsumer } from '@mtxt/adapters/cloudflare';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore .open-next/worker.js exists only after `opennextjs-cloudflare build`.
 import { default as nextHandler } from './.open-next/worker.js';
-import { chunkTooLarge, limitChunkBody, type Guarded } from './lib/chunk-guard';
+import {
+  chunkTooLarge,
+  limitChunkBody,
+  limitWebhookBody,
+  webhookTooLarge,
+  type Guarded,
+} from './lib/chunk-guard';
 import { keepEmptyRange } from './lib/http-range';
 import { handleJobs } from './workers/jobs';
 
@@ -15,23 +21,26 @@ export { UploadSession } from './workers/upload-session';
 
 const queue = cloudflareConsumer<unknown, CloudflareEnv>(handleJobs);
 
-/** A chunk body that ran past 8 MiB answers 413, whatever OpenNext made of the cut-off body. */
-function refused(guarded: Guarded): Response | null {
+/** A body that ran past its bound answers 413, whatever OpenNext made of the cut-off body. */
+function refused(guarded: Guarded, tooLarge: () => Response): Response | null {
   const taken = guarded.overrun();
   if (taken === null) return null;
-  console.log(`chunk body refused at the Worker entry after ${taken} bytes`);
-  return chunkTooLarge();
+  console.log(`body refused at the Worker entry after ${taken} bytes`);
+  return tooLarge();
 }
 
 export default {
   async fetch(request, env, ctx) {
-    const guarded = limitChunkBody(request);
+    const chunk = limitChunkBody(request);
+    if (chunk instanceof Response) return chunk;
+    const guarded = limitWebhookBody(chunk.request);
     if (guarded instanceof Response) return guarded;
+    const check = () => refused(chunk, chunkTooLarge) ?? refused(guarded, webhookTooLarge);
     try {
       const response = await nextHandler.fetch(keepEmptyRange(guarded.request), env, ctx);
-      return refused(guarded) ?? response;
+      return check() ?? response;
     } catch (error) {
-      const tooLarge = refused(guarded);
+      const tooLarge = check();
       if (tooLarge) return tooLarge;
       throw error;
     }
