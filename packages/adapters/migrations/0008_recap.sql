@@ -1,3 +1,14 @@
+CREATE TABLE `recap_images` (
+	`id` text PRIMARY KEY NOT NULL,
+	`install_id` text NOT NULL,
+	`meeting_id` text NOT NULL,
+	`path` text NOT NULL,
+	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `recap_images_meeting` ON `recap_images` (`meeting_id`);--> statement-breakpoint
+CREATE INDEX `recap_images_install_meeting` ON `recap_images` (`install_id`,`meeting_id`);--> statement-breakpoint
 ALTER TABLE `decisions` ADD `position` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE `recap_versions` ADD `number` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE `recap_versions` ADD `note` text;--> statement-breakpoint

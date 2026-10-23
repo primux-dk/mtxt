@@ -3,8 +3,8 @@ import type { Db } from './index';
 
 /**
  * The number of rows of another install that hang off a meeting, through any
- * foreign key: shares, recordings, speakers, recaps and audit rows on the
- * meeting; transcripts and segments under its recordings; versions and
+ * foreign key: shares, recordings, speakers, recaps, recap images and audit
+ * rows on the meeting; transcripts and segments under its recordings; versions and
  * decisions under its recap. The schema's foreign keys are one column, so a
  * cascade would delete them; nothing may. `meetingId` is a value or a
  * column (`sql\`m.id\``), so the count also works inside a selection.
@@ -17,6 +17,7 @@ export function foreignRowsSql(installId: string, meetingId: SQL | string): SQL 
     + (select count(*) from speakers where meeting_id = ${id} and install_id != ${installId})
     + (select count(*) from recaps where meeting_id = ${id} and install_id != ${installId})
     + (select count(*) from audit_events where meeting_id = ${id} and install_id != ${installId})
+    + (select count(*) from recap_images where meeting_id = ${id} and install_id != ${installId})
     + (select count(*) from transcripts where install_id != ${installId}
         and recording_id in (select id from recordings where meeting_id = ${id}))
     + (select count(*) from segments where install_id != ${installId}

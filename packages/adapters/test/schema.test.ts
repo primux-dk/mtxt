@@ -56,6 +56,7 @@ describe('schema', () => {
       'keyterms',
       'meeting_shares',
       'meetings',
+      'recap_images',
       'recap_jobs_seen',
       'recap_outbox',
       'recap_versions',

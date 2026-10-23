@@ -1,3 +1,4 @@
+import { schema } from '@mtxt/adapters';
 import { api, json } from '@/lib/api';
 import { HttpError } from '@/lib/http-error';
 import { recapMeeting } from '@/lib/recap/access';
@@ -9,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(request: Request, { params }: Params) {
   return api(async (user) => {
     const { id } = await params;
-    const { storage, installId, meeting } = await recapMeeting(user, id, 'owner');
+    const { db, storage, installId, meeting } = await recapMeeting(user, id, 'owner');
     const declared = Number(request.headers.get('content-length') ?? '0');
     if (declared > MAX_IMAGE_BYTES)
       throw new HttpError(413, 'too_large', 'An image is at most 8 MiB.');

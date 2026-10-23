@@ -60,7 +60,5 @@ export interface StorageAdapter extends MultipartStorage {
   get(key: string, range?: { offset: number; length?: number }): Promise<StoredObjectBody | null>;
   head(key: string): Promise<StoredObject | null>;
   delete(keys: string | string[]): Promise<void>;
-  /** Every key under `prefix` (a recap's images, for delete and retention). */
-  list(prefix: string): Promise<string[]>;
   read(key: string, options?: { expiresInSeconds?: number }): Promise<ReadHandle | null>;
 }

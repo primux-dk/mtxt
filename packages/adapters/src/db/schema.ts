@@ -453,6 +453,29 @@ export const decisions = sqliteTable(
   (t) => [index('decisions_recap').on(t.recapId), index('decisions_owner').on(t.ownerUserId)],
 );
 
+/**
+ * Every image uploaded into a meeting's recap, written before the object is
+ * stored. Delete and retention find a meeting's images here, whether or not
+ * the meeting has a transcript or a recap left.
+ */
+export const recapImages = sqliteTable(
+  'recap_images',
+  {
+    id: id(),
+    installId: installId(),
+    meetingId: text('meeting_id')
+      .notNull()
+      .references(() => meetings.id, { onDelete: 'cascade' }),
+    /** `images/{install}/{meeting}/{uuid}.{ext}` in storage. */
+    path: text('path').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('recap_images_meeting').on(t.meetingId),
+    index('recap_images_install_meeting').on(t.installId, t.meetingId),
+  ],
+);
+
 /** One list per install. */
 export const keyterms = sqliteTable(
   'keyterms',

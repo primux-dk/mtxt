@@ -13,7 +13,6 @@ function setup() {
   f.user('owner');
   const deleted: string[] = [];
   const storage = {
-    list: async () => [] as string[],
     delete: async (keys: string | string[]) => void deleted.push(...[keys].flat()),
   };
   const run = (limit?: number) =>
@@ -202,7 +201,6 @@ describe('retentionBatch', () => {
     // The reviewer's sequence: Keep lands on "second" while the first object deletion is awaited.
     const deleted: string[] = [];
     const storage = {
-      list: async () => [] as string[],
       delete: async (keys: string | string[]) => {
         deleted.push(...[keys].flat());
         t.sqlite.exec("UPDATE meetings SET keep = 1 WHERE id = 'second'");
@@ -224,7 +222,6 @@ describe('retentionBatch', () => {
     const t = setup();
     await t.full('kept-late', 400);
     const storage = {
-      list: async () => [] as string[],
       delete: async () => {
         // The audio went; then the owner pressed Keep before the transcript batch.
         t.sqlite.exec("UPDATE meetings SET keep = 1 WHERE id = 'kept-late'");
@@ -249,7 +246,6 @@ describe('retentionBatch', () => {
     t.f.meeting('m', { owner: 'owner', startedAt: ago(40) });
     t.f.recording('m-r', 'm');
     const storage = {
-      list: async () => [] as string[],
       delete: async () => Promise.reject(new Error('R2 down')),
     };
     await expect(
@@ -275,7 +271,7 @@ describe('retentionBatch', () => {
     const result = await retentionBatch(
       {
         db: t.db,
-        storage: { list: async () => [] as string[], delete: async () => {} },
+        storage: { delete: async () => {} },
         installId: INSTALL,
       },
       SETTINGS,
@@ -312,7 +308,7 @@ describe('retentionBatch', () => {
     const result = await retentionBatch(
       {
         db: t.db,
-        storage: { list: async () => [] as string[], delete: async () => {} },
+        storage: { delete: async () => {} },
         installId: INSTALL,
       },
       SETTINGS,
@@ -349,5 +345,32 @@ describe('retentionBatch', () => {
       rows(t.sqlite, "select count(*) as n from transcripts where recording_id = 'raw-r'"),
     ).toEqual([{ n: 0 }]);
     expect(rows(t.sqlite, 'select count(*) as n from storage_cleanup')).toEqual([{ n: 0 }]);
+  });
+});
+
+describe('recap images and retention (packet 5 review)', () => {
+  it('removes the images of a meeting with no recording, transcript or recap', async () => {
+    const { sqlite, f, run, deleted, meeting } = setup();
+    f.meeting('empty', { owner: 'owner', startedAt: ago(400) });
+    const path = `images/${INSTALL}/empty/0b3f2c1e-7a5d-4c8e-9f10-2a3b4c5d6e7f.png`;
+    sqlite.exec(
+      `insert into recap_images (id, install_id, meeting_id, path) values ('img-1', '${INSTALL}', 'empty', '${path}')`,
+    );
+    await run();
+    expect(deleted).toContain(path);
+    expect(rows(sqlite, `select * from recap_images where meeting_id = 'empty'`)).toEqual([]);
+    expect(rows(sqlite, `select * from storage_cleanup where path = '${path}'`)).toEqual([]);
+    expect(meeting('empty')?.deleted_at).not.toBeNull();
+  });
+
+  it('keeps the images of a kept meeting', async () => {
+    const { sqlite, f, run, deleted } = setup();
+    f.meeting('kept', { owner: 'owner', startedAt: ago(400), keep: true });
+    sqlite.exec(
+      `insert into recap_images (id, install_id, meeting_id, path) values ('img-2', '${INSTALL}', 'kept', 'images/${INSTALL}/kept/x.png')`,
+    );
+    await run();
+    expect(deleted).toEqual([]);
+    expect(rows(sqlite, `select id from recap_images where meeting_id = 'kept'`)).toHaveLength(1);
   });
 });

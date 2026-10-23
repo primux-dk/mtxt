@@ -100,7 +100,7 @@ export interface RetentionResult {
  * is left alone is listed with the reason, paged, never cut off.
  */
 export async function retentionBatch(
-  ctx: { db: Db; storage: Pick<StorageAdapter, 'delete' | 'list'>; installId: string },
+  ctx: { db: Db; storage: Pick<StorageAdapter, 'delete'>; installId: string },
   settings: RetentionSettings,
   now: Date,
   limit = RETENTION_BATCH,
@@ -125,7 +125,8 @@ export async function retentionBatch(
     and r.meeting_id = m.id and r.storage_path != '')`;
   const hasText = sql`(exists (select 1 from transcripts tr join recordings r on r.id = tr.recording_id
       where tr.install_id = ${installId} and r.install_id = ${installId} and r.meeting_id = m.id)
-    or exists (select 1 from recaps c where c.install_id = ${installId} and c.meeting_id = m.id))`;
+    or exists (select 1 from recaps c where c.install_id = ${installId} and c.meeting_id = m.id)
+    or exists (select 1 from recap_images i where i.install_id = ${installId} and i.meeting_id = m.id))`;
   const due = sql`m.install_id = ${installId} and m.deleted_at is null
       and m.started_at <= ${Math.max(audioCutoff, textCutoff)}
       and ((m.started_at <= ${audioCutoff} and ${hasAudio})
@@ -207,7 +208,7 @@ export async function retentionBatch(
     }
 
     if (started <= textCutoff && Number(meeting.text)) {
-      // What the transcript batch takes along in storage: the recaps' docx and the
+      // What the transcript batch takes along in storage: the recaps' docx and images, and the
       // providers' raw results (transcripts.raw_path), comparison transcripts included.
       const objects = await db.all<{ path: string }>(sql`
         select docx_path as path from recaps where install_id = ${installId}
@@ -215,15 +216,12 @@ export async function retentionBatch(
         union
         select t.raw_path from transcripts t
           join recordings r on r.id = t.recording_id and r.install_id = ${installId}
-          where t.install_id = ${installId} and r.meeting_id = ${meeting.id} and t.raw_path is not null`);
+          where t.install_id = ${installId} and r.meeting_id = ${meeting.id} and t.raw_path is not null
+        union
+        select path from recap_images where install_id = ${installId} and meeting_id = ${meeting.id}`);
       const guard = eligible(meeting.id, textCutoff);
-      // The recap's images (images/{install}/{meeting}/) go with the recap.
-      const images = await storage.list(`images/${installId}/${meeting.id}/`);
       // One cleanup entry per object, written in the batch only if the guard lets the rows go.
-      const cleanup = [...objects.map((o) => o.path), ...images].map((path) => ({
-        id: crypto.randomUUID(),
-        path,
-      }));
+      const cleanup = objects.map((o) => ({ id: crypto.randomUUID(), path: o.path }));
       const recordObjects = cleanup.map((e) =>
         db.insert(storageCleanup).select(
           db
@@ -327,6 +325,16 @@ export async function retentionBatch(
               sql`meeting_search match ${`meeting_key : "${meetingKey(meeting.id)}"`}`,
               eq(meetingSearch.installId, installId),
               inArray(meetingSearch.kind, ['segment', 'recap']),
+              guard,
+            ),
+          ),
+        // The recap's images, with or without a recap or a transcript left.
+        db
+          .delete(schema.recapImages)
+          .where(
+            and(
+              eq(schema.recapImages.installId, installId),
+              eq(schema.recapImages.meetingId, meeting.id),
               guard,
             ),
           ),

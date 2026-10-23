@@ -11,7 +11,6 @@ import {
   syncSearch,
 } from '@mtxt/adapters';
 import { HttpError } from '@/lib/http-error';
-import { imagePrefix } from '@/lib/recap/images';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { resetForRetry } from '@/lib/transcription/store';
 import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
@@ -104,8 +103,18 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
           ...recordings.map((rec) => rec.storagePath),
           ...raws.flatMap((raw) => (raw.path ? [raw.path] : [])),
           ...(recap?.docxPath ? [recap.docxPath] : []),
-          // The recap's images.
-          ...(await storage.list(imagePrefix(installId, meetingId))),
+          // The recap's images, each registered when it was uploaded.
+          ...(
+            await db
+              .select({ path: schema.recapImages.path })
+              .from(schema.recapImages)
+              .where(
+                and(
+                  eq(schema.recapImages.meetingId, meetingId),
+                  eq(schema.recapImages.installId, installId),
+                ),
+              )
+          ).map((image) => image.path),
         ]);
         const record = recordCleanup(db, installId, cleanup);
         await deleteMeetingRows(db, installId, meetingId, [
