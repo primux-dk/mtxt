@@ -105,6 +105,24 @@ describe('schema', () => {
     expect(rows[0]).toEqual({ installId: 'test', ...DEFAULT_SETTINGS });
   });
 
+  it("seeds a deploy's values into a new row and never over an existing one", async () => {
+    const values = {
+      productName: "Acme's Møder",
+      companyName: 'Acme A/S',
+      language: 'da',
+      interfaceLanguage: 'da',
+      aiGatewayId: 'mtxt-gateway',
+    } as const;
+    db.exec(seedSql('deploy', values));
+    db.exec(seedSql('deploy', { productName: 'Something else' }));
+    const orm = proxy(db);
+    const rows = await orm
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.installId, 'deploy'));
+    expect(rows).toEqual([{ installId: 'deploy', ...DEFAULT_SETTINGS, ...values }]);
+  });
+
   it('indexes every foreign key by the referencing column first', () => {
     for (const table of tables) {
       const config = getTableConfig(table);
