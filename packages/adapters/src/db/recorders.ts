@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import {
   GRANT_KEEP_MS,
   GRANT_LIFETIME_MS,
@@ -7,6 +7,7 @@ import {
   POLL_INTERVAL_MS,
   pollAllowed,
   safeEqual,
+  TOKEN_KEEP_MS,
   TOKEN_LIFETIME_MS,
 } from '../recorder-auth';
 import type { Db } from './index';
@@ -302,4 +303,34 @@ export async function revokeRecorderToken(
   if (revoked.length) return 'revoked';
   const found = await db.select({ id: tk.id }).from(tk).where(own).limit(1);
   return found.length ? 'already' : 'not_found';
+}
+
+/**
+ * The nightly job's share (docs/spec.md "Recorder connection"): grants that
+ * expired over a day ago, whoever holds them, and tokens revoked or expired
+ * over 90 days ago. A working token is never touched.
+ */
+export async function pruneRecorderRows(
+  db: Db,
+  installId: string,
+  now: Date = new Date(),
+): Promise<{ grants: number; tokens: number }> {
+  const t = now.getTime();
+  const tokenCutoff = new Date(t - TOKEN_KEEP_MS);
+  const [grants, tokens] = await db.batch([
+    db
+      .delete(g)
+      .where(and(eq(g.installId, installId), lt(g.expiresAt, new Date(t - GRANT_KEEP_MS))))
+      .returning({ challenge: g.challenge }),
+    db
+      .delete(tk)
+      .where(
+        and(
+          eq(tk.installId, installId),
+          or(lt(tk.revokedAt, tokenCutoff), lt(tk.expiresAt, tokenCutoff)),
+        ),
+      )
+      .returning({ id: tk.id }),
+  ]);
+  return { grants: grants.length, tokens: tokens.length };
 }

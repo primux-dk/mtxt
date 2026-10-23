@@ -96,6 +96,8 @@ The approval is not bound to the browser that the recorder opened. Anyone who ma
 
 The server keeps only the SHA-256 of a token, never the token, and never logs it. A call with a bearer token resolves the token's user row the same way a session cookie does: the row decides email and admin. A bad, expired or revoked token is 401 in the contract's error shape, never a login redirect. `last_used_at` is written at most once per 5 minutes.
 
+The nightly retention job deletes recorder grants that expired over a day ago and tokens revoked or expired over 90 days ago.
+
 A user sees their recorders under the user slot's menu, "Recorders": device name, connected since, last used, and Disconnect. Disconnect revokes the token at once; the recorder's next call gets 401. The recorder can disconnect itself with `DELETE /api/v1/recorder/tokens/{id}`, for its own token only; a recorder never revokes another of the user's recorders. Admins see nothing extra; the audit log gets `recorder_connected` and `recorder_disconnected`. A recorder connection is the user's own, so the settings page has no row for it.
 
 ## Local models in the recorder
@@ -182,7 +184,7 @@ Rules:
 - A speaker's default label is `Speaker n` (n from 1), shown in the reader's language. A rename sets the label; a link sets `user_id`, and the colleague's name is shown. A second recording of the same meeting reuses the row for the same provider speaker number.
 - A comparison transcript (`is_comparison`, written by `pnpm stt:compare`) is never shown, searched or exported by the app.
 - Every query, join and mutation carries `install_id`, child rows and shares included. A row whose install differs from the Worker's is ignored, whatever it points at; a meeting that another install's rows depend on is not deleted or archived.
-- Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way. Both count from the meeting's `started_at`. The meeting page announces a deletion 7 days ahead with Keep. A meeting whose audio and transcript are both gone keeps its metadata row with `deleted_at` set and shows in its owner's library as "Deleted by retention" until the owner removes it.
+- Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts, their speakers and recaps follow `retention_transcript_days` the same way. Both count from the meeting's `started_at`. The meeting page announces a deletion 7 days ahead with Keep. A meeting whose audio and transcript are both gone keeps its metadata row with `deleted_at` set and shows in its owner's library as "Deleted by retention" until the owner removes it.
 - Audit rows: `opened` when a meeting page or its audio is served to someone other than the owner, at most one per user, meeting and hour; `shared` and `visibility_changed` with before and after; `deleted` on delete; `exported` on export; `mcp_read` and `mcp_write` from MCP; `recorder_connected` when a recorder receives its token and `recorder_disconnected` when one is disconnected, with no meeting. Deleting a meeting keeps its audit rows, detached from it, with the title they were written with.
 - Search covers titles, transcript segments and recap text, through the same permission scope as the library, and answers with a snippet per meeting.
 - Admin queries never join `segments`, `recaps` or `recap_versions` for a private meeting. Admin sees title, owner, dates and the audit log.

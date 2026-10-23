@@ -24,8 +24,10 @@ export const POLL_ADVICE_S = 2;
 export const LAST_USED_EVERY_MS = 5 * 60 * 1000;
 /** Approved grants not yet exchanged, per user. */
 export const MAX_PENDING_GRANTS = 20;
-/** Expired grants older than this are deleted when the same user approves or cancels again. */
+/** Expired grants older than this are deleted when the same user approves or cancels again, and by the nightly job. */
 export const GRANT_KEEP_MS = 24 * 60 * 60 * 1000;
+/** Revoked or expired tokens older than this are deleted by the nightly job. */
+export const TOKEN_KEEP_MS = 90 * 24 * 60 * 60 * 1000;
 
 const base64Url = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))

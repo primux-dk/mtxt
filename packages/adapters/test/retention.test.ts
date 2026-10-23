@@ -348,6 +348,44 @@ describe('retentionBatch', () => {
   });
 });
 
+describe('speakers and retention', () => {
+  it("deletes a meeting's speakers with its transcripts, and keeps them while the transcript stays", async () => {
+    const t = setup();
+    for (const [id, days] of [
+      ['old', 400],
+      ['young', 40],
+    ] as const) {
+      await t.full(id, days);
+      t.sqlite
+        .prepare(
+          "INSERT INTO speakers (id, install_id, meeting_id, label, speaker_index) VALUES (?, 'test', ?, 'Speaker 1', 0)",
+        )
+        .run(`${id}-spk`, id);
+      t.sqlite
+        .prepare('UPDATE segments SET speaker_id = ? WHERE transcript_id = ?')
+        .run(`${id}-spk`, `${id}-t`);
+    }
+    await t.run();
+    expect(t.count('speakers', 'old')).toBe(0);
+    expect(t.count('segments', 'old')).toBe(0);
+    // Only its audio was due: the speakers still name the segments.
+    expect(t.count('speakers', 'young')).toBe(1);
+    expect(t.count('segments', 'young')).toBe(2);
+  });
+
+  it('keeps the speakers of a kept meeting', async () => {
+    const t = setup();
+    await t.full('kept', 400, true);
+    t.sqlite
+      .prepare(
+        "INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('kept-spk', 'test', 'kept', 'Speaker 1')",
+      )
+      .run();
+    await t.run();
+    expect(t.count('speakers', 'kept')).toBe(1);
+  });
+});
+
 describe('recap images and retention (packet 5 review)', () => {
   it('removes the images of a meeting with no recording, transcript or recap', async () => {
     const { sqlite, f, run, deleted, meeting } = setup();

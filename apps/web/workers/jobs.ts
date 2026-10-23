@@ -1,5 +1,6 @@
 import {
   cloudflareAdapters,
+  pruneRecorderRows,
   readSettings,
   retentionBatch,
   retryStorageCleanup,
@@ -85,6 +86,9 @@ export async function runRetention(job: RetentionJob, env: CloudflareEnv) {
     console.log(
       `Storage cleanup: ${cleanup.deleted} deleted, ${cleanup.failed} still failing, ${cleanup.givenUp} given up`,
     );
+    // Recorder grants that expired over a day ago, tokens revoked or expired over 90 days ago.
+    const pruned = await pruneRecorderRows(db, installId, new Date(job.now));
+    console.log(`Recorder rows: ${pruned.grants} grants, ${pruned.tokens} tokens deleted`);
   }
   // The night's first batch lists what is past a deadline and left alone; later ones add what changed meanwhile.
   const result = await retentionBatch(
