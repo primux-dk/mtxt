@@ -299,9 +299,16 @@ export interface components {
                 /** @description The user's display name, for the recorder's footer. */
                 name: string;
             };
-            /** @description The install's branding. The recorder reads it here at connect. */
+            /** @description The install's branding and the two defaults the recorder needs. The recorder reads them here at connect. */
             install: {
                 product_name: string;
+                /**
+                 * @description The install's default interface language. The recorder uses the operating system's language when a translation exists, otherwise this one.
+                 * @enum {string}
+                 */
+                interface_language: "en" | "da";
+                /** @description The admin's default for the live transcript. The user's own switch in the recorder wins once set. */
+                live_transcript_default: boolean;
                 /** @description Accent colour. */
                 theme_accent: string;
                 /** @description Button colour. */

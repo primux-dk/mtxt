@@ -132,6 +132,8 @@ describe('recorder connection', () => {
           product_name: 'Primux Møder',
           theme_accent: '#566b45',
           theme_primary: '#111111',
+          interface_language: 'en',
+          live_transcript_default: false,
         },
       });
       const lifetime = Date.parse(r.body.expires_at) - Date.now();

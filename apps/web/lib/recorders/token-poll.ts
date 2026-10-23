@@ -109,6 +109,8 @@ async function poll(deps: PollDeps, body: unknown): Promise<Response> {
           product_name: settings.productName,
           theme_accent: settings.themeAccent,
           theme_primary: settings.themePrimary,
+          interface_language: settings.interfaceLanguage,
+          live_transcript_default: settings.liveTranscriptDefault,
         },
       };
       return json(body);

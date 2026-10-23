@@ -748,11 +748,19 @@ components:
         install:
           type: object
           additionalProperties: false
-          required: [product_name, theme_accent, theme_primary]
-          description: The install's branding. The recorder reads it here at connect.
+          required:
+            [product_name, theme_accent, theme_primary, interface_language, live_transcript_default]
+          description: The install's branding and the two defaults the recorder needs. The recorder reads them here at connect.
           properties:
             product_name:
               type: string
+            interface_language:
+              type: string
+              enum: [en, da]
+              description: The install's default interface language. The recorder uses the operating system's language when a translation exists, otherwise this one.
+            live_transcript_default:
+              type: boolean
+              description: The admin's default for the live transcript. The user's own switch in the recorder wins once set.
             theme_accent:
               type: string
               pattern: '^#[0-9a-fA-F]{6}$'
