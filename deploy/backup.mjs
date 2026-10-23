@@ -174,7 +174,7 @@ function restoreTarget() {
   const found = list.find((d) => d.name === flags.into);
   if (!found) {
     fail(
-      `no D1 database "${flags.into}". Create it: npx wrangler d1 create ${flags.into} --jurisdiction eu -c "$MTXT_CFG"`,
+      `no D1 database "${flags.into}". Create it: "$MTXT_WRANGLER" d1 create ${flags.into} --jurisdiction eu -c "$MTXT_CFG" (deploy/README.md)`,
     );
   }
   if (found.uuid === liveDatabaseId && !(flags['into-live'] && flags['yes-i-mean-it'])) {

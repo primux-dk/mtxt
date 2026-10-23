@@ -470,6 +470,7 @@ function printEnv() {
     CLOUDFLARE_ACCOUNT_ID: accountId,
     MTXT_INSTALL_ID: installId,
     MTXT_CFG: generatedConfig,
+    MTXT_WRANGLER: wranglerBin,
     MTXT_WORKER: names.worker,
     MTXT_DB: names.database,
     MTXT_BUCKET: names.bucket,
