@@ -3,20 +3,12 @@
 import { useTranslations } from 'next-intl';
 import type { SttProvider } from '@mtxt/adapters/db/schema';
 
-/** How the chosen provider gets the audio: AssemblyAI and Azure Speech directly; AI Gateway fronts the rest it supports. */
-const ROUTE: Record<SttProvider, 'direct' | 'gateway' | 'local'> = {
-  assemblyai: 'direct',
-  azure: 'direct',
-  elevenlabs: 'gateway',
-  'workers-ai-whisper': 'gateway',
-  'local-whisper': 'local',
-  'local-parakeet': 'local',
-};
-
 /**
  * The data-flow panel: where audio goes for the provider picked on the page,
  * which model writes the recap and by which route, and the retention typed
- * there. It does not promise EU-only processing.
+ * there, as this build does it: AssemblyAI is called directly (AI Gateway
+ * does not front it), Workers AI and the recap model go through AI Gateway
+ * when an id is typed. It does not promise EU-only processing.
  */
 export function DataFlow({
   provider,
@@ -24,18 +16,22 @@ export function DataFlow({
   audioDays,
   textDays,
   supported,
+  available,
   recapName,
-  recapGateway,
+  gateway,
 }: {
   provider: SttProvider | null;
   providerName: string;
-  /** The recap model's provider, by name, and whether its requests go through AI Gateway. */
+  /** The recap model's provider, by name. */
   recapName: string;
-  recapGateway: boolean;
+  /** An AI Gateway id is typed: Workers AI and the recap model go through it. */
+  gateway: boolean;
   audioDays: number;
   textDays: number;
   /** The providers this build transcribes with, by name. */
   supported: string[];
+  /** The provider picked on the page is one this build transcribes with. */
+  available: boolean;
 }) {
   const t = useTranslations('settings.dataflow');
   const ts = useTranslations('stt');
@@ -44,11 +40,11 @@ export function DataFlow({
   }).format(supported);
   const step2 = !provider
     ? t('step2None')
-    : ROUTE[provider] === 'direct'
-      ? t('step2', { provider: providerName })
-      : ROUTE[provider] === 'gateway'
-        ? t('step2Gateway', { provider: providerName })
-        : t('step2Local', { provider: providerName });
+    : !available
+      ? t('step2Unavailable', { provider: providerName })
+      : provider === 'workers-ai-whisper'
+        ? t(gateway ? 'step2WorkersAi' : 'step2WorkersAiDirect', { provider: providerName })
+        : t('step2', { provider: providerName });
   return (
     <aside
       aria-labelledby="dataflow-heading"
@@ -61,7 +57,7 @@ export function DataFlow({
         <li>{t('step1')}</li>
         <li>{step2}</li>
         <li>
-          {recapGateway
+          {gateway
             ? t('step3', { provider: recapName })
             : t('step3Direct', { provider: recapName })}
         </li>
