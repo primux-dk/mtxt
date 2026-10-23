@@ -46,6 +46,7 @@ The whole admin surface. If a setting is not here, it does not exist. `/settings
 | Identity provider       | Entra ID or Google: tenant id (for Entra, the tenant's GUID; for Google, the Workspace domain), client id, secret. The secret is stored encrypted and never shown again                                                                                                                                                                                                                                                                              |
 | Speech-to-text provider | AssemblyAI (EU), Azure Speech (region), ElevenLabs Scribe, Workers AI Whisper, local Whisper or Parakeet: key, region. Workers AI and the local models need no key. The key is stored encrypted and never shown again. v0.1 transcribes with AssemblyAI and Workers AI Whisper; the others stay in the list and are refused at save with "Not available in this version" |
 | AI Gateway              | Gateway id in the company's Cloudflare account, optional. Workers AI, and the recap model from v0.1 packet 5, go through it when set                                                                                                                                                                                                                                                                                                                 |
+| Recap model             | Provider and model behind AI Gateway: Workers AI (default, no key), Anthropic, OpenAI, Azure OpenAI; key sealed; model id free text with a sensible default per provider |
 | Interface language      | Default for the install: en or da. A user's browser or OS language wins when a translation exists                                                                                                                                                                                                                                                                                                                                                    |
 | Default language        | For transcription. ISO code, auto-detect allowed                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Keyterms                | One list per install, CSV import                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -139,14 +140,19 @@ recap_jobs_seen  transcript_id, install_id, seen_at       -- one recap job taken
 segments         id, transcript_id, speaker_id, start_ms, end_ms, text
 speakers         id, meeting_id, label, user_id (nullable), speaker_index (nullable)
                  -- a label can link to a directory user; one row per provider speaker number per meeting
-recaps           id, meeting_id, template_id, body_md, current_version_id, docx_path
-recap_versions   id, recap_id, author_id (null = AI), body_md, created_at   -- one per save
-decisions        id, recap_id, text, owner_user_id, done     -- lifted from the recap by the AI, editable
+recaps           id, meeting_id, template_id, body_md, current_version_id, docx_path,
+                 status (drafting|ready|failed), failure_reason, draft_token
+                 -- draft_token: the AI draft being written now; a draft that no longer holds it writes nothing
+recap_versions   id, recap_id, number, author_id (null = AI), body_md, note, created_at   -- one per save
+                 -- (recap_id, number) unique: a save on a stale base cannot land
+decisions        id, recap_id, position, text, owner_user_id, done   -- the recap's decisions block, one row per item
+recap_images     id, install_id, meeting_id, path, created_at   -- every uploaded recap image, for delete and retention
 templates        id, name, name_key (unique), body_md, is_default   -- admin edits
 keyterms         id, term, boost                               -- one list per install
 settings         product_name, company_name, theme_accent, theme_primary, identity_provider,
                  oidc_tenant_id, oidc_client_id, oidc_client_secret (sealed), stt_provider,
                  stt_api_key (sealed), stt_region, webhook_secret (sealed), ai_gateway_id,
+                 recap_provider (workers-ai|anthropic|openai|azure-openai), recap_model, recap_api_key (sealed),
                  language, interface_language, live_transcript_default,
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
                  recording_sources (JSON array of desktop|upload|browser|teams|meet),
@@ -185,6 +191,11 @@ Rules:
 ## Recap editor
 
 Tiptap 3 core with the open React UI components (MIT), inside the Next.js app. Block list: headings, quote, note and warning callouts, lists, checklist, toggle, table of contents, table, divider, code, image. `/` at the start of a word opens the block menu. `@` searches colleagues and the meeting's speakers. Block handles in the gutter add and drag blocks. Markdown in and out; a toggle is `<details>`, a callout is a GitHub alert (`> [!NOTE]`). A version is saved after 1.5 s of quiet. The AI draft is version 1 with no author; every human save is a version with an author. No Tiptap Pro extensions.
+
+- **Drafting.** After a transcript, the recap job drafts from the transcript ("Speaker: text" lines, a timestamp every minute), the meeting's template (else the install's default) and the keyterms, in the transcript's language, with a 4,000-token output cap, through the install's recap model. A transcript longer than the model's context is summarised in parts first, and the version note says so. The first task list in the draft becomes the decisions block; an `@Name` that is a speaker linked to a colleague becomes a mention of that colleague and the decision's owner. A failure leaves the recap `failed` with a fixed reason; the owner gets Try again. Regenerate draft writes a new AI version and never replaces a human one.
+- **Saving.** Every save names its base version; a save whose base is no longer the current version is refused and the editor says "Changed elsewhere · Reload" with who saved and when. The editor keeps unsaved text in the browser (IndexedDB, by recap and base version) until the server confirms it. Only the owner edits; readers get a read-only view. Restore makes a new version from an old one.
+- **Markdown extras.** A table of contents is `<!-- toc -->`, the decisions block a task list between `<!-- decisions -->` and `<!-- /decisions -->`, a mention `[@Name](mtxt:user/<id>)` (or `mtxt:speaker/<id>`). Images live at `images/{install_id}/{meeting_id}/{image_id}.{ext}` and are served through `/api/v1/meetings/{id}/recap/images/{file}` after the permission check. Each upload is a `recap_images` row, written before the object, so delete and retention remove every image of a meeting, whether or not it has a transcript or a recap. No other HTML is rendered.
+- **Export.** Markdown (the stored body) and Word (.docx, built from the same document), named from the title and the date. Anyone who may read the recap may export it; each export is an `exported` audit row with the format.
 
 ## MCP
 

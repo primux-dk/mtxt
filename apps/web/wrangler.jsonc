@@ -24,9 +24,6 @@
     // The install's own origin, for the speech-to-text provider's webhook back to it.
     // A deploy sets its hostname, for example https://meetings.example.com.
     "PUBLIC_URL": "http://localhost:8787",
-    // AI Gateway in front of the recap model and the providers it supports.
-    // Placeholder until the recap packet; the gateway is created in the install's account.
-    "AI_GATEWAY_ID": "",
   },
   "d1_databases": [
     {

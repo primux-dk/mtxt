@@ -62,6 +62,9 @@ export async function deleteMeetingRows(
     // recaps.current_version_id points at a version: let go of it before the versions go.
     db.update(t.recaps).set({ currentVersionId: null }).where(inArray(t.recaps.id, caps)),
     db
+      .delete(t.recapImages)
+      .where(and(eq(t.recapImages.meetingId, meetingId), eq(t.recapImages.installId, installId))),
+    db
       .delete(t.decisions)
       .where(and(inArray(t.decisions.recapId, caps), eq(t.decisions.installId, installId))),
     db

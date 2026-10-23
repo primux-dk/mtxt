@@ -7,6 +7,8 @@ const configured: Current = {
   hasClientSecret: true,
   sttProvider: 'assemblyai',
   hasSttKey: true,
+  recapProvider: 'workers-ai',
+  hasRecapKey: false,
 };
 
 /** A form that passes, with overrides. `null` removes a field. */
@@ -133,6 +135,8 @@ describe('validateSettings', () => {
       hasClientSecret: false,
       sttProvider: null,
       hasSttKey: false,
+      recapProvider: 'workers-ai',
+      hasRecapKey: false,
     };
     expect(errorsOf(form(), fresh).oidcClientSecret).toEqual({ code: 'secretRequired' });
     expect(
@@ -274,5 +278,56 @@ describe('validateTemplate', () => {
       ok: false,
       errors: { name: { code: 'required' } },
     });
+  });
+});
+
+describe('the recap model', () => {
+  it('defaults to Workers AI with no key and the default model', () => {
+    const result = validateSettings(form(), configured, SELF);
+    expect(result.ok && result.patch).toMatchObject({
+      recapProvider: 'workers-ai',
+      recapModel: null,
+    });
+    expect(result.ok && result.clearRecapKey).toBe(true);
+  });
+
+  it('needs a key for Anthropic, OpenAI and Azure OpenAI, and keeps one already stored for the same provider', () => {
+    expect(errorsOf(form({ recapProvider: 'anthropic' })).recapApiKey).toEqual({
+      code: 'secretRequired',
+    });
+    const withKey = validateSettings(
+      form({ recapProvider: 'anthropic', recapApiKey: 'sk-1' }),
+      configured,
+      SELF,
+    );
+    expect(withKey.ok && withKey.secrets.recapApiKey).toBe('sk-1');
+    const kept = validateSettings(
+      form({ recapProvider: 'openai', recapModel: 'gpt-5.4' }),
+      { ...configured, recapProvider: 'openai', hasRecapKey: true },
+      SELF,
+    );
+    expect(kept.ok && kept.clearRecapKey).toBe(false);
+    // Another provider needs its own key.
+    expect(
+      errorsOf(form({ recapProvider: 'anthropic' }), {
+        ...configured,
+        recapProvider: 'openai',
+        hasRecapKey: true,
+      }).recapApiKey,
+    ).toEqual({ code: 'secretRequired' });
+  });
+
+  it('refuses a model id with spaces, and an Azure model that is not resource/deployment', () => {
+    expect(errorsOf(form({ recapModel: 'llama 4' })).recapModel).toEqual({ code: 'modelFormat' });
+    expect(
+      errorsOf(form({ recapProvider: 'azure-openai', recapApiKey: 'k', recapModel: 'recaps' }))
+        .recapModel,
+    ).toEqual({ code: 'azureModel' });
+    expect(
+      errorsOf(
+        form({ recapProvider: 'azure-openai', recapApiKey: 'k', recapModel: 'acme-openai/recaps' }),
+      ).recapModel,
+    ).toBeUndefined();
+    expect(errorsOf(form({ recapProvider: 'gemini' })).recapProvider).toEqual({ code: 'invalid' });
   });
 });

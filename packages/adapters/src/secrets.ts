@@ -41,7 +41,10 @@ async function importKey(keyBase64: string): Promise<CryptoKey> {
 
 /** Where a sealed value may live. */
 export type SecretContext =
-  'settings.oidc_client_secret' | 'settings.stt_api_key' | 'settings.webhook_secret';
+  | 'settings.oidc_client_secret'
+  | 'settings.stt_api_key'
+  | 'settings.webhook_secret'
+  | 'settings.recap_api_key';
 
 const additionalData = (context: SecretContext) =>
   new TextEncoder().encode(`mtxt:${context}:${VERSION}`);

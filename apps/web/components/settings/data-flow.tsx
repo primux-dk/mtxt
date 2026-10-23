@@ -14,8 +14,9 @@ const ROUTE: Record<SttProvider, 'direct' | 'gateway' | 'local'> = {
 };
 
 /**
- * The data-flow panel: where audio goes for the provider picked on the page
- * and the retention typed there. It does not promise EU-only processing.
+ * The data-flow panel: where audio goes for the provider picked on the page,
+ * which model writes the recap and by which route, and the retention typed
+ * there. It does not promise EU-only processing.
  */
 export function DataFlow({
   provider,
@@ -23,9 +24,14 @@ export function DataFlow({
   audioDays,
   textDays,
   supported,
+  recapName,
+  recapGateway,
 }: {
   provider: SttProvider | null;
   providerName: string;
+  /** The recap model's provider, by name, and whether its requests go through AI Gateway. */
+  recapName: string;
+  recapGateway: boolean;
   audioDays: number;
   textDays: number;
   /** The providers this build transcribes with, by name. */
@@ -54,7 +60,11 @@ export function DataFlow({
       <ol className="grid list-decimal gap-2 pl-5">
         <li>{t('step1')}</li>
         <li>{step2}</li>
-        <li>{t('step3')}</li>
+        <li>
+          {recapGateway
+            ? t('step3', { provider: recapName })
+            : t('step3Direct', { provider: recapName })}
+        </li>
         <li>{t('step4', { audioDays, textDays })}</li>
       </ol>
       <p className="mt-4">

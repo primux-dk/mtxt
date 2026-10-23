@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE_BYTES } from '@mtxt/contract';
-import { limitChunkBody, limitWebhookBody, WEBHOOK_MAX_BYTES } from '../lib/chunk-guard';
+import {
+  guardPath,
+  limitChunkBody,
+  nonCanonicalApiPath,
+  RECORDER_TOKEN_MAX_BYTES,
+  limitRecapBody,
+  limitWebhookBody,
+  RECAP_IMAGE_MAX_BYTES,
+  RECAP_SAVE_MAX_BYTES,
+  WEBHOOK_MAX_BYTES,
+} from '../lib/chunk-guard';
 
 /** A byte stream of `total` bytes that counts what it hands over, as workerd gives a body. */
 function byteBody(total: number) {
@@ -90,5 +100,114 @@ describe('limitWebhookBody', () => {
     if (guarded instanceof Response) throw new Error('refused');
     expect(await guarded.request.text()).toBe('{"transcript_id":"a","status":"completed"}');
     expect(guarded.overrun()).toBeNull();
+  });
+});
+
+describe('limitRecapBody', () => {
+  const cases = [
+    ['the recap save', 'PUT', 'http://localhost/api/v1/meetings/m1/recap', RECAP_SAVE_MAX_BYTES],
+    [
+      'an image upload',
+      'POST',
+      'http://localhost/api/v1/meetings/m1/recap/images',
+      RECAP_IMAGE_MAX_BYTES,
+    ],
+  ] as const;
+  for (const [what, method, target, max] of cases) {
+    const send = (body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) =>
+      new Request(target, { method, body, headers, duplex: 'half' } as RequestInit);
+
+    it(`refuses ${what} declared over ${max} bytes with 413, unread`, async () => {
+      const { stream, meter } = byteBody(max + 10);
+      const result = limitRecapBody(send(stream, { 'content-length': String(max + 1) }));
+      expect(result).toBeInstanceOf(Response);
+      expect((result as Response).status).toBe(413);
+      expect(((await (result as Response).json()) as { error: { code: string } }).error.code).toBe(
+        'too_large',
+      );
+      expect(meter.provided).toBe(0);
+    });
+
+    it(`cuts ${what} with no declared length off after ${max} + 1 bytes`, async () => {
+      const { stream, meter } = byteBody(2 * max);
+      const guarded = limitRecapBody(send(stream));
+      if (guarded instanceof Response) throw new Error('refused early');
+      await expect(guarded.request.arrayBuffer()).rejects.toThrow();
+      expect(guarded.overrun()).toBe(max + 1);
+      expect(meter.provided).toBe(max + 1);
+    });
+
+    it(`passes ${what} at the bound whole`, async () => {
+      const { stream } = byteBody(max);
+      const guarded = limitRecapBody(send(stream));
+      if (guarded instanceof Response) throw new Error('refused early');
+      expect((await guarded.request.arrayBuffer()).byteLength).toBe(max);
+    });
+  }
+
+  it('leaves the recap routes it does not bound alone', () => {
+    const get = new Request('http://localhost/api/v1/meetings/m1/recap/images', {
+      method: 'PUT',
+      body: 'x',
+    });
+    expect((limitRecapBody(get) as { request: Request }).request).toBe(get);
+  });
+});
+
+describe('every slash variant of a guarded route is bounded, and refused at the entry (second review)', () => {
+  const routes = [
+    ['the chunk upload', 'PUT', '/api/v1/recordings/r1/chunks/1', CHUNK_SIZE_BYTES, limitChunkBody],
+    ['the webhook', 'POST', '/api/v1/webhooks/assemblyai', WEBHOOK_MAX_BYTES, limitWebhookBody],
+    [
+      'the token poll',
+      'POST',
+      '/api/v1/recorder/token',
+      RECORDER_TOKEN_MAX_BYTES,
+      limitWebhookBody,
+    ],
+    ['the recap save', 'PUT', '/api/v1/meetings/m1/recap', RECAP_SAVE_MAX_BYTES, limitRecapBody],
+    [
+      'an image upload',
+      'POST',
+      '/api/v1/meetings/m1/recap/images',
+      RECAP_IMAGE_MAX_BYTES,
+      limitRecapBody,
+    ],
+  ] as const;
+  const variants = (path: string) => {
+    const at = path.lastIndexOf('/');
+    return {
+      trailing: `${path}/`,
+      doubled: `${path.slice(0, at)}//${path.slice(at + 1)}`,
+      encoded: `${path.slice(0, at)}%2F${path.slice(at + 1)}`,
+    };
+  };
+  for (const [what, method, path, max, guard] of routes) {
+    for (const [name, variant] of Object.entries(variants(path))) {
+      it(`bounds ${what} at ${name} (${variant})`, () => {
+        const { stream, meter } = byteBody(max + 10);
+        const request = new Request(`http://localhost${variant}`, {
+          method,
+          body: stream,
+          headers: { 'content-length': String(max + 1) },
+          duplex: 'half',
+        } as RequestInit);
+        const result = guard(request);
+        expect(result).toBeInstanceOf(Response);
+        expect((result as Response).status).toBe(413);
+        expect(meter.provided).toBe(0);
+        expect(guardPath(new URL(request.url).pathname)).toBe(path);
+        expect(nonCanonicalApiPath(new URL(request.url).pathname)).toBe(true);
+      });
+    }
+    it(`accepts ${what} in its one canonical form`, () => {
+      expect(nonCanonicalApiPath(path)).toBe(false);
+    });
+  }
+
+  it('leaves pages and the root alone', () => {
+    for (const path of ['/', '/meetings', '/meetings/m1', '/design/', '/settings/audit'])
+      expect(nonCanonicalApiPath(path)).toBe(false);
+    expect(nonCanonicalApiPath('//api/v1/recordings')).toBe(true);
   });
 });

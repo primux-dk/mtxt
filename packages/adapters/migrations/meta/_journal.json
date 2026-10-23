@@ -57,6 +57,13 @@
       "when": 1792721655397,
       "tag": "0007_recorder_connection",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792730054536,
+      "tag": "0008_recap",
+      "breakpoints": true
     }
   ]
 }

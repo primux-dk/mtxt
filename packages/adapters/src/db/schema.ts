@@ -61,6 +61,10 @@ export const STT_PROVIDERS = [
   'local-parakeet',
 ] as const;
 export const INTERFACE_LANGUAGES = ['en', 'da'] as const;
+/** The recap model's provider (docs/spec.md, "Recap model"). Workers AI needs no key. */
+export const RECAP_PROVIDERS = ['workers-ai', 'anthropic', 'openai', 'azure-openai'] as const;
+/** A recap is being drafted by the AI, holds a version, or its last draft failed. */
+export const RECAP_STATUSES = ['drafting', 'ready', 'failed'] as const;
 /** A transcript waits for an async provider, holds the result, or records that the provider failed. */
 export const TRANSCRIPT_STATUSES = ['pending', 'done', 'failed'] as const;
 /** A recorder grant: approved on /connect and waiting for the poll, cancelled there, or exchanged for a token. */
@@ -387,6 +391,15 @@ export const recaps = sqliteTable(
       (): AnySQLiteColumn => recapVersions.id,
     ),
     docxPath: text('docx_path'),
+    /**
+     * RECAP_STATUSES, checked by the app (a CHECK would rebuild the table).
+     * `failed` keeps the current version, if there is one.
+     */
+    status: text('status', { enum: RECAP_STATUSES }).notNull().default('ready'),
+    /** A fixed reason and the HTTP status (`rate_limited:429`), never the provider's own text. */
+    failureReason: text('failure_reason'),
+    /** The AI draft being written now. A draft whose token is no longer here writes nothing. */
+    draftToken: text('draft_token'),
   },
   (t) => [
     uniqueIndex('recaps_meeting').on(t.meetingId),
@@ -404,17 +417,25 @@ export const recapVersions = sqliteTable(
     recapId: text('recap_id')
       .notNull()
       .references((): AnySQLiteColumn => recaps.id, { onDelete: 'cascade' }),
+    /** 1, 2, 3, ... per recap. Unique, so two saves on the same base cannot both land. */
+    number: integer('number').notNull().default(0),
     authorId: text('author_id').references(() => users.id),
     bodyMd: text('body_md').notNull(),
+    /** What made the version, when it is not a plain save: "Restored from v2", a chunked draft. */
+    note: text('note'),
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex('recap_versions_recap_number').on(t.recapId, t.number),
     index('recap_versions_recap_created').on(t.recapId, t.createdAt),
     index('recap_versions_author').on(t.authorId),
   ],
 );
 
-/** Lifted from the recap by the AI, editable. */
+/**
+ * The recap's decisions block, one row per item in order: written with every
+ * version (lib/recap/decisions.ts), so the rows always match the current body.
+ */
 export const decisions = sqliteTable(
   'decisions',
   {
@@ -423,11 +444,36 @@ export const decisions = sqliteTable(
     recapId: text('recap_id')
       .notNull()
       .references(() => recaps.id, { onDelete: 'cascade' }),
+    /** The item's place in the block, from 0. */
+    position: integer('position').notNull().default(0),
     text: text('text').notNull(),
     ownerUserId: text('owner_user_id').references(() => users.id),
     done: bool('done').notNull().default(false),
   },
   (t) => [index('decisions_recap').on(t.recapId), index('decisions_owner').on(t.ownerUserId)],
+);
+
+/**
+ * Every image uploaded into a meeting's recap, written before the object is
+ * stored. Delete and retention find a meeting's images here, whether or not
+ * the meeting has a transcript or a recap left.
+ */
+export const recapImages = sqliteTable(
+  'recap_images',
+  {
+    id: id(),
+    installId: installId(),
+    meetingId: text('meeting_id')
+      .notNull()
+      .references(() => meetings.id, { onDelete: 'cascade' }),
+    /** `images/{install}/{meeting}/{uuid}.{ext}` in storage. */
+    path: text('path').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('recap_images_meeting').on(t.meetingId),
+    index('recap_images_install_meeting').on(t.installId, t.meetingId),
+  ],
 );
 
 /** One list per install. */
@@ -474,8 +520,16 @@ export const settings = sqliteTable(
      * request that finds none; never shown and never logged.
      */
     webhookSecret: text('webhook_secret'),
-    /** Cloudflare AI Gateway id. Workers AI (and later the recap model) go through it when set. */
+    /** Cloudflare AI Gateway id. Workers AI and the recap model go through it when set. */
     aiGatewayId: text('ai_gateway_id'),
+    /** RECAP_PROVIDERS. Checked by the app; a CHECK would rebuild the table. */
+    recapProvider: text('recap_provider', { enum: RECAP_PROVIDERS })
+      .notNull()
+      .default('workers-ai'),
+    /** The model id; null means the provider's default (lib/recap/models.ts). */
+    recapModel: text('recap_model'),
+    /** Sealed. Workers AI has none. */
+    recapApiKey: text('recap_api_key'),
     /** Default transcription language: an ISO code, or `auto`. */
     language: text('language').notNull().default('auto'),
     interfaceLanguage: text('interface_language', { enum: INTERFACE_LANGUAGES })
@@ -633,6 +687,11 @@ export type Transcript = typeof transcripts.$inferSelect;
 export type TranscriptStatus = (typeof TRANSCRIPT_STATUSES)[number];
 export type Speaker = typeof speakers.$inferSelect;
 export type Segment = typeof segments.$inferSelect;
+export type Recap = typeof recaps.$inferSelect;
+export type RecapVersion = typeof recapVersions.$inferSelect;
+export type RecapStatus = (typeof RECAP_STATUSES)[number];
+export type RecapProvider = (typeof RECAP_PROVIDERS)[number];
+export type Decision = typeof decisions.$inferSelect;
 export type RecorderToken = typeof recorderTokens.$inferSelect;
 export type RecorderGrant = typeof recorderGrants.$inferSelect;
 export type RecorderGrantStatus = (typeof RECORDER_GRANT_STATUSES)[number];

@@ -300,7 +300,6 @@ function installConfig(found, gatewayId) {
       ...base.vars,
       INSTALL_ID: installId,
       PUBLIC_URL: publicUrl,
-      AI_GATEWAY_ID: gatewayId ?? '',
     },
     d1_databases: [
       {

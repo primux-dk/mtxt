@@ -13,12 +13,18 @@ export interface TranscribeJob {
   poll?: boolean;
 }
 
-/** `transcript_id` is the idempotency key: the consumer takes one recap job per transcript. */
+/**
+ * After a transcript, `transcript_id` is the idempotency key: the consumer
+ * takes one recap job per transcript. Regenerate and Try again carry the
+ * `draft_token` the owner's action set on the recap; a draft whose token is
+ * no longer the recap's writes nothing.
+ */
 export interface RecapJob {
   type: 'recap';
   meeting_id: string;
   transcript_id: string;
   install_id: string;
+  draft_token?: string;
 }
 
 /** Queues the recordings that waited for a provider, 100 at a time, after `after` (a recording id). */
@@ -63,7 +69,11 @@ export function isJob(value: unknown): value is Job {
     );
   }
   if (job.type === 'recap') {
-    return typeof job.meeting_id === 'string' && typeof job.transcript_id === 'string';
+    return (
+      typeof job.meeting_id === 'string' &&
+      typeof job.transcript_id === 'string' &&
+      (job.draft_token === undefined || typeof job.draft_token === 'string')
+    );
   }
   if (job.type === 'drain_transcriptions') {
     return job.after === undefined || typeof job.after === 'string';

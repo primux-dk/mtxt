@@ -414,6 +414,8 @@ test('a reader sees speaker labels, not buttons', async ({ request, browser }) =
   await asUser(reader, 'newcomer');
   const readerPage = await reader.newPage();
   await readerPage.goto(`/meetings/${ids.meetingId}`);
+  // Packet 5: a transcribed meeting gets its recap, and the recap tab opens first.
+  await readerPage.getByRole('tab', { name: /Transcript/ }).click();
   await expect(segments(readerPage)).toHaveCount(5);
   await expect(readerPage.getByText('Danish · 3 speakers', { exact: true })).toBeVisible();
   await expect(readerPage.getByRole('button', { name: /rename or link/ })).toHaveCount(0);

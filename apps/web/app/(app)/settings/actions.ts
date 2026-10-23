@@ -52,6 +52,8 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
       hasClientSecret: Boolean(current.oidcClientSecret),
       sttProvider: current.sttProvider,
       hasSttKey: Boolean(current.sttApiKey),
+      recapProvider: current.recapProvider,
+      hasRecapKey: Boolean(current.recapApiKey),
     },
     user.email,
   );
@@ -88,6 +90,13 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
           ? { sttApiKey: await sealWith(result.secrets.sttApiKey, 'settings.stt_api_key') }
           : result.clearSttKey
             ? { sttApiKey: null }
+            : {}),
+        ...(result.secrets.recapApiKey
+          ? {
+              recapApiKey: await sealWith(result.secrets.recapApiKey, 'settings.recap_api_key'),
+            }
+          : result.clearRecapKey
+            ? { recapApiKey: null }
             : {}),
       },
       result.keyterms,

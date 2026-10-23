@@ -10,7 +10,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const here = new URL('..', import.meta.url).pathname;
-const NAMES = ['fakeAssemblyAiUrl', 'fakeSpeech', 'WORKERS_AI_FAKE_URL', 'ASSEMBLYAI_BASE_URL'];
+const NAMES = [
+  'fakeAssemblyAiUrl',
+  'fakeSpeech',
+  'WORKERS_AI_FAKE_URL',
+  'ASSEMBLYAI_BASE_URL',
+  'fakeRecapLlm',
+  'RECAP_FAKE_URL',
+];
 
 const openNext = join(here, '.open-next');
 if (!existsSync(join(openNext, 'worker.js'))) {
@@ -34,7 +41,7 @@ try {
   const found = [];
   for (const file of [...files(out), ...files(openNext)]) {
     const text = readFileSync(file, 'utf8');
-    if (text.includes('/api/test/fake-assemblyai'))
+    if (text.includes('/api/test/fake-assemblyai') || text.includes('/api/test/fake-recap'))
       found.push(`${file}: a fake route (an e2e build?)`);
     for (const name of NAMES) if (text.includes(name)) found.push(`${file}: ${name}`);
   }

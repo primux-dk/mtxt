@@ -10,7 +10,11 @@ import { default as nextHandler } from './.open-next/worker.js';
 import {
   chunkTooLarge,
   limitChunkBody,
+  limitRecapBody,
   limitWebhookBody,
+  nonCanonicalApiPath,
+  nonCanonicalNotFound,
+  recapTooLarge,
   smallBodyTooLarge,
   type Guarded,
 } from './lib/chunk-guard';
@@ -31,14 +35,20 @@ function refused(guarded: Guarded, tooLarge: () => Response): Response | null {
 
 export default {
   async fetch(request, env, ctx) {
+    // One accepted form per API path: a slash variant would pass the body bounds below.
+    if (nonCanonicalApiPath(new URL(request.url).pathname)) return nonCanonicalNotFound();
     const chunk = limitChunkBody(request);
     if (chunk instanceof Response) return chunk;
     const guarded = limitWebhookBody(chunk.request);
     if (guarded instanceof Response) return guarded;
+    const recap = limitRecapBody(guarded.request);
+    if (recap instanceof Response) return recap;
     const check = () =>
-      refused(chunk, chunkTooLarge) ?? refused(guarded, () => smallBodyTooLarge(request));
+      refused(chunk, chunkTooLarge) ??
+      refused(guarded, () => smallBodyTooLarge(request)) ??
+      refused(recap, () => recapTooLarge(request));
     try {
-      const response = await nextHandler.fetch(keepEmptyRange(guarded.request), env, ctx);
+      const response = await nextHandler.fetch(keepEmptyRange(recap.request), env, ctx);
       return check() ?? response;
     } catch (error) {
       const tooLarge = check();

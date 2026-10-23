@@ -1,6 +1,7 @@
 import { createDb } from '../db';
 import type { Job } from '../jobs';
 import { cloudflareQueue } from './queue';
+import { workersAiLanguage } from './language';
 import { workersAiSpeech } from './speech';
 import { r2Storage } from './storage';
 import { durableObjectUploadSessions } from './uploads';
@@ -9,6 +10,7 @@ export { cloudflareConsumer, cloudflareQueue } from './queue';
 export { r2Storage } from './storage';
 export { durableObjectUploadSessions } from './uploads';
 export { WHISPER_MODEL, workersAiSpeech } from './speech';
+export { workersAiLanguage } from './language';
 
 /** The Cloudflare bindings the adapters read. Names match apps/web/wrangler.jsonc. */
 export interface CloudflareBindings {
@@ -32,5 +34,6 @@ export function cloudflareAdapters(env: CloudflareBindings) {
     queue: cloudflareQueue(env.JOBS),
     uploads: durableObjectUploadSessions(env.UPLOAD_SESSIONS),
     speech: workersAiSpeech(env.AI),
+    language: workersAiLanguage(env.AI),
   };
 }

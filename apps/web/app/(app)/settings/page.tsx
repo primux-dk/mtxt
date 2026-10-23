@@ -49,6 +49,8 @@ export default async function SettingsPage() {
       sttRegion: settings.sttRegion ?? '',
       aiGatewayId: settings.aiGatewayId ?? '',
       language: settings.language,
+      recapProvider: settings.recapProvider,
+      recapModel: settings.recapModel ?? '',
       interfaceLanguage: settings.interfaceLanguage,
       keyterms: formatKeyterms(terms),
       liveTranscriptDefault: settings.liveTranscriptDefault,
@@ -62,6 +64,7 @@ export default async function SettingsPage() {
     // Whether a secret is stored, never the secret.
     hasClientSecret: Boolean(settings.oidcClientSecret),
     hasSttKey: Boolean(settings.sttApiKey),
+    hasRecapKey: Boolean(settings.recapApiKey),
     redirectUris: { entra: callback(PROVIDER_IDS.entra), google: callback(PROVIDER_IDS.google) },
     languages,
     templates: templates.map(({ id, name, bodyMd, isDefault }) => ({

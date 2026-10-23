@@ -2,6 +2,7 @@ export type * from './storage';
 export type * from './queue';
 export type * from './uploads';
 export type * from './speech';
+export type * from './language';
 export { isJob, JOB_TYPES, routeJobs } from './jobs';
 export type {
   DrainTranscriptionsJob,
@@ -46,6 +47,8 @@ export {
   CAPTURE_SOURCES,
   IDENTITY_PROVIDERS,
   INTERFACE_LANGUAGES,
+  RECAP_PROVIDERS,
+  RECAP_STATUSES,
   STT_PROVIDERS,
   TRANSCRIPT_STATUSES,
   VISIBILITIES,
@@ -67,6 +70,11 @@ export type {
   Meeting,
   Recording,
   RecordingStatus,
+  Decision,
+  Recap,
+  RecapProvider,
+  RecapStatus,
+  RecapVersion,
   Segment,
   Speaker,
   Transcript,
@@ -123,6 +131,7 @@ export {
   durableObjectUploadSessions,
   r2Storage,
   WHISPER_MODEL,
+  workersAiLanguage,
   workersAiSpeech,
   type CloudflareBindings,
 } from './cloudflare';

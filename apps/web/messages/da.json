@@ -177,7 +177,6 @@
       "failed": "Titlen blev ikke gemt. Den sidst gemte titel er tilbage."
     },
     "noRecording": "Ingen optagelse",
-    "exportLater": "Kommer i pakke 5",
     "more": "Flere handlinger",
     "archive": {
       "action": "Arkivér",
@@ -208,12 +207,6 @@
         "title": "Ingen optagelse endnu",
         "body": "Upload en optagelse til mødet for at få en transskription.",
         "action": "Upload en optagelse"
-      }
-    },
-    "recap": {
-      "pending": {
-        "title": "Intet referat endnu",
-        "body": "Referatet skrives efter transskriptionen."
       }
     },
     "recordings": {
@@ -309,13 +302,24 @@
   "recap": {
     "template": {
       "heading": "Referatskabelon",
-      "label": "Vælg referatskabelon"
+      "label": "Vælg referatskabelon",
+      "default": "Installationens standard",
+      "failed": "Skabelonen blev ikke ændret. Prøv igen."
     },
-    "versions": "AI-udkast v1, redigeret af {name} v{version}",
+    "versions": "AI-udkast v{ai}, redigeret af {name} v{version}",
     "status": {
       "saving": "Gemmer",
       "saved": "Gemt",
-      "notSaved": "Ikke gemt"
+      "notSaved": "Ikke gemt",
+      "changedElsewhere": "Ændret et andet sted",
+      "changedBy": "Ændret et andet sted af {name}, {time}",
+      "reload": "Genindlæs",
+      "problem": {
+        "offline": "intet netværk, gemt i denne browser",
+        "too_long": "Referatet er for langt til at blive gemt (højst 500.000 tegn)",
+        "refused": "serveren afviste at gemme"
+      },
+      "tickUndone": "afkrydsningen blev fortrudt"
     },
     "toolbar": {
       "label": "Referatformatering",
@@ -327,9 +331,57 @@
       "undo": "Fortryd"
     },
     "decision": {
-      "markDone": "Markér som færdig: {task}"
+      "markDone": "Markér som færdig: {task}",
+      "untitled": "en tom beslutning"
     },
-    "editorHint": "Skriv / for blokke. Brug @ til kolleger."
+    "editorHint": "Skriv / for blokke. Brug @ til kolleger.",
+    "versionLine": {
+      "ai": "AI-udkast v{version}",
+      "human": "Skrevet af {name}, v{version}",
+      "someone": "en kollega",
+      "aiName": "AI'en"
+    },
+    "placeholder": "Skriv referatet. Skriv / for blokke.",
+    "editorLabel": "Referat",
+    "readerLabel": "Referat, kun læsning",
+    "local": {
+      "offer": "Tekst, du skrev {time}, blev ikke gemt, og referatet er ændret siden.",
+      "use": "Brug min tekst",
+      "discard": "Kassér den"
+    },
+    "versionsButton": "Versioner",
+    "draft": {
+      "drafting": "Referatet skrives",
+      "draftingBody": "AI'en skriver det første udkast ud fra transskriptionen og skabelonen. Det vises her, når det er færdigt.",
+      "start": "Skriv udkast nu",
+      "failed": "Referatet kunne ikke skrives",
+      "failedBody": "Sprogmodellen svarede ikke.",
+      "tryAgain": "Prøv igen",
+      "askOwner": "Mødets ejer kan prøve igen.",
+      "regenerate": "Skriv nyt udkast",
+      "newVersion": "Et nyt udkast skrives. Den nuværende version bliver i Versioner.",
+      "newFailed": "Det nye udkast mislykkedes. {reason}",
+      "noTranscript": "Der er endnu ingen transskription at skrive ud fra.",
+      "couldNotStart": "Udkastet kunne ikke startes. Prøv igen."
+    },
+    "pending": {
+      "title": "Intet referat endnu",
+      "body": "Referatet skrives efter transskriptionen."
+    },
+    "reason": {
+      "unauthorised": "Referatmodellen afviste API-nøglen{status, select, none {} other { (HTTP {status})}}.",
+      "rate_limited": "Referatmodellen havde travlt og afviste flere forespørgsler{status, select, none {} other { (HTTP {status})}}.",
+      "provider_error": "Referatmodellen havde en fejl{status, select, none {} other { (HTTP {status})}}.",
+      "timeout": "Referatmodellen svarede ikke i tide.",
+      "refused": "Referatmodellen afslog at skrive dette referat.",
+      "empty": "Referatmodellen svarede uden tekst.",
+      "config": "En indstilling, som referatmodellen skal bruge, mangler eller er forkert.",
+      "no_transcript": "Der er ingen transskription at skrive ud fra.",
+      "internal": "Installationen fik en fejl, mens den skrev referatet.",
+      "template_too_long": "Skabelonen er for lang til referatmodellens kontekst. Gør den kortere under Indstillinger, eller vælg en model med mere kontekst.",
+      "too_long": "Mødet er for langt til referatmodellen, også i resumerede dele.",
+      "incomplete_draft": "Referatmodellens udkast blev afbrudt eller manglede et afsnit fra skabelonen, to gange."
+    }
   },
   "recorder": {
     "meetingTitle": "Mødetitel",
@@ -560,14 +612,15 @@
       "heading": "Dataflow",
       "step1": "Optageren sender lyd til virksomhedens egen Cloudflare-konto. Lyd i R2 lagres med EU-jurisdiktion, og uploadsessioner i Durable Objects bruger jurisdiktionen eu. Begge dele er tilgængelige uden Enterprise.",
       "step2": "{provider} modtager lyd og nøgleord direkte og sender tekst og talere tilbage.",
-      "step3": "Den valgte sprogmodel skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
+      "step3": "{provider} skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
       "step4": "Lyd slettes efter {audioDays, plural, one {# dag} other {# dage}}. Transskriptioner og referater slettes efter {textDays, plural, one {# dag} other {# dage}}. Behold forhindrer begge sletninger.",
       "promise": "Det er ikke garanteret, at al behandling sker i EU.",
       "caveats": "Installationsværktøjet opretter D1-databasen og køerne med EU-jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
       "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen.",
       "step2Gateway": "{provider} modtager lyd og nøgleord gennem AI Gateway og sender tekst og talere tilbage.",
       "step2Local": "{provider} kører inde i installationen; lyden sendes ikke til et firma, der laver tale til tekst.",
-      "step2None": "Der er ikke valgt en udbyder af tale til tekst endnu. Lyden gemmes, og transskriptionen venter, til der er valgt en."
+      "step2None": "Der er ikke valgt en udbyder af tale til tekst endnu. Lyden gemmes, og transskriptionen venter, til der er valgt en.",
+      "step3Direct": "{provider} skriver referatet ud fra transskriptionen. Der er ikke angivet et AI Gateway-ID, så forespørgslerne går direkte til {provider}. Mødedata gemmes i D1."
     },
     "footer": "Ændringer gælder for denne installation.",
     "save": "Gem indstillinger",
@@ -611,9 +664,27 @@
       "saveFailed": "Indstillingerne kunne ikke gemmes, og intet blev ændret. Prøv igen.",
       "unterminatedQuote": "Post {record}: et anførselstegn åbnes og lukkes aldrig. Intet blev importeret.",
       "notAvailable": "Findes ikke i denne version.",
-      "gatewayFormat": "Skriv gateway-id'et: bogstaver, tal, - og _."
+      "gatewayFormat": "Skriv gateway-id'et: bogstaver, tal, - og _.",
+      "modelFormat": "Skriv et model-ID uden mellemrum, højst 200 tegn.",
+      "azureModel": "Skriv ressourcen og deployment som ressource/deployment, for eksempel acme-openai/referater."
     },
-    "saved": "Indstillingerne er gemt."
+    "saved": "Indstillingerne er gemt.",
+    "recap": {
+      "heading": "Referatmodel",
+      "help": "Sprogmodellen, der skriver udkastet til hvert referat ud fra transskriptionen og skabelonen. Én for hele installationen.",
+      "provider": "Udbyder",
+      "providers": {
+        "workersAi": "Workers AI",
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "azureOpenai": "Azure OpenAI"
+      },
+      "model": "Model-ID",
+      "modelHelp": "Lad feltet stå tomt for standardmodellen, {model}.",
+      "modelHelpAzure": "Skriv Azure-ressourcen og deployment som ressource/deployment.",
+      "apiKey": "API-nøgle",
+      "noKey": "Workers AI kører i virksomhedens egen Cloudflare-konto og kræver ingen nøgle."
+    }
   },
   "auth": {
     "signOut": "Log ud",
@@ -675,7 +746,7 @@
     "supported": "Denne version transskriberer med {providers}. AssemblyAI kører Universal-3.5 Pro, og Universal-2 for et sprog, Universal-3.5 Pro ikke har. De andre udbydere på listen kommer senere.",
     "gateway": {
       "field": "AI Gateway-id",
-      "help": "Kald til Workers AI, og senere til referatmodellen, går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde Workers AI direkte."
+      "help": "Forespørgsler til Workers AI og til referatmodellen går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde dem direkte."
     },
     "drainFailed": "Indstillingerne blev gemt, men de optagelser, der venter på en udbyder, blev ikke sat i kø. Gem igen for at sætte dem i kø."
   },
@@ -789,7 +860,11 @@
       "readers": "{count, plural, =0 {ingen andre har adgang} one {# person har adgang} other {# personer har adgang}}",
       "andMore": "{names} og {count} til",
       "unknownUser": "en fjernet bruger",
-      "device": "Enhed: {device}"
+      "device": "Enhed: {device}",
+      "format": {
+        "md": "Markdown",
+        "docx": "Word"
+      }
     },
     "empty": {
       "first": {
@@ -865,5 +940,86 @@
     "disconnect": "Afbryd",
     "disconnectLabel": "Afbryd {device}",
     "disconnectFailed": "{device} blev ikke afbrudt. Prøv igen."
+  },
+  "editor": {
+    "block": {
+      "heading1": "Overskrift 1",
+      "heading2": "Overskrift 2",
+      "heading3": "Overskrift 3",
+      "bulletList": "Punktopstilling",
+      "orderedList": "Nummereret liste",
+      "checklist": "Tjekliste",
+      "decisions": "Beslutninger",
+      "quote": "Citat",
+      "note": "Note",
+      "warning": "Advarsel",
+      "toggle": "Fold ud",
+      "toc": "Indholdsfortegnelse",
+      "table": "Tabel",
+      "divider": "Skillelinje",
+      "code": "Kode",
+      "image": "Billede"
+    },
+    "toc": {
+      "empty": "Tilføj overskrifter for at fylde indholdsfortegnelsen.",
+      "untitled": "Overskrift uden tekst"
+    },
+    "menu": {
+      "blocks": "Blokke",
+      "noBlocks": "Ingen blok passer",
+      "mentions": "Kolleger og talere",
+      "noPeople": "Ingen passer"
+    },
+    "mention": {
+      "speaker": "Taler i dette møde"
+    },
+    "handle": {
+      "add": "Tilføj en blok nedenfor",
+      "drag": "Træk for at flytte blokken"
+    },
+    "image": {
+      "uploading": "Tilføjer billedet",
+      "failed": "Billedet kunne ikke tilføjes. Brug en PNG-, JPEG-, GIF- eller WebP-fil på højst 8 MB."
+    },
+    "link": {
+      "title": "Link",
+      "help": "Adressen, som den markerede tekst linker til. Lad feltet stå tomt for at fjerne linket.",
+      "field": "Adresse",
+      "invalid": "Brug en adresse, der begynder med https://, http:// eller mailto:.",
+      "apply": "Anvend"
+    }
+  },
+  "export": {
+    "button": "Eksportér",
+    "title": "Eksportér referatet",
+    "description": "Hent den nuværende version.",
+    "none": "Der er endnu intet referat at eksportere.",
+    "md": {
+      "label": "Markdown (.md)",
+      "help": "Referatet, som det er gemt, til andre værktøjer."
+    },
+    "docx": {
+      "label": "Word (.docx)",
+      "help": "Til deling og udskrift."
+    }
+  },
+  "versions": {
+    "title": "Versioner",
+    "description": "Hver gang der gemmes, bliver det en version. Gendan laver en ny version ud fra en ældre; intet går tabt.",
+    "list": "Versioner, nyeste først",
+    "item": "v{version}, {who}",
+    "ai": "AI-udkast",
+    "someone": "en kollega",
+    "current": "Nuværende",
+    "preview": "Version {version}",
+    "previewNone": "Forhåndsvisning",
+    "loading": "Indlæser",
+    "loadFailed": "Versionerne kunne ikke indlæses. Luk og prøv igen.",
+    "restore": "Gendan v{version}",
+    "restoreFailed": "Versionen blev ikke gendannet. Prøv igen.",
+    "note": {
+      "restored": "Gendannet fra v{version}",
+      "chunked": "Skrevet ud fra resuméer af {parts} dele af transskriptionen"
+    }
   }
 }

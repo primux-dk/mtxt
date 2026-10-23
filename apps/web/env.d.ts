@@ -18,6 +18,8 @@ interface CloudflareEnv {
   /** Test runs only (AUTH_TEST_MODE=1, localhost): the fake providers. See lib/stt/test-hooks.ts. */
   ASSEMBLYAI_BASE_URL?: string;
   WORKERS_AI_FAKE_URL?: string;
+  /** Test runs only: the fake recap model. See lib/recap/test-hooks.ts. */
+  RECAP_FAKE_URL?: string;
   /** "1" in `pnpm preview` and the e2e run (`wrangler dev --var`): an http://localhost PUBLIC_URL is allowed. */
   MTXT_LOCAL_DEV?: string;
 }

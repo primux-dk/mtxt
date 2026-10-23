@@ -298,6 +298,213 @@ export function demoSql(installId: string, count: number, now?: number): string 
   sql += foreignInstallSql(installId);
   if (count > 5) sql += demoTranscriptsSql(installId);
   sql += accessDemoSql(installId, meetings, now ?? Date.UTC(2026, 9, 22, 9, 0));
+  if (count > 5) sql += demoRecapsSql(installId);
+  return sql;
+}
+
+/** Figure 04's recap: the AI's draft (v1), then three saves by the dev user. */
+const FIGURE_04_RECAP = `# En rolig opstart på linje 2
+
+> [!NOTE]
+> Vi øger først kapaciteten, når torsdagens test er godkendt.
+
+## Beslutninger
+
+<!-- decisions -->
+- [ ] Test det nye skift torsdag. [@Jonas Skov](mtxt:user/dev-colleague)
+- [x] Saml kapacitetstallene. [@Anne Holm](mtxt:user/dev-newcomer)
+<!-- /decisions -->
+
+## Næste skridt
+
+| Opgave | Ansvarlig | Frist |
+| --- | --- | --- |
+| Skiftetest | Jonas | 22. okt. |
+| Opdatér planen | Anne | 23. okt. |
+
+<details>
+<summary>Åbne spørgsmål til næste møde</summary>
+
+Kan det nye skift dække fredagens ekstra ordre?
+
+</details>
+`;
+const FIGURE_04_TEXT = [
+  'En rolig opstart på linje 2',
+  'Vi øger først kapaciteten, når torsdagens test er godkendt.',
+  'Beslutninger',
+  'Test det nye skift torsdag. @Jonas Skov',
+  'Saml kapacitetstallene. @Anne Holm',
+  'Næste skridt',
+  'Opgave Ansvarlig Frist Skiftetest Jonas 22. okt. Opdatér planen Anne 23. okt.',
+  'Åbne spørgsmål til næste møde',
+  'Kan det nye skift dække fredagens ekstra ordre?',
+].join('\n');
+
+const RECAP_WORDS = [
+  'kapaciteten',
+  'leverancen',
+  'kvaliteten',
+  'budgettet',
+  'lageret',
+  'kunden',
+  'tidsplanen',
+  'produktionen',
+  'vedligeholdet',
+  'indkøbet',
+  'rapporten',
+  'sikkerheden',
+  'oplæringen',
+  'maskinen',
+  'leveringen',
+  'kontrakten',
+  'prisen',
+  'analysen',
+  'skiftet',
+  'ordren',
+];
+const RECAP_VERBS = ['gennemgår', 'følger op på', 'tester', 'justerer', 'beskriver', 'måler'];
+
+/**
+ * A recap of about 3,000 words with 40 decisions under a 120-character
+ * heading (behaviour.md rule 13), on demo-0001, whose title is that heading.
+ */
+function longRecap(): { md: string; text: string } {
+  const random = generator(43);
+  const pick = <T>(list: readonly T[]) => list[Math.floor(random() * list.length)]!;
+  const sentence = () => {
+    const words = [
+      pick(RECAP_WORDS),
+      pick(RECAP_VERBS),
+      pick(RECAP_WORDS),
+      'inden',
+      pick(['fredag', 'mandag', 'næste uge', 'kvartalets udgang']),
+    ];
+    const s = `Holdet ${words.slice(1, 3).join(' ')} ${words[0]} og ${words[2]} ${words.slice(3).join(' ')}, så alle kan se status.`;
+    return s;
+  };
+  const md: string[] = [`# ${LONG_TITLE}`, '', '<!-- toc -->', ''];
+  const text: string[] = [LONG_TITLE];
+  let words = 0;
+  for (let section = 1; words < 2600; section++) {
+    md.push(`## Punkt ${section}: ${pick(RECAP_WORDS)}`, '');
+    text.push(`Punkt ${section}`);
+    for (let p = 0; p < 4; p++) {
+      const para = Array.from({ length: 6 }, sentence).join(' ');
+      words += para.split(' ').length;
+      md.push(para, '');
+      text.push(para);
+    }
+  }
+  md.push('## Beslutninger', '', '<!-- decisions -->');
+  const owners = [
+    ['dev-user', 'Mette Lund'],
+    ['dev-colleague', 'Jonas Skov'],
+    ['dev-newcomer', 'Anne Holm'],
+  ] as const;
+  for (let i = 0; i < 40; i++) {
+    const [id, name] = owners[i % 3]!;
+    const item = `Beslutning ${i + 1}: ${pick(RECAP_VERBS)} ${pick(RECAP_WORDS)} inden ${pick(['fredag', 'mandag'])}.`;
+    md.push(`- [${i % 4 === 0 ? 'x' : ' '}] ${item} [@${name}](mtxt:user/${id})`);
+    text.push(`${item} @${name}`);
+  }
+  md.push('<!-- /decisions -->', '');
+  return { md: md.join('\n'), text: text.join('\n') };
+}
+
+/** The demo recaps: figure 04's on demo-0000, the long one on demo-0001, with their rows and search text. */
+export function demoRecapsSql(installId: string): string {
+  const iid = quote(installId);
+  const t = Date.UTC(2026, 9, 22, 10);
+  const long = longRecap();
+  let sql = '';
+  const recap = (
+    id: string,
+    meetingId: string,
+    versions: { author: string | null; md: string }[],
+    text: string,
+  ) => {
+    sql += `INSERT INTO recaps (id, install_id, meeting_id, body_md, status) VALUES (${quote(id)}, ${iid}, ${quote(meetingId)}, ${quote(versions.at(-1)!.md)}, 'ready');\n`;
+    sql += insertRows(
+      'recap_versions',
+      ['id', 'install_id', 'recap_id', 'number', 'author_id', 'body_md', 'note', 'created_at'],
+      versions.map((v, n) => [
+        quote(`${id}-v${n + 1}`),
+        iid,
+        quote(id),
+        String(n + 1),
+        v.author ? quote(v.author) : 'NULL',
+        quote(v.md),
+        'NULL',
+        String(t + n * 600_000),
+      ]),
+    );
+    sql += `UPDATE recaps SET current_version_id = ${quote(`${id}-v${versions.length}`)} WHERE id = ${quote(id)};\n`;
+    sql += `INSERT INTO meeting_search (install_id, meeting_id, meeting_key, kind, ref, text) VALUES (${iid}, ${quote(meetingId)}, 'm' || lower(hex(${quote(meetingId)})), 'recap', ${quote(id)}, ${quote(text)});\n`;
+  };
+  const draft = FIGURE_04_RECAP.replace('- [x] Saml', '- [ ] Saml').replace(
+    '| Opdatér planen | Anne | 23. okt. |\n',
+    '',
+  );
+  recap(
+    'demo-0000-recap',
+    'demo-0000',
+    [
+      { author: null, md: draft },
+      { author: 'dev-user', md: draft.replace('Vi øger først', 'Vi øger') },
+      { author: 'dev-user', md: draft },
+      { author: 'dev-user', md: FIGURE_04_RECAP },
+    ],
+    FIGURE_04_TEXT,
+  );
+  sql += insertRows(
+    'decisions',
+    ['id', 'install_id', 'recap_id', 'position', 'text', 'owner_user_id', 'done'],
+    [
+      [
+        "'demo-0000-d1'",
+        iid,
+        "'demo-0000-recap'",
+        '0',
+        quote('Test det nye skift torsdag. @Jonas Skov'),
+        "'dev-colleague'",
+        '0',
+      ],
+      [
+        "'demo-0000-d2'",
+        iid,
+        "'demo-0000-recap'",
+        '1',
+        quote('Saml kapacitetstallene. @Anne Holm'),
+        "'dev-newcomer'",
+        '1',
+      ],
+    ],
+  );
+  recap('demo-0001-recap', 'demo-0001', [{ author: null, md: long.md }], long.text);
+  const rows = long.md
+    .split('\n')
+    .filter((l) => /^- \[[ x]\] Beslutning/.test(l))
+    .map((l, i) => {
+      const done = l.startsWith('- [x]');
+      const name = /\[@([^\]]+)\]/.exec(l)![1]!;
+      const owner = /mtxt:user\/([a-z-]+)/.exec(l)![1]!;
+      const item = l.replace(/^- \[[ x]\] /, '').replace(/ \[@[^\]]+\]\([^)]+\)$/, '');
+      return [
+        quote(`demo-0001-d${i + 1}`),
+        iid,
+        "'demo-0001-recap'",
+        String(i),
+        quote(`${item} @${name}`),
+        quote(owner),
+        done ? '1' : '0',
+      ];
+    });
+  sql += insertRows(
+    'decisions',
+    ['id', 'install_id', 'recap_id', 'position', 'text', 'owner_user_id', 'done'],
+    rows,
+  );
   return sql;
 }
 

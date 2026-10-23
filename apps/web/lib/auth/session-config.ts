@@ -18,7 +18,10 @@ export const isPublicPath = (path: string) =>
     (path === '/api/test/sign-in' ||
       // The fake providers (lib/stt/test-hooks.ts) are called by the Worker itself.
       path.startsWith('/api/test/fake-assemblyai/') ||
-      path === '/api/test/fake-workers-ai'));
+      path === '/api/test/fake-workers-ai' ||
+      // And the fake recap model (lib/recap/test-hooks.ts).
+      path === '/api/test/fake-recap' ||
+      path === '/api/test/fake-recap/control'));
 
 /**
  * API paths a desktop recorder calls with its bearer token. With an
