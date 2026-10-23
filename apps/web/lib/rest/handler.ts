@@ -3,7 +3,6 @@ import { API_RATE_LIMIT, takeApiRequest, type ViaApi } from '@mtxt/adapters';
 import { getApiUser, type SessionUser } from '../auth/session';
 import { HttpError } from '../http-error';
 import { getAdapters } from '../install';
-import { ETAG_BASIS } from '../recap/export-file';
 import { authorise, etagFor, etagMatches } from './rules';
 
 /*
@@ -93,15 +92,12 @@ export async function rest(
     const headers = new Headers(response.headers);
     for (const [k, v] of Object.entries(limits)) headers.set(k, v);
     if (request.method !== 'GET' || response.status !== 200) {
-      headers.delete(ETAG_BASIS);
       for (const write of writes) await write();
       return new Response(response.body, { status: response.status, headers });
     }
     const bytes = await response.arrayBuffer();
-    // A file that carries its build time names what it is made from instead (lib/recap/export-file.ts).
-    const basis = headers.get(ETAG_BASIS);
-    headers.delete(ETAG_BASIS);
-    const etag = await etagFor(basis ? new TextEncoder().encode(basis) : bytes);
+    // Over the bytes sent; a Word file packs to the same bytes for the same version (lib/recap/docx.ts).
+    const etag = await etagFor(bytes);
     headers.set('etag', etag);
     if (etagMatches(request.headers.get('if-none-match'), etag)) {
       headers.delete('content-type');

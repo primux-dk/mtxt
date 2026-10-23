@@ -8,9 +8,6 @@ import { IMAGE_FILE, imageKey } from './images';
 import { parseMarkdown } from './markdown';
 import { loadRecap } from './store';
 
-/** A response header the REST handler takes as the ETag's input instead of the bytes, and removes. */
-export const ETAG_BASIS = 'x-mtxt-etag-basis';
-
 /**
  * The recap's current version as a download: the stored markdown, or Word
  * built from the same document with colleagues under their current names
@@ -21,15 +18,12 @@ export async function recapFile(
   ctx: { db: Db; installId: string; storage: StorageAdapter },
   meeting: Pick<Meeting, 'id' | 'title' | 'startedAt'>,
   format: ExportFormat,
-  options: { etagBasis?: boolean } = {},
 ): Promise<Response | null> {
   const { db, installId, storage } = ctx;
   const recap = await loadRecap(db, installId, meeting.id);
   if (!recap?.current) return null;
 
   let bytes: Uint8Array<ArrayBuffer> | string;
-  /** What the file is made from, for the REST API's ETag: a Word file carries the time it was built. */
-  let basis: unknown[] = [];
   if (format === 'md') bytes = recap.current.bodyMd;
   else {
     const doc = parseMarkdown(recap.current.bodyMd);
@@ -48,10 +42,11 @@ export async function recapFile(
           .where(and(eq(schema.users.installId, installId), inArray(schema.users.id, [...ids])))
       : [];
     const byId = new Map(names.map((u) => [`user:${u.id}`, u.name]));
-    basis = [recap.current.id, meeting.title, meeting.startedAt.getTime(), [...byId].sort()];
     bytes = await recapDocx({
       doc,
       title: meeting.title,
+      // The version's time, so the same version gives the same bytes and the same ETag.
+      at: recap.current.createdAt,
       subtitle: new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(
         meeting.startedAt,
       ),
@@ -76,15 +71,5 @@ export async function recapFile(
     'x-content-type-options': 'nosniff',
     'cache-control': 'private, no-store',
   });
-  if (options.etagBasis && basis.length) {
-    const digest = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(JSON.stringify(basis)),
-    );
-    headers.set(
-      ETAG_BASIS,
-      [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join(''),
-    );
-  }
   return new Response(bytes, { headers });
 }

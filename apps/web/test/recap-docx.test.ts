@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { recapDocx } from '../lib/recap/docx';
+import { etagFor } from '../lib/rest/rules';
 import { parseMarkdown } from '../lib/recap/markdown';
 
 const FIXTURE = readFileSync(new URL('./fixtures/recap-every-block.md', import.meta.url), 'utf8');
@@ -60,4 +61,31 @@ describe('the Word export', () => {
     expect(Object.keys(zip.files).some((f) => f.startsWith('word/media/'))).toBe(true);
     expect(xml).not.toContain('[Tavlen efter mødet]');
   });
+  it('packs the same version to the same bytes, links and times included, for the API ETag', async () => {
+    const at = new Date(Date.UTC(2026, 9, 22, 9, 30));
+    const make = () =>
+      recapDocx({
+        doc: parseMarkdown(FIXTURE),
+        title: 'Produktionsmøde, uge 43',
+        subtitle: '22. oktober 2026',
+        at,
+        mentionName: () => 'Søren Bak',
+        image: async () => ({ bytes: PNG, type: 'png' }),
+      });
+    const first = await make();
+    // Across a zip timestamp's 2-second step.
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    const second = await make();
+    expect(Buffer.from(second).equals(Buffer.from(first))).toBe(true);
+    expect(await etagFor(second)).toBe(await etagFor(first));
+    const { zip, xml } = await open(first);
+    const rels = await zip.file('word/_rels/document.xml.rels')!.async('string');
+    expect(rels).toContain('Id="rIdLink1"');
+    expect(xml).toContain('r:id="rIdLink1"');
+    expect(rels).not.toMatch(/Id="rId(?!\d+"|Link\d+")/);
+    const core = await zip.file('docProps/core.xml')!.async('string');
+    expect(core).toContain('>2026-10-22T09:30:00Z</dcterms:created>');
+    expect(core).toContain('>2026-10-22T09:30:00Z</dcterms:modified>');
+    expect(zip.file('word/document.xml')!.date.getTime()).toBe(at.getTime());
+  }, 15_000);
 });

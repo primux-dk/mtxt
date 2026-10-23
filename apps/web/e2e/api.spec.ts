@@ -315,7 +315,12 @@ test('a meeting, its transcript and its recap in every format; ETag and 304; sea
   expect(docx.status()).toBe(200);
   const zip = await JSZip.loadAsync(await docx.body());
   expect(await zip.file('word/document.xml')!.async('string')).toContain('færgeplanen til Ærø');
-  // A Word file is built anew each time; its ETag still holds while the recap does not change.
+  // A Word file is built anew each time, to the same bytes: two plain downloads match, and so do their ETags.
+  const docxTwice = await request.get('/api/v1/meetings/api-ida-1/recap?format=docx', {
+    headers: bearer(readToken),
+  });
+  expect(Buffer.from(await docxTwice.body()).equals(Buffer.from(await docx.body()))).toBe(true);
+  expect(docxTwice.headers()['etag']).toBe(docx.headers()['etag']);
   const docxAgain = await request.get('/api/v1/meetings/api-ida-1/recap?format=docx', {
     headers: { ...bearer(readToken), 'if-none-match': docx.headers()['etag']! },
   });
