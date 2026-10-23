@@ -1,0 +1,73 @@
+[package]
+name = "mtxt-recorder"
+version = "0.2.0"
+description = "The mtxt desktop recorder: microphone and system audio, uploaded to the company's own library."
+edition = "2021"
+rust-version = "1.92"
+license = "PolyForm-Noncommercial-1.0.0"
+publish = false
+default-run = "mtxt-recorder"
+
+[lib]
+name = "mtxt_recorder"
+crate-type = ["rlib"]
+
+[features]
+default = ["parakeet", "whisper"]
+# The two local models for the live preview. Each can be left out of a build.
+parakeet = ["dep:ort"]
+whisper = ["dep:whisper-rs"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2.8"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "io-util"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls", "http2", "system-proxy"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.3"
+hex = "0.4"
+percent-encoding = "2"
+unicode-normalization = "0.1"
+unicode-properties = { version = "0.1", default-features = false, features = ["general-category"] }
+thiserror = "2"
+log = "0.4"
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
+keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
+sys-locale = "0.3"
+cpal = "0.18"
+rtrb = "0.4"
+opus = "0.4"
+ogg = "0.9"
+ort = { version = "=2.0.0-rc.15", optional = true }
+whisper-rs = { version = "0.16", optional = true, features = ["metal"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSUUID", "NSValue", "NSProcessInfo"] }
+objc2-core-foundation = { version = "0.3", features = ["CFDictionary", "CFString", "CFNumber", "CFArray", "CFBase"] }
+objc2-core-audio = "0.3"
+objc2-core-audio-types = "0.3"
+objc2-av-foundation = { version = "0.3", features = ["AVCaptureDevice", "AVMediaFormat"] }
+objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSButton", "NSControl", "NSView", "NSResponder"] }
+block2 = "0.6"
+
+[dev-dependencies]
+axum = "0.8"
+serde_yaml = "0.9"
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = 3
+strip = "debuginfo"
