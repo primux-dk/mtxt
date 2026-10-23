@@ -975,7 +975,7 @@
     },
     "image": {
       "uploading": "Adding the image",
-      "failed": "The image could not be added. Use a PNG, JPEG, GIF or WebP file of at most 10 MB."
+      "failed": "The image could not be added. Use a PNG, JPEG, GIF or WebP file of at most 8 MB."
     },
     "link": {
       "title": "Link",

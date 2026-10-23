@@ -975,7 +975,7 @@
     },
     "image": {
       "uploading": "Tilføjer billedet",
-      "failed": "Billedet kunne ikke tilføjes. Brug en PNG-, JPEG-, GIF- eller WebP-fil på højst 10 MB."
+      "failed": "Billedet kunne ikke tilføjes. Brug en PNG-, JPEG-, GIF- eller WebP-fil på højst 8 MB."
     },
     "link": {
       "title": "Link",

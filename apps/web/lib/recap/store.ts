@@ -21,8 +21,8 @@ const c = schema.recaps;
 const v = schema.recapVersions;
 const dc = schema.decisions;
 
-/** A recap body as D1 can hold it, with room: 1,000,000 bytes is 150,000 words. */
-export const MAX_BODY_BYTES = 1_000_000;
+/** A recap body: under the save's 512 KiB bound at the Worker entry, JSON and all; about 70,000 words. */
+export const MAX_BODY_BYTES = 500_000;
 
 export interface VersionInfo {
   id: string;

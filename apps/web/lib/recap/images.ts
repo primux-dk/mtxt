@@ -4,7 +4,8 @@
   the meeting's permission-checked route; never a public URL. The type is
   taken from the file's first bytes, not from what the browser says.
 */
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** The Worker entry holds an upload to the same bound (lib/chunk-guard.ts). */
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const TYPES = {
   png: 'image/png',

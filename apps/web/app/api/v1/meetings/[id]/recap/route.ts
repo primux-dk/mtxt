@@ -1,7 +1,8 @@
 import { api, json } from '@/lib/api';
 import { HttpError } from '@/lib/http-error';
 import { readJson, recapMeeting } from '@/lib/recap/access';
-import { loadRecap, MAX_BODY_BYTES, writeVersion } from '@/lib/recap/store';
+import { RECAP_SAVE_MAX_BYTES } from '@/lib/chunk-guard';
+import { loadRecap, writeVersion } from '@/lib/recap/store';
 import { versionView } from '@/lib/recap/view';
 
 /*
@@ -17,7 +18,7 @@ export async function PUT(request: Request, { params }: Params) {
   return api(async (user) => {
     const { id } = await params;
     const { db, installId, meeting } = await recapMeeting(user, id, 'owner');
-    const body = await readJson(request, MAX_BODY_BYTES + 4096);
+    const body = await readJson(request, RECAP_SAVE_MAX_BYTES);
     const base = body.base_version_id;
     const markdown = body.body_md;
     if ((base !== null && typeof base !== 'string') || typeof markdown !== 'string') {

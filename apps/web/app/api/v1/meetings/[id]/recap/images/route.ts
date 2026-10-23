@@ -3,7 +3,7 @@ import { HttpError } from '@/lib/http-error';
 import { recapMeeting } from '@/lib/recap/access';
 import { imageKey, imageSrc, imageType, MAX_IMAGE_BYTES, sniffImage } from '@/lib/recap/images';
 
-/** An image for the recap, from its owner: PNG, JPEG, GIF or WebP, at most 10 MiB. */
+/** An image for the recap, from its owner: PNG, JPEG, GIF or WebP, at most 8 MiB. */
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: Params) {
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: Params) {
     const { storage, installId, meeting } = await recapMeeting(user, id, 'owner');
     const declared = Number(request.headers.get('content-length') ?? '0');
     if (declared > MAX_IMAGE_BYTES)
-      throw new HttpError(413, 'too_large', 'An image is at most 10 MiB.');
+      throw new HttpError(413, 'too_large', 'An image is at most 8 MiB.');
     const reader = request.body?.getReader();
     if (!reader) throw new HttpError(400, 'invalid_request', 'Send the image as the body.');
     const chunks: Uint8Array[] = [];
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: Params) {
       size += value.byteLength;
       if (size > MAX_IMAGE_BYTES) {
         await reader.cancel().catch(() => {});
-        throw new HttpError(413, 'too_large', 'An image is at most 10 MiB.');
+        throw new HttpError(413, 'too_large', 'An image is at most 8 MiB.');
       }
       chunks.push(value);
     }

@@ -111,3 +111,46 @@ function limitBody(request: Request, max: number): Guarded {
     overrun: () => over,
   };
 }
+
+/*
+  The recap's two bodies (packet 5 review): the editor's save, JSON with the
+  markdown, at 512 KiB, and an image upload at 8 MiB. Bounded here for the
+  same reason as a chunk: OpenNext buffers the body before the route runs.
+*/
+export const RECAP_SAVE_MAX_BYTES = 512 * 1024;
+export const RECAP_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+const RECAP_SAVE_PATH = /^\/api\/v1\/meetings\/[^/]+\/recap$/;
+const RECAP_IMAGE_PATH = /^\/api\/v1\/meetings\/[^/]+\/recap\/images$/;
+
+function recapBound(request: Request) {
+  const path = new URL(request.url).pathname;
+  if (request.method === 'PUT' && RECAP_SAVE_PATH.test(path))
+    return { max: RECAP_SAVE_MAX_BYTES, what: 'A recap save' };
+  if (request.method === 'POST' && RECAP_IMAGE_PATH.test(path))
+    return { max: RECAP_IMAGE_MAX_BYTES, what: 'An image' };
+  return null;
+}
+
+/** The 413 for a recap save or image upload, in the API's error shape. */
+export const recapTooLarge = (request: Request) => {
+  const bound = recapBound(request);
+  return Response.json(
+    {
+      error: {
+        code: 'too_large',
+        message: `${bound?.what ?? 'The body'} is at most ${bound?.max ?? 0} bytes.`,
+      },
+    },
+    { status: 413, headers: { 'cache-control': 'no-store' } },
+  );
+};
+
+export function limitRecapBody(request: Request): Guarded | Response {
+  const pass: Guarded = { request, overrun: () => null };
+  if (!request.body) return pass;
+  const bound = recapBound(request);
+  if (!bound) return pass;
+  const declared = request.headers.get('content-length');
+  if (declared !== null && Number(declared) > bound.max) return recapTooLarge(request);
+  return limitBody(request, bound.max);
+}
