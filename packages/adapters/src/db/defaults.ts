@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS = {
   sttProvider: null,
   sttApiKey: null,
   sttRegion: null,
+  webhookSecret: null,
+  aiGatewayId: null,
   language: 'auto',
   interfaceLanguage: 'en',
   liveTranscriptDefault: false,

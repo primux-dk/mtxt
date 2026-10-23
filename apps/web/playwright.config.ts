@@ -43,7 +43,14 @@ export default defineConfig({
       'pnpm db:migrate --persist-to .wrangler/e2e',
       // The dev users and a 30-meeting demo library (packet 3).
       'pnpm db:seed --demo=30 --persist-to .wrangler/e2e',
-      `wrangler dev --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e`,
+      // The origin and the fakes follow the port, so two worktrees can run side by side.
+      `wrangler dev --local --define MTXT_E2E_BUILD:'"1"' --var MTXT_LOCAL_DEV:1` +
+        ` --var PUBLIC_URL:http://localhost:${port}` +
+        ` --var ASSEMBLYAI_BASE_URL:http://localhost:${port}/api/test/fake-assemblyai` +
+        ` --var WORKERS_AI_FAKE_URL:http://localhost:${port}/api/test/fake-workers-ai` +
+        ` --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e` +
+        // Everything the Worker logs, for the spec that checks no secret reaches it.
+        ` > .wrangler/e2e-worker.log 2>&1`,
     ]
       .filter(Boolean)
       .join(' && '),

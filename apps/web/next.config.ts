@@ -35,5 +35,6 @@ const nextConfig: NextConfig = {
 
 export default withNextIntl(nextConfig);
 
-// Gives `next dev` the bindings from wrangler.jsonc, with local D1 and R2.
-initOpenNextCloudflareForDev();
+// Gives `next dev` the bindings from wrangler.jsonc, with local D1 and R2. Remote
+// bindings (Workers AI) need a Cloudflare login, so they are off unless asked for.
+initOpenNextCloudflareForDev({ remoteBindings: process.env.MTXT_REMOTE_BINDINGS === '1' });

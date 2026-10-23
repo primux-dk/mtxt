@@ -8,9 +8,18 @@ const message = (body: unknown, id = 'm1') => {
 };
 
 describe('jobs', () => {
-  it('recognises the two job types', () => {
+  it('recognises the job types', () => {
     expect(isJob({ type: 'transcribe', recording_id: 'r', install_id: 'i' })).toBe(true);
-    expect(isJob({ type: 'recap', meeting_id: 'm', install_id: 'i' })).toBe(true);
+    expect(isJob({ type: 'recap', meeting_id: 'm', transcript_id: 't', install_id: 'i' })).toBe(
+      true,
+    );
+    // The recap job carries its transcript as the idempotency key.
+    expect(isJob({ type: 'recap', meeting_id: 'm', install_id: 'i' })).toBe(false);
+    expect(isJob({ type: 'drain_transcriptions', install_id: 'i' })).toBe(true);
+    expect(isJob({ type: 'drain_transcriptions', install_id: 'i', after: 'r9' })).toBe(true);
+    expect(isJob({ type: 'transcribe', recording_id: 'r', install_id: 'i', poll: true })).toBe(
+      true,
+    );
     expect(isJob({ type: 'transcribe', install_id: 'i' })).toBe(false);
     expect(isJob({ type: 'export', install_id: 'i' })).toBe(false);
     expect(isJob(null)).toBe(false);
@@ -24,7 +33,12 @@ describe('jobs', () => {
     const handle = routeJobs({ transcribe }, log);
     const ok = message({ type: 'transcribe', recording_id: 'r1', install_id: 'dev' });
     const failing = message({ type: 'transcribe', recording_id: 'bad', install_id: 'dev' });
-    const recap = message({ type: 'recap', meeting_id: 'm1', install_id: 'dev' });
+    const recap = message({
+      type: 'recap',
+      meeting_id: 'm1',
+      transcript_id: 't1',
+      install_id: 'dev',
+    });
     const junk = message('hello');
     await handle([ok, failing, recap, junk], {});
 

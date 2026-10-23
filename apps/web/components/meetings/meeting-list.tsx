@@ -14,6 +14,17 @@ import { RestoreButton } from './restore-button';
 export async function MeetingList({ rows, restore }: { rows: LibraryRow[]; restore?: boolean }) {
   const t = await getTranslations('format');
   const tm = await getTranslations('meeting');
+  const tt = await getTranslations('transcript');
+  const intl = (await getTranslations('locale'))('intl');
+  const list = new Intl.ListFormat(intl, { type: 'conjunction' });
+  /** "Mette, Jonas and Søren"; past three, "Mette, Jonas and 3 others" (figure 02). */
+  const speakersLine = (speakers: LibraryRow['speakers']) => {
+    const names = speakers.map((s) =>
+      s.unnamed !== null ? tt('speaker.unnamed', { number: s.unnamed }) : s.name.split(/\s+/)[0]!,
+    );
+    if (names.length <= 3) return list.format(names);
+    return list.format([...names.slice(0, 2), t('others', { count: names.length - 2 })]);
+  };
   return (
     <ul
       className="overflow-hidden rounded-card border border-border bg-card"
@@ -42,6 +53,23 @@ export async function MeetingList({ rows, restore }: { rows: LibraryRow[]; resto
               <span>
                 {row.durationS === null ? tm('noRecording') : formatDuration(t, row.durationS)}
               </span>
+              {row.speakers.length > 0 && (
+                <>
+                  <span aria-hidden="true" className="text-text-muted">
+                    ·
+                  </span>
+                  <span
+                    className="min-w-0 break-words"
+                    title={
+                      row.speakers.length > 3
+                        ? list.format(row.speakers.map((s) => s.name))
+                        : undefined
+                    }
+                  >
+                    {speakersLine(row.speakers)}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div>

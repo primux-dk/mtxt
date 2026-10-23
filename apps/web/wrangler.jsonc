@@ -14,9 +14,15 @@
     "binding": "ASSETS",
   },
   "observability": { "enabled": true },
+  // The e2e run bundles with --define MTXT_E2E_BUILD:"1"; a deploy keeps "" and esbuild
+  // drops the fake providers from the Worker (lib/transcription/deps.ts).
+  "define": { "MTXT_E2E_BUILD": "\"\"" },
   "vars": {
     // Written into every row's install_id. One install per account.
     "INSTALL_ID": "dev",
+    // The install's own origin, for the speech-to-text provider's webhook back to it.
+    // A deploy sets its hostname, for example https://meetings.example.com.
+    "PUBLIC_URL": "http://localhost:8787",
     // AI Gateway in front of the recap model and the providers it supports.
     // Placeholder until the recap packet; the gateway is created in the install's account.
     "AI_GATEWAY_ID": "",
@@ -41,6 +47,9 @@
     "producers": [{ "binding": "JOBS", "queue": "mtxt-jobs" }],
     "consumers": [{ "queue": "mtxt-jobs", "max_batch_size": 1, "max_retries": 5 }],
   },
+  // Workers AI, for the Whisper speech-to-text provider. Always remote; local dev and the
+  // e2e run use `wrangler dev --local`, where calling it fails and the job records why.
+  "ai": { "binding": "AI", "remote": true },
   "durable_objects": {
     "bindings": [{ "name": "UPLOAD_SESSIONS", "class_name": "UploadSession" }],
   },

@@ -2,6 +2,7 @@ import 'server-only';
 import { and, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { foldTitle, schema, type Db, type Meeting, type Recording } from '@mtxt/adapters';
 import type { SessionUser as CurrentUser } from '../auth/session';
+import { unnamedNumber } from '../transcription/speakers';
 import { resolveAccess, type Access } from './access';
 import { PAGE_SIZE, type LibraryParams, type StatusFilter } from './library-params';
 
@@ -32,6 +33,8 @@ export interface LibraryRow {
   durationS: number | null;
   state: MeetingState;
   archived: boolean;
+  /** Who spoke, for the speakers line: linked colleagues' names or the labels, in speaking order. */
+  speakers: { name: string; unnamed: number | null }[];
 }
 
 export interface LibraryPage {
@@ -129,6 +132,11 @@ export async function listMeetings(
       ${from} ${statusWhere} order by ${order} limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}`,
   );
 
+  const speakers = await speakersFor(
+    db,
+    installId,
+    rows.map((r) => r.id),
+  );
   return {
     rows: rows.map((r) => ({
       id: r.id,
@@ -138,12 +146,39 @@ export async function listMeetings(
       durationS: r.duration_s === null ? null : Number(r.duration_s),
       state: r.state,
       archived: r.archived_at !== null,
+      speakers: speakers.get(r.id) ?? [],
     })),
     total,
     counts,
     page,
     pages,
   };
+}
+
+/**
+ * The speakers of a page of meetings, in one query: the colleague's name
+ * when a speaker is linked, else the label. Install-scoped on both sides.
+ */
+async function speakersFor(db: Db, installId: string, meetingIds: string[]) {
+  const out = new Map<string, { name: string; unnamed: number | null }[]>();
+  if (!meetingIds.length) return out;
+  const rows = await db.all<{ meeting_id: string; label: string; user_name: string | null }>(
+    sql`select s.meeting_id, s.label, u.name as user_name from speakers s
+      left join users u on u.id = s.user_id and u.install_id = ${installId}
+      where s.install_id = ${installId}
+        and s.meeting_id in (select value from json_each(${JSON.stringify(meetingIds)}))
+      order by s.meeting_id, coalesce(s.speaker_index, 1000000), s.label`,
+  );
+  for (const row of rows) {
+    const list = out.get(row.meeting_id) ?? [];
+    list.push(
+      row.user_name
+        ? { name: row.user_name, unnamed: null }
+        : { name: row.label, unnamed: unnamedNumber(row.label) },
+    );
+    out.set(row.meeting_id, list);
+  }
+  return out;
 }
 
 export interface MeetingDetail {

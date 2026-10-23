@@ -1,12 +1,13 @@
 'use server';
 
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { foldTitle, schema } from '@mtxt/adapters';
 import { getSessionUser } from '@/lib/auth/session';
 import { HttpError } from '@/lib/http-error';
 import { getAdapters } from '@/lib/install';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { accessTo } from '@/lib/meetings/queries';
+import { resetForRetry } from '@/lib/transcription/store';
 
 /**
  * The owner's changes to a meeting. Each sets a value rather than toggling
@@ -112,8 +113,24 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
       const recap = await db.query.recaps.findFirst({
         where: and(eq(schema.recaps.meetingId, meetingId), eq(schema.recaps.installId, installId)),
       });
+      // The providers' raw results live in storage too (transcripts.raw_path).
+      const raws = recordings.length
+        ? await db
+            .select({ path: schema.transcripts.rawPath })
+            .from(schema.transcripts)
+            .where(
+              and(
+                inArray(
+                  schema.transcripts.recordingId,
+                  recordings.map((rec) => rec.id),
+                ),
+                eq(schema.transcripts.installId, installId),
+              ),
+            )
+        : [];
       const keys = [
         ...recordings.map((rec) => rec.storagePath),
+        ...raws.flatMap((raw) => (raw.path ? [raw.path] : [])),
         ...(recap?.docxPath ? [recap.docxPath] : []),
       ];
       if (keys.length) await storage.delete(keys);
@@ -161,27 +178,25 @@ export async function retryTranscription(
 ): Promise<ActionResult> {
   return outcome(() =>
     asOwner(meetingId, async ({ db, queue, installId }) => {
-      const [updated] = await db
-        .update(r)
-        .set({ status: 'transcribing', failure: null })
-        .where(
-          and(
-            eq(r.id, recordingId),
-            eq(r.installId, installId),
-            eq(r.meetingId, meetingId),
-            eq(r.status, 'failed'),
-            isNotNull(r.confirmedAt),
-          ),
-        )
-        .returning({ id: r.id });
+      const before = await db.query.recordings.findFirst({
+        where: and(eq(r.id, recordingId), eq(r.installId, installId)),
+      });
+      // The recording and its transcript row go back to a fresh attempt together; this is
+      // the one place a failed row is reset (the job never does it).
+      const updated = await resetForRetry(db, installId, meetingId, recordingId);
       // Already queued by an earlier click: nothing to do, and no second job.
       if (!updated) return;
       try {
         await queue.send({ type: 'transcribe', recording_id: recordingId, install_id: installId });
       } catch (error) {
+        // Back to the failure the page showed, reason and all.
         await db
           .update(r)
-          .set({ status: 'failed' })
+          .set({
+            status: 'failed',
+            failure: before?.failure ?? null,
+            failureReason: before?.failureReason ?? null,
+          })
           .where(and(eq(r.id, recordingId), eq(r.installId, installId)));
         throw error;
       }

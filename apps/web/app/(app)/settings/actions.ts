@@ -96,6 +96,18 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
     console.error('Could not save the settings:', error);
     return { status: 'error', message: t('errors.saveFailed') };
   }
+  // Recordings that waited for a provider start now: one drain job queues them, 100 at a
+  // time (docs/decisions.md, packet 4 review). A queue failure is said, not swallowed.
+  if (result.patch.sttProvider) {
+    const { installId, queue } = await getAdapters();
+    try {
+      await queue.send({ type: 'drain_transcriptions', install_id: installId });
+    } catch (error) {
+      console.error('Could not queue the waiting recordings:', (error as Error).name);
+      revalidatePath('/', 'layout');
+      return { status: 'error', message: (await getTranslations('stt'))('drainFailed') };
+    }
+  }
   // The shell, the theme and the language come from this row on every page.
   revalidatePath('/', 'layout');
   return { status: 'saved', message: t('saved') };

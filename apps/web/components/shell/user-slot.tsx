@@ -2,20 +2,14 @@ import { LogOut } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth';
+import { Avatar } from '@/components/ui/avatar';
+
+export { Avatar };
 
 export interface ShellUser {
   name: string;
   email: string;
 }
-
-/** Up to two initials from the name; the avatar is decorative, the name is beside it. */
-const initials = (name: string) =>
-  name
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toLocaleUpperCase())
-    .join('');
 
 async function signOutAction() {
   'use server';
@@ -53,16 +47,5 @@ export async function UserSlot({
         </Button>
       </form>
     </div>
-  );
-}
-
-export function Avatar({ name }: { name?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-accent-line-strong bg-accent-tint text-xs font-[550] text-accent-foreground"
-    >
-      {name ? initials(name) : null}
-    </span>
   );
 }

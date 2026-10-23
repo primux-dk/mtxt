@@ -59,6 +59,8 @@ export const STT_PROVIDERS = [
   'local-parakeet',
 ] as const;
 export const INTERFACE_LANGUAGES = ['en', 'da'] as const;
+/** A transcript waits for an async provider, holds the result, or records that the provider failed. */
+export const TRANSCRIPT_STATUSES = ['pending', 'done', 'failed'] as const;
 /** The settings page's "Recording sources": where a meeting may come from. */
 export const CAPTURE_SOURCES = ['desktop', 'upload', 'browser', 'teams', 'meet'] as const;
 
@@ -195,8 +197,14 @@ export const recordings = sqliteTable(
     contentType: text('content_type').notNull().default('audio/webm'),
     storagePath: text('storage_path').notNull(),
     status: text('status', { enum: RECORDING_STATUSES }).notNull().default('uploading'),
-    /** A contract error code when status is failed, for example `hash_mismatch`. */
+    /** A contract error code when status is failed, for example `hash_mismatch` or `stt_failed`. */
     failure: text('failure'),
+    /**
+     * What the speech-to-text provider said when transcription failed, in its
+     * own words (never a secret). The page shows it under the localised line
+     * for `failure`. Null for upload failures and while nothing has failed.
+     */
+    failureReason: text('failure_reason'),
     /**
      * When the recording was created. A constant SQL default, because ALTER
      * TABLE ADD COLUMN takes no expression; the app sets the real time, and
@@ -233,12 +241,86 @@ export const transcripts = sqliteTable(
       .references(() => recordings.id, { onDelete: 'cascade' }),
     provider: text('provider').notNull(),
     model: text('model').notNull(),
+    /** '' while pending. */
     language: text('language').notNull(),
+    /** The provider's own response, kept whole. `{}` while pending. */
     rawJson: text('raw_json', { mode: 'json' }).notNull(),
     createdAt: createdAt(),
+    /**
+     * TRANSCRIPT_STATUSES. Checked by the app, not by a CHECK: SQLite cannot
+     * add a table constraint without rebuilding the table, and D1's rebuild
+     * cascades (decisions.md, packet 3).
+     */
+    status: text('status', { enum: TRANSCRIPT_STATUSES }).notNull().default('done'),
+    /** The provider's id for an async job (AssemblyAI's transcript id); null for sync providers. */
+    providerJobId: text('provider_job_id'),
+    /** A second provider's transcript for the comparison tool. Never shown in the app. */
+    isComparison: bool('is_comparison').notNull().default(false),
+    /**
+     * The job delivery that holds the row: set by one conditional UPDATE, so
+     * two deliveries never both submit. Every later write by the job names
+     * `claim_token`. A claim older than the lease may be taken over.
+     */
+    claimedAt: timestamp('claimed_at'),
+    claimToken: text('claim_token'),
+    /** When the claim lapses (15 minutes after it is taken). A held delivery retries until then. */
+    claimExpiresAt: timestamp('claim_expires_at'),
+    /** The current attempt's polling deadline: past it, a job the provider still has is failed as a timeout. */
+    pollDeadlineAt: timestamp('poll_deadline_at'),
+    /**
+     * Where the provider's raw result lives in storage
+     * (`transcripts/{install}/{recording}/{provider}-{claim_token}.json`), set
+     * by the completion that won. `raw_json` is no longer written beyond `{}`:
+     * a full result can pass D1's 2 MB value limit.
+     */
+    rawPath: text('raw_path'),
   },
-  /** One server transcript per recording; the live preview is never stored. */
-  (t) => [uniqueIndex('transcripts_recording').on(t.recordingId)],
+  (t) => [
+    /** One server transcript per recording; the live preview is never stored. Comparisons sit beside it. */
+    uniqueIndex('transcripts_recording')
+      .on(t.recordingId)
+      .where(sql`"is_comparison" = 0`),
+    /** The same provider job never makes two rows in an install (a replayed webhook, a retried job). */
+    uniqueIndex('transcripts_install_provider_job').on(t.installId, t.provider, t.providerJobId),
+  ],
+);
+
+/**
+ * The recap job a completed transcript owes, written in the completion
+ * batch. `sent_at` is set once the queue took the message; a later delivery
+ * re-sends a row left unsent for over a minute.
+ */
+export const recapOutbox = sqliteTable(
+  'recap_outbox',
+  {
+    transcriptId: text('transcript_id')
+      .notNull()
+      .references(() => transcripts.id, { onDelete: 'cascade' }),
+    installId: installId(),
+    meetingId: text('meeting_id').notNull(),
+    createdAt: createdAt(),
+    sentAt: timestamp('sent_at'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.transcriptId] }),
+    index('recap_outbox_install_unsent').on(t.installId, t.sentAt),
+  ],
+);
+
+/**
+ * Recap jobs the consumer has taken, by transcript: a redelivered or
+ * duplicated recap message for the same transcript is skipped.
+ */
+export const recapJobsSeen = sqliteTable(
+  'recap_jobs_seen',
+  {
+    transcriptId: text('transcript_id')
+      .notNull()
+      .references(() => transcripts.id, { onDelete: 'cascade' }),
+    installId: installId(),
+    seenAt: createdAt('seen_at'),
+  },
+  (t) => [primaryKey({ columns: [t.transcriptId] })],
 );
 
 /** A label can link to a directory user; externals stay plain labels. */
@@ -252,8 +334,20 @@ export const speakers = sqliteTable(
       .references(() => meetings.id, { onDelete: 'cascade' }),
     label: text('label').notNull(),
     userId: text('user_id').references(() => users.id),
+    /**
+     * The provider's speaker number, from 0. A second recording of the same
+     * meeting reuses the row for the same number, so a rename holds across
+     * them. Null for a speaker added by hand.
+     */
+    speakerIndex: integer('speaker_index'),
   },
-  (t) => [index('speakers_meeting').on(t.meetingId), index('speakers_user').on(t.userId)],
+  (t) => [
+    index('speakers_meeting').on(t.meetingId),
+    index('speakers_user').on(t.userId),
+    uniqueIndex('speakers_meeting_index')
+      .on(t.meetingId, t.speakerIndex)
+      .where(sql`"speaker_index" is not null`),
+  ],
 );
 
 export const segments = sqliteTable(
@@ -370,6 +464,14 @@ export const settings = sqliteTable(
     sttApiKey: text('stt_api_key'),
     /** Azure: the region name. ElevenLabs: `eu` or null for the provider default. */
     sttRegion: text('stt_region'),
+    /**
+     * Sealed. Authenticates the speech-to-text provider's webhook back to the
+     * install (AssemblyAI's custom auth header). Generated on the first
+     * request that finds none; never shown and never logged.
+     */
+    webhookSecret: text('webhook_secret'),
+    /** Cloudflare AI Gateway id. Workers AI (and later the recap model) go through it when set. */
+    aiGatewayId: text('ai_gateway_id'),
     /** Default transcription language: an ISO code, or `auto`. */
     language: text('language').notNull().default('auto'),
     interfaceLanguage: text('interface_language', { enum: INTERFACE_LANGUAGES })
@@ -436,3 +538,7 @@ export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
 export type User = typeof users.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type Keyterm = typeof keyterms.$inferSelect;
+export type Transcript = typeof transcripts.$inferSelect;
+export type TranscriptStatus = (typeof TRANSCRIPT_STATUSES)[number];
+export type Speaker = typeof speakers.$inferSelect;
+export type Segment = typeof segments.$inferSelect;

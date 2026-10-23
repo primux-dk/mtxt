@@ -37,7 +37,7 @@ export function MeetingTabs({
         <TabsPrimitive.Content
           key={tab.value}
           value={tab.value}
-          className="min-w-0 overflow-hidden rounded-card border border-border bg-card"
+          className="min-w-0 overflow-clip rounded-card border border-border bg-card"
         >
           {tab.panel}
         </TabsPrimitive.Content>

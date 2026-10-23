@@ -1,14 +1,23 @@
 export type * from './storage';
 export type * from './queue';
 export type * from './uploads';
+export type * from './speech';
 export { isJob, JOB_TYPES, routeJobs } from './jobs';
-export type { Job, JobType, JobHandlers, RecapJob, TranscribeJob } from './jobs';
+export type {
+  DrainTranscriptionsJob,
+  Job,
+  JobType,
+  JobHandlers,
+  RecapJob,
+  TranscribeJob,
+} from './jobs';
 export { createDb, schema, type Db } from './db';
 export { DEFAULT_SETTINGS } from './db/defaults';
 export { seedSql } from './db/seed';
 export {
   bootstrapIdentity,
   claimFirstAdmin,
+  ensureWebhookSecret,
   listKeyterms,
   readSettings,
   saveSettings,
@@ -31,11 +40,13 @@ export {
   updateTemplate,
 } from './db/templates';
 export { open, seal, type SecretContext } from './secrets';
+export { describeError, redact, rememberSecret } from './redact';
 export {
   CAPTURE_SOURCES,
   IDENTITY_PROVIDERS,
   INTERFACE_LANGUAGES,
   STT_PROVIDERS,
+  TRANSCRIPT_STATUSES,
   VISIBILITIES,
 } from './db/schema';
 export type {
@@ -49,13 +60,23 @@ export type {
   User,
   Visibility,
 } from './db/schema';
-export type { Meeting, Recording, RecordingStatus } from './db/schema';
+export type {
+  Meeting,
+  Recording,
+  RecordingStatus,
+  Segment,
+  Speaker,
+  Transcript,
+  TranscriptStatus,
+} from './db/schema';
 export {
   cloudflareAdapters,
   cloudflareConsumer,
   cloudflareQueue,
   durableObjectUploadSessions,
   r2Storage,
+  WHISPER_MODEL,
+  workersAiSpeech,
   type CloudflareBindings,
 } from './cloudflare';
 export { foldTitle } from './db/fold';

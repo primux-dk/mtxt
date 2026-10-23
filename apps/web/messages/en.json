@@ -199,18 +199,6 @@
         "title": "Uploading",
         "body": "The recording is still uploading. The transcript starts when the whole file is here."
       },
-      "transcribing": {
-        "title": "Transcribing",
-        "body": "The transcript appears here when it is ready. You can leave this page."
-      },
-      "failed": {
-        "title": "Transcription failed",
-        "body": "{provider} could not transcribe the recording.",
-        "bodyUnknown": "The speech-to-text provider could not transcribe the recording.",
-        "retry": "Try again",
-        "retryFailed": "Not queued. Try again.",
-        "switchProvider": "Switch provider"
-      },
       "uploadFailed": {
         "title": "The upload did not complete",
         "body": "The server did not keep the file: {reason, select, hash_mismatch {it changed on the way} size_mismatch {the size did not match} session_expired {it was not finished within 7 days} other {it was rejected}}. Upload it again.",
@@ -249,20 +237,77 @@
     "conflict": "Data from another installation depends on this meeting, so it was left as it is. Contact your admin."
   },
   "transcript": {
-    "head": "{language} · {count, plural, one {# speaker} other {# speakers}} · Click a speaker to rename",
-    "headShort": "{language} · {count, plural, one {# speaker} other {# speakers}}",
+    "head": "{language} · {count, plural, =0 {no speakers} one {# speaker} other {# speakers}} · Click a speaker to rename",
+    "headShort": "{language} · {count, plural, =0 {no speakers} one {# speaker} other {# speakers}}",
     "speaker": {
       "rename": "{name}, rename or link to a colleague",
       "unnamed": "Speaker {number}"
     },
-    "position": "Showing {position} of {duration}"
+    "position": "Showing {position} of {duration}",
+    "label": "Transcript",
+    "seek": "Go to {time}",
+    "playing": "Now playing",
+    "state": {
+      "transcribing": {
+        "body": "Transcribing with {provider}. The transcript appears here when it is ready. You can leave this page.",
+        "waiting": "Waiting for a speech-to-text provider. Transcription starts when an admin chooses one in Settings."
+      },
+      "failed": {
+        "title": "Transcription failed",
+        "detail": "Reason: {reason}",
+        "retry": "Try again",
+        "retryFailed": "Not queued. Try again.",
+        "switchProvider": "Switch provider",
+        "askAdmin": "To switch provider, ask an admin."
+      },
+      "empty": {
+        "title": "No speech was found",
+        "body": "The recording was transcribed, but {provider} heard no speech in it."
+      }
+    },
+    "failure": {
+      "stt_failed": "{provider} could not transcribe the recording.",
+      "stt_too_long": "This recording is too long for {provider}; switch provider in Settings.",
+      "stt_auth": "{provider} refused the API key. An admin can enter a new key in Settings.",
+      "stt_no_provider": "No speech-to-text provider is chosen. An admin chooses one in Settings.",
+      "stt_unavailable": "{provider} is not available in this version; switch provider in Settings.",
+      "stt_config": "The installation is missing a setting it needs to reach {provider}. Contact your admin."
+    },
+    "providerUnknown": "The speech-to-text provider",
+    "languageUnknown": "Language not detected",
+    "reason": {
+      "unauthorised": "The provider refused the API key{status, select, none {} other { (HTTP {status})}}.",
+      "rate_limited": "The provider was busy and refused more requests{status, select, none {} other { (HTTP {status})}}.",
+      "bad_audio": "The provider could not read the audio{status, select, none {} other { (HTTP {status})}}.",
+      "provider_error": "The provider had an error{status, select, none {} other { (HTTP {status})}}.",
+      "timeout": "The provider did not answer in time.",
+      "too_long": "The recording is over the provider's size limit.",
+      "missing_audio": "The audio file is missing from storage.",
+      "config": "A setting the installation needs is missing or wrong.",
+      "internal": "The installation had an error while it saved the transcript."
+    }
   },
   "speaker": {
     "rename": {
       "title": "Rename speaker",
       "field": "Name",
-      "help": "The new name applies to every line from this speaker in this meeting."
-    }
+      "help": "The new name applies to every line from this speaker in this meeting.",
+      "save": "Save",
+      "required": "Enter a name."
+    },
+    "link": {
+      "heading": "Colleague",
+      "help": "A linked speaker carries the colleague's name in every meeting.",
+      "search": "Search colleagues",
+      "searchHelp": "Name or email address",
+      "none": "No colleague matches.",
+      "searching": "Searching",
+      "searchFailed": "The search did not work. Try again.",
+      "linked": "Linked to {name}",
+      "choose": "Link to {name}, {email}",
+      "unlink": "Unlink"
+    },
+    "failed": "The speaker was not changed. It is back as it was."
   },
   "recap": {
     "template": {
@@ -567,7 +612,9 @@
       "keepSelf": "Keep your own address, {email}, in the list. Another admin can remove it.",
       "duplicate": "A template called {name} exists already. Choose another name.",
       "saveFailed": "The settings could not be saved, and nothing was changed. Try again.",
-      "unterminatedQuote": "Record {record}: a double quote opens and never closes. Nothing was imported."
+      "unterminatedQuote": "Record {record}: a double quote opens and never closes. Nothing was imported.",
+      "notAvailable": "Not available in this version.",
+      "gatewayFormat": "Enter the gateway ID: letters, digits, - and _."
     },
     "saved": "Settings saved."
   },
@@ -626,5 +673,13 @@
       "rejected": "The server rejected the file ({code}). Contact your admin."
     },
     "retry": "Try again"
+  },
+  "stt": {
+    "supported": "This version transcribes with {providers}. AssemblyAI runs Universal-3.5 Pro, and Universal-2 for a language Universal-3.5 Pro lacks. The other providers in the list arrive later.",
+    "gateway": {
+      "field": "AI Gateway ID",
+      "help": "Workers AI requests, and later the recap model's, go through this gateway in the company's Cloudflare account. Leave it empty to call Workers AI directly."
+    },
+    "drainFailed": "The settings were saved, but the recordings that wait for a provider were not queued. Save again to queue them."
   }
 }
