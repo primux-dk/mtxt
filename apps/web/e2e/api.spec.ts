@@ -406,6 +406,13 @@ test('a read-only token cannot write; a read_write token sets title, visibility,
     data: { user_id: ole },
   });
   expect(notShared.status()).toBe(400);
+  // Someone who is not a user of this install, unknown or another install's, is one 404.
+  const stranger = await request.post('/api/v1/meetings/api-ida-2/shares', {
+    headers: bearer(writeToken),
+    data: { email: 'nobody@example.com' },
+  });
+  expect(stranger.status()).toBe(404);
+  expect((await stranger.json()).error.code).toBe('not_found');
 
   // The recap: a save on the version read, then a stale one is a conflict naming the current.
   const save = await request.put('/api/v1/meetings/api-ida-1/recap', {

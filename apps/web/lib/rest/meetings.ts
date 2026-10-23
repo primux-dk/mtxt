@@ -370,3 +370,29 @@ export async function recapJson(db: Db, installId: string, meetingId: string) {
     })),
   };
 }
+
+/**
+ * A colleague named by a share call: a user of this install, by id or by
+ * address (ASCII case ignored). An id or address that is unknown and one
+ * that belongs to another install get the same 404, so the API tells a
+ * caller nothing about who exists elsewhere.
+ */
+export async function installColleague(
+  db: Db,
+  installId: string,
+  who: { id: string } | { email: string },
+): Promise<{ id: string }> {
+  const u = schema.users;
+  const colleague = await db
+    .select({ id: u.id })
+    .from(u)
+    .where(
+      and(
+        eq(u.installId, installId),
+        'id' in who ? eq(u.id, who.id) : sql`lower(${u.email}) = lower(${who.email.trim()})`,
+      ),
+    )
+    .get();
+  if (!colleague) throw new HttpError(404, 'not_found', 'No such colleague in this install.');
+  return colleague;
+}

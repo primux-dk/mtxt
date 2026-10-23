@@ -51,6 +51,8 @@ const meetingsRoute = await import('../app/api/v1/meetings/route');
 const meetingRoute = await import('../app/api/v1/meetings/[id]/route');
 const searchRoute = await import('../app/api/v1/search/route');
 const transcriptRoute = await import('../app/api/v1/meetings/[id]/transcript/route');
+const sharesRoute = await import('../app/api/v1/meetings/[id]/shares/route');
+const shareRoute = await import('../app/api/v1/meetings/[id]/shares/[userId]/route');
 
 describe('authorise', () => {
   const api = (scope: ApiTokenScope) => ({ kind: 'api' as const, scope });
@@ -394,6 +396,40 @@ describe('the REST API on a database', () => {
       .prepare(`select rate_count from recorder_tokens where kind = 'api'`)
       .all() as { rate_count: number }[];
     expect(row!.rate_count).toBe(60);
+  });
+
+  it("answers an unknown colleague and another install's user with the same 404", async () => {
+    ctx.raw.exec(`INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES
+      ('elsewhere', 'other-install', 'e', 'karen@example.com', 'Karen Holt')`);
+    ctx.raw.exec(`UPDATE meetings SET visibility = 'shared' WHERE id = 'a1'`);
+    as(await token('anne', 'read_write'));
+    const add = async (body: unknown) => {
+      const response = await sharesRoute.POST(
+        new Request('http://localhost/api/v1/meetings/a1/shares', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+        { params: Promise.resolve({ id: 'a1' }) },
+      );
+      return { status: response.status, body: await response.json() };
+    };
+    const unknown = await add({ email: 'nobody@example.com' });
+    const foreign = await add({ email: 'karen@example.com' });
+    const foreignId = await add({ user_id: 'elsewhere' });
+    expect(unknown).toEqual({
+      status: 404,
+      body: { error: { code: 'not_found', message: 'No such colleague in this install.' } },
+    });
+    expect(foreign).toEqual(unknown);
+    expect(foreignId).toEqual(unknown);
+    const removed = await shareRoute.DELETE(
+      new Request('http://localhost/api/v1/meetings/a1/shares/elsewhere', { method: 'DELETE' }),
+      { params: Promise.resolve({ id: 'a1', userId: 'elsewhere' }) },
+    );
+    expect(removed.status).toBe(404);
+    expect(await removed.json()).toEqual(unknown.body);
+    // A colleague of this install by address, whatever its case.
+    expect(await add({ email: 'JONAS@example.com' })).toMatchObject({ status: 200 });
   });
 
   it('is 401 without a token, and with a revoked one', async () => {

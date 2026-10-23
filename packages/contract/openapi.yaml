@@ -871,7 +871,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ShareList'
         '400':
-          description: A bad body, a colleague not in this install, the owner themselves, or a meeting that is not `shared` (`invalid_request`).
+          description: A bad body, the owner themselves, or a meeting that is not `shared` (`invalid_request`).
           content:
             application/json:
               schema:
@@ -881,7 +881,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiOwnerOnly'
         '404':
-          $ref: '#/components/responses/MeetingNotFound'
+          $ref: '#/components/responses/ShareNotFound'
         '413':
           $ref: '#/components/responses/ApiTooLarge'
         '429':
@@ -908,7 +908,7 @@ paths:
         '204':
           description: Not a reader now.
         '400':
-          description: No such user in this install, or the owner themselves (`invalid_request`).
+          description: The owner themselves (`invalid_request`).
           content:
             application/json:
               schema:
@@ -918,7 +918,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiOwnerOnly'
         '404':
-          $ref: '#/components/responses/MeetingNotFound'
+          $ref: '#/components/responses/ShareNotFound'
         '429':
           $ref: '#/components/responses/ApiRateLimited'
         '500':
@@ -1059,6 +1059,12 @@ components:
             $ref: '#/components/schemas/Error'
     MeetingNotFound:
       description: No meeting with this id that the user may read (`not_found`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ShareNotFound:
+      description: No meeting with this id that the user may read, or a colleague who is not a user of this install, whether unknown or another install's (`not_found`, the same answer for both).
       content:
         application/json:
           schema:

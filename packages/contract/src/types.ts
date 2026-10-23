@@ -753,6 +753,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description No meeting with this id that the user may read, or a colleague who is not a user of this install, whether unknown or another install's (`not_found`, the same answer for both). */
+        ShareNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description The body is larger than the call takes (`too_large`). */
         ApiTooLarge: {
             headers: {
@@ -1454,7 +1463,7 @@ export interface operations {
                     "application/json": components["schemas"]["ShareList"];
                 };
             };
-            /** @description A bad body, a colleague not in this install, the owner themselves, or a meeting that is not `shared` (`invalid_request`). */
+            /** @description A bad body, the owner themselves, or a meeting that is not `shared` (`invalid_request`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1465,7 +1474,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["ApiOwnerOnly"];
-            404: components["responses"]["MeetingNotFound"];
+            404: components["responses"]["ShareNotFound"];
             413: components["responses"]["ApiTooLarge"];
             429: components["responses"]["ApiRateLimited"];
             500: components["responses"]["Internal"];
@@ -1491,7 +1500,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description No such user in this install, or the owner themselves (`invalid_request`). */
+            /** @description The owner themselves (`invalid_request`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1502,7 +1511,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["ApiOwnerOnly"];
-            404: components["responses"]["MeetingNotFound"];
+            404: components["responses"]["ShareNotFound"];
             429: components["responses"]["ApiRateLimited"];
             500: components["responses"]["Internal"];
         };
