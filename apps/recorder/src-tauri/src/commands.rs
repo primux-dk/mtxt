@@ -3,7 +3,7 @@
 //! as a new snapshot.
 
 use crate::app::{App, Snapshot};
-use crate::live::LiveUpdate;
+use crate::live::LiveTranscript;
 use crate::permissions::Permissions;
 use std::sync::Arc;
 use tauri::State;
@@ -164,7 +164,7 @@ pub fn pause_live(app: AppState, paused: bool) {
 }
 
 #[tauri::command]
-pub fn live_state(app: AppState) -> Option<LiveUpdate> {
+pub fn live_state(app: AppState) -> LiveTranscript {
     app.live_state()
 }
 

@@ -6,7 +6,7 @@
 use crate::api::{Api, ApiError, PollResult};
 use crate::audio::recorder::{self, LiveFeed, Recording, Wanted};
 use crate::connect::{self, Pkce};
-use crate::live::{models, LiveSession, LiveUpdate};
+use crate::live::{models, LiveSession, LiveTranscript, LiveUpdate};
 use crate::permissions::{self, Permission, Permissions};
 use crate::profile::Profile;
 use crate::queue::recovery::{inspect_file, FileCheck};
@@ -47,7 +47,8 @@ pub struct Inner {
     pub online: bool,
     pub downloads: HashMap<String, Download>,
     pub live: Option<LiveSession>,
-    pub live_update: Option<LiveUpdate>,
+    /// The running recording's live transcript, in memory only.
+    pub live_text: LiveTranscript,
     pub live_hidden: bool,
     /// The recording whose 7-day question is open.
     pub ask: Option<String>,
@@ -227,7 +228,7 @@ impl App {
                 online: true,
                 downloads: HashMap::new(),
                 live: None,
-                live_update: None,
+                live_text: LiveTranscript::default(),
                 live_hidden: false,
                 ask: None,
                 notice: None,
@@ -1286,13 +1287,19 @@ impl App {
                 return;
             }
             inner.live_hidden = false;
-            inner.live_update = None;
+            inner.live_text = LiveTranscript::default();
             models::usable(&inner.profile.model).to_string()
         };
+        let offset_s = self
+            .lock()
+            .active
+            .as_ref()
+            .map(|a| a.started.elapsed().as_secs_f64())
+            .unwrap_or(0.0);
         let app = self.clone();
-        let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), move |update| {
+        let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), offset_s, move |update| {
             // Runs only while the session is alive (`LiveSession` guards it).
-            app.lock().live_update = Some(update.clone());
+            app.lock().live_text.apply(&update);
             let _ = app.handle.emit_to("live", "live", &update);
         });
         self.lock().live = Some(session);
@@ -1306,7 +1313,7 @@ impl App {
         if let Some(s) = session {
             s.stop();
         }
-        self.lock().live_update = None;
+        self.lock().live_text = LiveTranscript::default();
         let _ = self.handle.emit_to("live", "live", LiveUpdate::stopped());
         crate::windows::hide_live(&self.handle);
     }
@@ -1361,8 +1368,8 @@ impl App {
         }
     }
 
-    pub fn live_state(&self) -> Option<LiveUpdate> {
-        self.lock().live_update.clone()
+    pub fn live_state(&self) -> LiveTranscript {
+        self.lock().live_text.clone()
     }
 
     pub fn set_model(self: &Arc<App>, id: &str) {
@@ -1411,7 +1418,7 @@ impl App {
                         let inner = app.lock();
                         inner.live.is_some()
                             && inner.profile.model == spec.id
-                            && inner.live_update.as_ref().is_some_and(|u| u.state == "needs_model")
+                            && inner.live_text.state == "needs_model"
                     };
                     if waiting {
                         app.stop_live();

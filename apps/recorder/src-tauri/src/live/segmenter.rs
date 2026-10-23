@@ -14,8 +14,9 @@ const MIN_SPEECH_RMS: f32 = 0.006;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Cut {
-    Partial(Vec<f32>),
-    Final(Vec<f32>),
+    /// The utterance so far, and the stream position (in samples) where it starts.
+    Partial(Vec<f32>, u64),
+    Final(Vec<f32>, u64),
 }
 
 pub struct Segmenter {
@@ -25,15 +26,22 @@ pub struct Segmenter {
     silence: usize,
     since_partial: usize,
     noise: f32,
+    /// Samples that went through `frame` since the stream began.
+    framed: u64,
 }
 
 impl Default for Segmenter {
     fn default() -> Self {
-        Segmenter { buf: Vec::new(), pending: Vec::new(), speech: false, silence: 0, since_partial: 0, noise: 0.002 }
+        Segmenter::starting_at(0)
     }
 }
 
 impl Segmenter {
+    /// A segmenter whose first sample is at stream position `pos` (after a pause).
+    pub fn starting_at(pos: u64) -> Segmenter {
+        Segmenter { buf: Vec::new(), pending: Vec::new(), speech: false, silence: 0, since_partial: 0, noise: 0.002, framed: pos }
+    }
+
     pub fn push(&mut self, samples: &[f32]) -> Vec<Cut> {
         self.pending.extend_from_slice(samples);
         let mut cuts = Vec::new();
@@ -47,10 +55,10 @@ impl Segmenter {
         }
         self.pending.drain(..at);
         // Only the newest partial matters.
-        let last_partial = cuts.iter().rposition(|c| matches!(c, Cut::Partial(_)));
+        let last_partial = cuts.iter().rposition(|c| matches!(c, Cut::Partial(..)));
         let mut i = 0;
         cuts.retain(|c| {
-            let keep = !matches!(c, Cut::Partial(_)) || Some(i) == last_partial;
+            let keep = !matches!(c, Cut::Partial(..)) || Some(i) == last_partial;
             i += 1;
             keep
         });
@@ -65,6 +73,8 @@ impl Segmenter {
             self.noise = 0.95 * self.noise + 0.05 * rms;
         }
         self.buf.extend_from_slice(frame);
+        self.framed += frame.len() as u64;
+        let start = self.framed - self.buf.len() as u64;
         if !self.speech {
             if voiced {
                 self.speech = true;
@@ -79,11 +89,11 @@ impl Segmenter {
         self.since_partial += frame.len();
         self.silence = if voiced { 0 } else { self.silence + frame.len() };
         if self.silence >= PAUSE || self.buf.len() >= MAX_UTTERANCE {
-            return Some(Cut::Final(self.take()));
+            return Some(Cut::Final(self.take(), start));
         }
         if self.buf.len() >= MIN_PARTIAL && self.since_partial >= PARTIAL_EVERY {
             self.since_partial = 0;
-            return Some(Cut::Partial(self.buf.clone()));
+            return Some(Cut::Partial(self.buf.clone(), start));
         }
         None
     }
@@ -121,10 +131,10 @@ mod tests {
         let mut cuts = s.push(&quiet(1.0));
         cuts.extend(s.push(&tone(3.0)));
         cuts.extend(s.push(&quiet(1.0)));
-        let partials = cuts.iter().filter(|c| matches!(c, Cut::Partial(_))).count();
+        let partials = cuts.iter().filter(|c| matches!(c, Cut::Partial(..))).count();
         let finals: Vec<usize> = cuts
             .iter()
-            .filter_map(|c| if let Cut::Final(a) = c { Some(a.len()) } else { None })
+            .filter_map(|c| if let Cut::Final(a, _) = c { Some(a.len()) } else { None })
             .collect();
         assert!(partials >= 1, "{cuts:?}");
         assert_eq!(finals.len(), 1);
@@ -137,13 +147,23 @@ mod tests {
     fn a_long_utterance_is_cut_at_twelve_seconds() {
         let mut s = Segmenter::default();
         let cuts = s.push(&tone(25.0));
-        let finals = cuts.iter().filter(|c| matches!(c, Cut::Final(_))).count();
+        let finals = cuts.iter().filter(|c| matches!(c, Cut::Final(..))).count();
         assert_eq!(finals, 2);
         for c in &cuts {
-            if let Cut::Final(a) = c {
+            if let Cut::Final(a, _) = c {
                 assert!(a.len() <= MAX_UTTERANCE);
             }
         }
+    }
+
+    #[test]
+    fn cuts_carry_where_the_utterance_starts() {
+        let mut s = Segmenter::starting_at(RATE as u64 * 60);
+        let cuts = s.push(&[quiet(2.0), tone(2.0), quiet(1.0)].concat());
+        let start = cuts.iter().find_map(|c| if let Cut::Final(_, at) = c { Some(*at) } else { None }).unwrap();
+        // One minute in, plus two seconds of quiet, less the 0.3 s pre-roll.
+        let secs = start as f64 / RATE as f64;
+        assert!((secs - 61.7).abs() < 0.05, "{secs}");
     }
 
     #[test]
@@ -154,6 +174,6 @@ mod tests {
         for block in audio.chunks(320) {
             cuts.extend(s.push(block));
         }
-        assert_eq!(cuts.iter().filter(|c| matches!(c, Cut::Final(_))).count(), 1);
+        assert_eq!(cuts.iter().filter(|c| matches!(c, Cut::Final(..))).count(), 1);
     }
 }
