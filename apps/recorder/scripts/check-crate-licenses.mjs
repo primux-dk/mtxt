@@ -1,65 +1,94 @@
 #!/usr/bin/env node
 /* global console, process, URL */
-// The Rust side of `pnpm check:licenses`: every crate the recorder ships
-// (normal dependencies of mtxt-recorder for macOS, both architectures) must be
-// under MIT, Apache-2.0, BSD, ISC or another licence in ALLOWED. A crate with
-// a licence that needs a note is listed in NOTED with the reason; anything
-// else, and every GPL or LGPL crate without a permissive alternative, fails.
-// Build-time crates (build scripts, proc macros) are listed for information.
+// The Rust side of `pnpm check:licenses`. It judges every crate the recorder
+// builds for macOS (both architectures): normal dependencies, build
+// dependencies and proc macros; dev dependencies are left out, a release
+// never builds them. A crate passes when one alternative of its SPDX
+// expression is all ALLOWED, or when it is named in EXCEPTIONS with exactly
+// that licence. Everything else fails, GPL and LGPL included.
 //
-//   node apps/recorder/scripts/check-crate-licenses.mjs [--list]
+// It also keeps the crate inventory in NOTICE.md (between the
+// `recorder-crates` markers) generated from `cargo metadata`, and fails when
+// the inventory is not current.
+//
+//   node apps/recorder/scripts/check-crate-licenses.mjs                check licences and NOTICE.md
+//   node apps/recorder/scripts/check-crate-licenses.mjs --write-notice regenerate the inventory
+//   node apps/recorder/scripts/check-crate-licenses.mjs --list         print every crate
 import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const manifest = fileURLToPath(new URL('../src-tauri/Cargo.toml', import.meta.url));
+const noticePath = fileURLToPath(new URL('../../../NOTICE.md', import.meta.url));
+
 const ALLOWED = new Set([
   'MIT',
+  'MIT-0',
   'Apache-2.0',
+  'Apache-2.0 WITH LLVM-exception',
   'BSD-2-Clause',
   'BSD-3-Clause',
   'ISC',
   '0BSD',
   'CC0-1.0',
-  'MIT-0',
   'Zlib',
   'BSL-1.0',
-  'Apache-2.0 WITH LLVM-exception',
+  'Unicode-3.0',
+  'Unicode-DFS-2016',
 ]);
-// Permissive, but not in the repository's list: each is named in NOTICE.md.
-const NOTED = {
-  'Unicode-3.0': 'Unicode data tables (ICU4X and unicode-ident); a permissive data licence.',
-  Unlicense: 'whisper-rs and whisper-rs-sys: a public-domain dedication.',
-  'CDLA-Permissive-2.0': 'webpki-roots: Mozilla root certificates as data.',
-  'MPL-2.0': 'Used unmodified through Tauri (file-level copyleft); listed in NOTICE.md.',
+
+// Licences outside the list, accepted for these crates only, each named in NOTICE.md.
+export const EXCEPTIONS = {
+  cssparser: {
+    license: 'MPL-2.0',
+    reason:
+      'Through Tauri (tauri-utils HTML handling); unmodified. Accepted by the lead, 2026-10-23.',
+  },
+  'cssparser-macros': { license: 'MPL-2.0', reason: 'Proc macro of cssparser; unmodified.' },
+  selectors: {
+    license: 'MPL-2.0',
+    reason: 'Through Tauri (tauri-utils HTML handling); unmodified.',
+  },
+  'dtoa-short': { license: 'MPL-2.0', reason: 'Through cssparser; unmodified.' },
+  'option-ext': { license: 'MPL-2.0', reason: 'Through dirs, which Tauri uses; unmodified.' },
+  'webpki-root-certs': {
+    license: 'CDLA-Permissive-2.0',
+    reason: 'Mozilla root certificates as data; build time (ort-sys download).',
+  },
+  'whisper-rs': {
+    license: 'Unlicense',
+    reason: 'Public-domain dedication; bindings to whisper.cpp (MIT).',
+  },
+  'whisper-rs-sys': {
+    license: 'Unlicense',
+    reason: 'Public-domain dedication; builds whisper.cpp (MIT).',
+  },
 };
 
-const meta = JSON.parse(
-  execFileSync(
-    'cargo',
-    [
-      'metadata',
-      '--format-version',
-      '1',
-      '--manifest-path',
-      manifest,
-      '--filter-platform',
-      'aarch64-apple-darwin',
-      '--filter-platform',
-      'x86_64-apple-darwin',
-    ],
-    {
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
-    },
-  ),
-);
-const pkgs = new Map(meta.packages.map((p) => [p.id, p]));
-const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
-const root = meta.packages.find((p) => p.name === 'mtxt-recorder').id;
+function metadata() {
+  return JSON.parse(
+    execFileSync(
+      'cargo',
+      [
+        'metadata',
+        '--format-version',
+        '1',
+        '--manifest-path',
+        manifest,
+        '--filter-platform',
+        'aarch64-apple-darwin',
+        '--filter-platform',
+        'x86_64-apple-darwin',
+      ],
+      { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
+    ),
+  );
+}
 
-function walk(start, kinds) {
+function walk(meta, root, kinds) {
+  const nodes = new Map(meta.resolve.nodes.map((n) => [n.id, n]));
   const seen = new Set();
-  const stack = [start];
+  const stack = [root];
   while (stack.length) {
     const id = stack.pop();
     if (seen.has(id)) continue;
@@ -68,52 +97,91 @@ function walk(start, kinds) {
       if (dep.dep_kinds.some((k) => kinds.includes(k.kind ?? 'normal'))) stack.push(dep.pkg);
     }
   }
-  seen.delete(start);
+  seen.delete(root);
   return seen;
 }
 
-const runtime = walk(root, ['normal']);
-const all = walk(root, ['normal', 'build']);
-const buildOnly = [...all].filter((id) => !runtime.has(id));
-
-function verdict(expr) {
-  if (!expr) return 'unknown';
+export function verdict(name, expr) {
+  if (!expr) return 'refused';
   const clean = expr.replaceAll('/', ' OR ').replace(/[()]/g, ' ').trim();
   const alternatives = clean
     .split(/\s+OR\s+/)
-    .map((a) => a.split(/\s+AND\s+/).map((s) => s.trim()));
+    .map((a) => a.split(/\s+AND\s+/).map((s) => s.trim().replace(/\s+/g, ' ')));
   if (alternatives.some((alt) => alt.every((id) => ALLOWED.has(id)))) return 'ok';
-  if (alternatives.some((alt) => alt.every((id) => ALLOWED.has(id) || id in NOTED))) return 'noted';
+  const ex = EXCEPTIONS[name];
+  if (ex && alternatives.some((alt) => alt.every((id) => ALLOWED.has(id) || id === ex.license)))
+    return 'excepted';
   return 'refused';
 }
 
-const rows = [...runtime]
-  .map((id) => pkgs.get(id))
-  .map((p) => ({
-    name: p.name,
-    version: p.version,
-    license: p.license ?? '(none)',
-    v: verdict(p.license),
-  }));
-rows.sort((a, b) => a.name.localeCompare(b.name));
-const refused = rows.filter((r) => r.v === 'refused' || r.v === 'unknown');
-const noted = rows.filter((r) => r.v === 'noted');
+export function inventory(rows) {
+  const lines = rows.map((r) => `- ${r.name} ${r.version}: ${r.license}`);
+  return [
+    '<!-- recorder-crates:start -->',
+    `<!-- Generated by apps/recorder/scripts/check-crate-licenses.mjs --write-notice from cargo metadata. ${rows.length} crates. -->`,
+    ...lines,
+    '<!-- recorder-crates:end -->',
+  ].join('\n');
+}
 
-if (process.argv.includes('--list')) {
-  for (const r of rows) console.log(`${r.name} ${r.version}\t${r.license}`);
-  console.log(`\nbuild-time only: ${buildOnly.length} crates`);
+function main() {
+  const meta = metadata();
+  const pkgs = new Map(meta.packages.map((p) => [p.id, p]));
+  const root = meta.packages.find((p) => p.name === 'mtxt-recorder').id;
+  const all = walk(meta, root, ['normal', 'build']);
+  const shipped = walk(meta, root, ['normal']);
+  const row = (id) => {
+    const p = pkgs.get(id);
+    return {
+      name: p.name,
+      version: p.version,
+      license: p.license ?? '(none)',
+      shipped: shipped.has(id),
+      v: verdict(p.name, p.license),
+    };
+  };
+  const rows = [...all]
+    .map(row)
+    .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+  const refused = rows.filter((r) => r.v === 'refused');
+  const excepted = rows.filter((r) => r.v === 'excepted');
+
+  if (process.argv.includes('--list'))
+    for (const r of rows)
+      console.log(`${r.name} ${r.version}\t${r.license}${r.shipped ? '' : '\t(build)'}`);
+  const byLicence = {};
+  for (const r of rows) byLicence[r.license] = (byLicence[r.license] ?? 0) + 1;
+  console.log(
+    `${rows.length} crates (${rows.filter((r) => r.shipped).length} shipped, the rest build time)`,
+  );
+  for (const [l, n] of Object.entries(byLicence).sort((a, b) => b[1] - a[1]))
+    console.log(`  ${String(n).padStart(4)}  ${l}`);
+  if (excepted.length) {
+    console.log('\nExceptions (named in NOTICE.md):');
+    for (const r of excepted)
+      console.log(`  ${r.name} ${r.version}: ${r.license}. ${EXCEPTIONS[r.name].reason}`);
+  }
+
+  const notice = readFileSync(noticePath, 'utf8');
+  const block = inventory(rows.filter((r) => r.shipped));
+  const re = /<!-- recorder-crates:start -->[\s\S]*<!-- recorder-crates:end -->/;
+  let failed = false;
+  if (process.argv.includes('--write-notice')) {
+    writeFileSync(
+      noticePath,
+      re.test(notice) ? notice.replace(re, block) : `${notice.trimEnd()}\n\n${block}\n`,
+    );
+    console.log(`\nwrote the crate inventory to ${noticePath}`);
+  } else if (!notice.includes(block)) {
+    console.error('\nNOTICE.md: the crate inventory is not current. Run with --write-notice.');
+    failed = true;
+  }
+  if (refused.length) {
+    console.error('\nRefused:');
+    for (const r of refused) console.error(`  ${r.name} ${r.version}: ${r.license}`);
+    failed = true;
+  }
+  process.exit(failed ? 1 : 0);
 }
-const byLicence = {};
-for (const r of rows) byLicence[r.license] = (byLicence[r.license] ?? 0) + 1;
-console.log(`${rows.length} runtime crates`);
-for (const [l, n] of Object.entries(byLicence).sort((a, b) => b[1] - a[1]))
-  console.log(`  ${String(n).padStart(4)}  ${l}`);
-if (noted.length) {
-  console.log('\nNoted (permissive, named in NOTICE.md):');
-  for (const r of noted) console.log(`  ${r.name} ${r.version}: ${r.license}`);
-}
-if (refused.length) {
-  console.error('\nRefused:');
-  for (const r of refused) console.error(`  ${r.name} ${r.version}: ${r.license}`);
-  process.exit(1);
-}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) main();

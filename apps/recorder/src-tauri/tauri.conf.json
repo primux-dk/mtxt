@@ -18,10 +18,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app",
-      "dmg"
-    ],
+    "targets": ["app", "dmg"],
     "category": "Productivity",
     "copyright": "Primux (PRIMUX DIGITAL, S.L.). PolyForm Noncommercial 1.0.0.",
     "shortDescription": "Meeting recorder",
