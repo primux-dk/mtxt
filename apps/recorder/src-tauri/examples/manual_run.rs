@@ -46,8 +46,10 @@ async fn main() {
         assert!(started.elapsed() < Duration::from_secs(600), "not approved in 10 minutes");
     };
     println!(
-        "connected as {} to {} (accent {}, language {:?}, live default {:?})",
-        token.user.name, token.install.product_name, token.install.theme_accent, token.install.interface_language, token.install.live_transcript_default
+        "connected as {} <{}> (user {}) to {} (accent {}, language {:?}, live default {:?})",
+        token.user.name,
+        token.user.email,
+        token.user.id, token.install.product_name, token.install.theme_accent, token.install.interface_language, token.install.live_transcript_default
     );
 
     // 2. Record, or encode a WAV.
@@ -91,6 +93,7 @@ async fn main() {
 
     // 3. Upload.
     let mut rec = RecordingState::new(uuid::Uuid::new_v4().to_string(), host.clone(), title, started_at);
+    rec.owner = Some(mtxt_recorder::queue::state::Owner { user_id: token.user.id.clone(), email: token.user.email.clone() });
     rec.apply(Event::Stopped { at: chrono::Utc::now(), duration_s: duration.round() as u64, sha256, size_bytes: size }, chrono::Utc::now());
     loop {
         let outcome = attempt(&mut rec, &api, &token.token, &path, &mut |r: &RecordingState| {
