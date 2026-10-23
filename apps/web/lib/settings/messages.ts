@@ -1,12 +1,12 @@
 import 'server-only';
 import { getTranslations } from 'next-intl/server';
 import { formatRatio } from '../theme/contrast';
-import type { FieldError, TemplateError } from './validate';
+import type { EndpointError, FieldError, TemplateError } from './validate';
 
 type T = Awaited<ReturnType<typeof getTranslations<'settings'>>>;
 
 /** A validation code as the sentence the reader sees at the field, in their language. */
-export function fieldMessage(t: T, error: FieldError | TemplateError): string {
+export function fieldMessage(t: T, error: FieldError | TemplateError | EndpointError): string {
   switch (error.code) {
     case 'contrast':
       return t('errors.contrast', {

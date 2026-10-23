@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import {
   auditStatement,
   cleanupEntries,
@@ -14,7 +14,7 @@ import { HttpError } from '@/lib/http-error';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { resetForRetry } from '@/lib/transcription/store';
 import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
-import { planDeleted, queueDeleted } from '@/lib/webhooks/store';
+import { planDeleted, queueCurrentState, queueDeleted } from '@/lib/webhooks/store';
 
 /** The owner's changes to a meeting. Each answers with the outcome; the screen rolls back on `ok: false`. */
 export type { ActionResult };
@@ -216,4 +216,33 @@ export async function retryTranscription(
       }
     }),
   );
+}
+
+export type SendResult =
+  | { ok: true; queued: number; transcript: boolean; recap: boolean }
+  | Extract<ActionResult, { ok: false }>;
+
+/**
+ * "Send to connected systems" (docs/spec.md "Webhooks", Consent): the owner
+ * lets the meeting go to the install's endpoints whatever its visibility,
+ * and its current state goes at once. Consent is a value, so a second press
+ * changes nothing; the dedupe keys stop it sending the same transcript or
+ * version twice. Setting the meeting to private takes the consent back.
+ */
+export async function sendToConnected(meetingId: string): Promise<SendResult> {
+  let sent: { queued: number; transcript: boolean; recap: boolean } = {
+    queued: 0,
+    transcript: false,
+    recap: false,
+  };
+  const result = await outcome(() =>
+    asOwner(meetingId, async ({ db, installId, queue }) => {
+      await db
+        .update(m)
+        .set({ webhookConsentAt: sql`coalesce(${m.webhookConsentAt}, ${Date.now()})` })
+        .where(thisMeeting(meetingId, installId));
+      sent = await queueCurrentState({ db, installId, queue }, meetingId);
+    }),
+  );
+  return result.ok ? { ok: true, ...sent } : result;
 }

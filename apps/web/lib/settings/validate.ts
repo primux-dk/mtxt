@@ -12,7 +12,11 @@ import {
   INTERFACE_LANGUAGES,
   STT_PROVIDERS,
   VISIBILITIES,
+  WEBHOOK_AUTO_SEND,
+  WEBHOOK_EVENTS,
   type CaptureSource,
+  type WebhookAutoSend,
+  type WebhookEvent,
   type Settings,
   type SttProvider,
   templateNameKey,
@@ -21,6 +25,8 @@ import { isTenantGuid } from '../auth/identity';
 import { HEX, themeFailures, type ContrastPair, type ThemeMode } from '../theme/contrast';
 import { parseKeyterms, type Keyterm, type KeytermError } from './keyterms';
 import { AZURE_MODEL, MODEL_ID, NEEDS_RECAP_KEY } from '../recap/models';
+import { checkEndpointUrl } from '../webhooks/address';
+import { MAX_LABEL_LENGTH, MAX_URL_LENGTH } from '../webhooks/rules';
 
 export const MAX_NAME = 120;
 export const MAX_RETENTION_DAYS = 3650;
@@ -73,6 +79,7 @@ export const FIELDS = [
   'recordingSources',
   'retentionAudioDays',
   'retentionTranscriptDays',
+  'webhookAutoSend',
   'adminEmails',
 ] as const;
 export type Field = (typeof FIELDS)[number];
@@ -122,6 +129,7 @@ export interface SettingsPatch {
   retentionAudioDays: number;
   retentionTranscriptDays: number;
   mcpEnabled: boolean;
+  webhookAutoSend: WebhookAutoSend;
   adminEmails: string[];
 }
 
@@ -281,6 +289,9 @@ export function validateSettings(
   const retentionAudioDays = days('retentionAudioDays');
   const retentionTranscriptDays = days('retentionTranscriptDays');
 
+  const webhookAutoSend = text('webhookAutoSend') || 'off';
+  if (!oneOf(WEBHOOK_AUTO_SEND, webhookAutoSend)) errors.webhookAutoSend = { code: 'invalid' };
+
   const adminEmails: string[] = [];
   for (const line of String(form.get('adminEmails') ?? '').split(/[\n,;]+/)) {
     const email = line.trim().toLowerCase();
@@ -322,6 +333,7 @@ export function validateSettings(
       retentionAudioDays,
       retentionTranscriptDays,
       mcpEnabled: form.get('mcpEnabled') === 'on',
+      webhookAutoSend: webhookAutoSend as WebhookAutoSend,
       adminEmails,
     },
     keyterms: parsed.terms,
@@ -358,4 +370,48 @@ export function validateTemplate(
   if (bodyMd.length > MAX_TEMPLATE_BODY)
     errors.bodyMd = { code: 'tooLong', max: MAX_TEMPLATE_BODY };
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, name, bodyMd };
+}
+
+export type EndpointField = 'label' | 'url' | 'events';
+export type EndpointError =
+  | { code: 'required' }
+  | { code: 'tooLong'; max: number }
+  | { code: 'urlInvalid' }
+  | { code: 'urlNotHttps' }
+  | { code: 'urlCredentials' }
+  | { code: 'urlPrivate' }
+  | { code: 'atLeastOneEvent' };
+
+const URL_ERRORS = {
+  invalid: { code: 'urlInvalid' },
+  not_https: { code: 'urlNotHttps' },
+  credentials: { code: 'urlCredentials' },
+  private_host: { code: 'urlPrivate' },
+  too_long: { code: 'tooLong', max: MAX_URL_LENGTH },
+} as const satisfies Record<string, EndpointError>;
+
+/**
+ * A new webhook endpoint (docs/spec.md "Webhooks"): an optional label, an
+ * https URL up to 2,048 characters that names no local or private host, and
+ * at least one event. `allowLocal` lets the e2e run's receiver through.
+ */
+export function validateEndpoint(
+  value: { label: string; url: string; events: readonly string[] },
+  options: { allowLocal?: boolean } = {},
+):
+  | { ok: true; label: string | null; url: string; events: WebhookEvent[] }
+  | { ok: false; errors: Partial<Record<EndpointField, EndpointError>> } {
+  const errors: Partial<Record<EndpointField, EndpointError>> = {};
+  const label = value.label.trim();
+  if (label.length > MAX_LABEL_LENGTH) errors.label = { code: 'tooLong', max: MAX_LABEL_LENGTH };
+  const url = value.url.trim();
+  if (!url) errors.url = { code: 'required' };
+  else {
+    const checked = checkEndpointUrl(url, options);
+    if (!checked.ok) errors.url = URL_ERRORS[checked.problem];
+  }
+  const events = WEBHOOK_EVENTS.filter((e) => value.events.includes(e));
+  if (events.length === 0) errors.events = { code: 'atLeastOneEvent' };
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, label: label || null, url, events };
 }

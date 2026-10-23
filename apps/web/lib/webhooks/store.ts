@@ -37,6 +37,16 @@ export interface QueuedPayload {
   meeting: MeetingMeta | null;
 }
 
+/** The meeting's metadata as a payload carries it: the owner by name and address, not by id. */
+const snapshotOf = (meta: MeetingMeta): MeetingMeta => ({
+  id: meta.id,
+  title: meta.title,
+  started_at: meta.started_at,
+  duration_s: meta.duration_s,
+  visibility: meta.visibility,
+  owner: { name: meta.owner.name, email: meta.owner.email },
+});
+
 export async function listEndpoints(db: Db, installId: string): Promise<WebhookEndpoint[]> {
   return db.select().from(e).where(eq(e.installId, installId)).orderBy(e.createdAt, e.id);
 }
@@ -91,12 +101,13 @@ export async function lastDeliveries(db: Db, installId: string) {
   const rows = await db.all<{
     endpoint_id: string;
     status: WebhookDelivery['status'];
+    attempts: number;
     last_status_code: number | null;
     last_error: string | null;
     last_attempt_at: number | null;
     created_at: number;
   }>(sql`
-    select endpoint_id, status, last_status_code, last_error, last_attempt_at, created_at
+    select endpoint_id, status, attempts, last_status_code, last_error, last_attempt_at, created_at
     from (
       select *, row_number() over (partition by endpoint_id order by created_at desc, id desc) as n
       from webhook_deliveries where install_id = ${installId}
@@ -209,9 +220,8 @@ export async function queueMeetingEvent(
   if (!meeting || !mayBeSent(meeting, settings.webhookAutoSend)) return 0;
   const meta = await meetingMeta(db, installId, meeting.id);
   if (!meta) return 0;
-  const { ownerId: _owner, ...snapshot } = meta;
   return queueFor(deps, endpoints, {
-    payload: { event: input.event, meeting: snapshot },
+    payload: { event: input.event, meeting: snapshotOf(meta) },
     meetingId: meeting.id,
     dedupeKey: input.dedupeKey,
     delayS: input.delayS,
@@ -314,8 +324,7 @@ export async function planDeleted(
     .filter((endpoint) => eligible || delivered.has(endpoint.id))
     .map((endpoint) => endpoint.id);
   if (!endpointIds.length) return null;
-  const { ownerId: _owner, ...snapshot } = meta;
-  return { meetingId, meeting: snapshot, endpointIds };
+  return { meetingId, meeting: snapshotOf(meta), endpointIds };
 }
 
 /** After the delete committed: `meeting.deleted`, once per endpoint, from the snapshot. */
