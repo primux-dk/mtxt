@@ -908,7 +908,13 @@ impl App {
 
     pub fn is_busy(&self) -> bool {
         let inner = self.lock();
-        inner.active.is_some() || inner.queue.iter().any(|r| r.is_unconfirmed())
+        // An upload that can still make progress keeps the app in the menu bar;
+        // one waiting for a person (signed out, refused) does not.
+        inner.active.is_some()
+            || inner.queue.iter().any(|r| {
+                r.is_unconfirmed()
+                    && !matches!(r.pending_reason, Some(PendingReason::SignedOut) | Some(PendingReason::Rejected { .. }))
+            })
     }
 
     pub fn request_permissions(&self) -> Permissions {
