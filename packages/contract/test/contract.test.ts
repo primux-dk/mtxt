@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
@@ -57,6 +58,19 @@ describe('contract', () => {
       '429',
       '500',
     ]);
+  });
+
+  it('gives a pairing-code example a client can check its derivation against', async () => {
+    const flow = parse(await readFile(specUrl, 'utf8'))['x-recorder-flow'];
+    const { alphabet, example } = flow.pairing_code;
+    const bytes = createHash('sha256').update(example.challenge, 'ascii').digest();
+    expect(bytes.subarray(0, 4).toString('hex')).toBe(example.first_bytes_hex);
+    const bits = bytes.readUInt32BE(0) >>> 2;
+    expect(bits).toBe(example.bits);
+    const code = [25, 20, 15, 10, 5, 0].map((shift) => alphabet[(bits >>> shift) & 31]).join('');
+    expect(`${code.slice(0, 3)}-${code.slice(3)}`).toBe(example.code);
+    expect(alphabet).toHaveLength(32);
+    expect(alphabet).not.toMatch(/[ILOU]/);
   });
 
   it('uses 8 MB chunks', () => {

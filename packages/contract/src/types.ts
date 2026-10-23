@@ -28,7 +28,12 @@ export interface paths {
          *     - 410: `expired` (the grant passed its 10 minutes or was already
          *       used) or `denied` (the user chose Cancel, or the verifier does not
          *       hash to the challenge). Stop polling; connect again.
-         *     - 429: more than one poll a second for this grant; wait `Retry-After`.
+         *     - 429: more than one poll a second on an approved grant; wait
+         *       `Retry-After` seconds.
+         *
+         *     The body is checked before anything else, so 400 and a wrong
+         *     verifier cost the server nothing; a challenge with no grant costs
+         *     one read.
          */
         post: operations["pollRecorderToken"];
         delete?: never;
@@ -53,10 +58,12 @@ export interface paths {
         /**
          * Disconnect a recorder. The token stops working at once.
          * @description The recorder disconnects itself with its own `token_id` (a "Sign out"
-         *     in the recorder). Any of the caller's own recorder tokens may be
-         *     revoked; revoking one already revoked is 204 again. After revoking its
-         *     own token the recorder deletes it from the keychain; every later call
-         *     with it is 401.
+         *     in the recorder). With a bearer token, `{id}` must be the id of that
+         *     same token; any other id is 404, so a recorder never revokes another
+         *     of the user's recorders. With the library's session cookie, any of
+         *     the user's own recorder tokens may be revoked, and one already
+         *     revoked is 204 again. After revoking its own token the recorder
+         *     deletes it from the keychain; every later call with it is 401.
          */
         delete: operations["revokeRecorderToken"];
         options?: never;
@@ -418,7 +425,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description More than one poll a second for this grant (`rate_limited`). */
+            /** @description More than one poll a second on an approved grant (`rate_limited`). */
             429: {
                 headers: {
                     /** @description Seconds to wait. */
@@ -452,7 +459,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            /** @description No recorder token with this id belongs to the caller (`not_found`). */
+            /** @description With a bearer token, `{id}` is not the calling token; with the session, no recorder token with this id belongs to the caller (`not_found`). */
             404: {
                 headers: {
                     [name: string]: unknown;

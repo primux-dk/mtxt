@@ -10,18 +10,109 @@ info:
     "Confirmed" means the server holds the whole file and its SHA-256 matches.
     Only then does the recorder start its 7-day local timer.
 
-    A desktop recorder connects first (docs/spec.md "Recorder connection"):
-    it opens `/connect?challenge=<S256 of a verifier>&name=<device name>` in
-    the browser, the user approves there with the company login, and the
-    recorder polls `POST /recorder/token` with the challenge and the verifier
-    until it receives a bearer token. Every other call carries that token as
-    `Authorization: Bearer <token>`.
+    ## Recorder connection
+
+    A desktop recorder connects once, through the browser, and then sends a
+    bearer token with every call. It never handles the company's identity
+    provider. The values below are also in `x-recorder-flow`.
+
+    1. **Verifier and challenge (RFC 7636 S256).** The verifier is 32 random
+       bytes from the OS random source, base64url without padding: 43
+       characters of `A-Z a-z 0-9 - _` (the server accepts 43 to 128
+       characters of `A-Z a-z 0-9 - . _ ~`). The challenge is the SHA-256 of
+       the verifier's ASCII bytes, base64url without padding: 43 characters.
+       Keep the verifier in memory only; never put it in a URL or a log.
+    2. **Device name.** Take the computer's name, then: remove every code
+       point in the Unicode general categories Cc, Cf, Zl and Zp (this
+       removes control characters, the bidi controls U+200E, U+200F,
+       U+202A to U+202E and U+2066 to U+2069, and zero-width characters);
+       normalise to NFC; trim Unicode White_Space at both ends; truncate to
+       64 Unicode code points; trim again. If nothing is left, use
+       "Recorder". The server takes 1 to 64 code points after NFC and trim
+       and refuses a name with any of those categories.
+    3. **Pairing code.** SHA-256 of the challenge's ASCII bytes; read the
+       first 4 bytes as a big-endian unsigned 32-bit integer and shift it
+       right by 2 (the first 30 bits); split those into six 5-bit groups,
+       most significant first; map each through Crockford's base32 alphabet
+       `0123456789ABCDEFGHJKMNPQRSTVWXYZ`; show it as `XXX-XXX` next to
+       "Waiting for approval". The connect page shows the same code and
+       tells the user to approve only when they match. Worked example: the
+       challenge `E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM` gives the
+       bytes `0d 29 9b 1e`, the 30-bit value 55207623, and the code
+       `1MM-SP7`.
+    4. **Open the browser** at `https://<host>/connect?challenge=<challenge>&name=<device name>`,
+       where `<host>` is the install's own hostname. Percent-encode the
+       name's UTF-8 bytes as RFC 3986 says for a query value (everything
+       outside `A-Z a-z 0-9 - . _ ~`; a space is `%20`, so
+       "Kontor Ærø" is `Kontor%20%C3%86r%C3%B8`). The server also reads `+`
+       as a space. The challenge needs no encoding.
+    5. **Poll** `POST /api/v1/recorder/token` with
+       `{"challenge": "...", "verifier": "..."}` and
+       `Content-Type: application/json`, no Authorization header, body at
+       most 4096 bytes. Wait the seconds in `Retry-After` (an integer, in
+       seconds) between polls; the 202 says 2. Stop after 10 minutes and
+       ask the user to connect again. The answers, all JSON:
+       - `200` the token: see `RecorderToken`. It comes once.
+       - `202` `{"status": "pending"}` with `Retry-After: 2`: not approved yet.
+       - `400` `{"error": {"code": "invalid_request", "message": "..."}}`:
+         the body is not JSON or a field has the wrong format. A bug; stop.
+       - `410` `{"error": {"code": "expired" | "denied", "message": "..."}}`:
+         `expired` is past the grant's 10 minutes or already used; `denied`
+         is Cancel on the page, or a verifier that does not hash to the
+         challenge. Stop and connect again.
+       - `413` `{"error": {"code": "too_large", ...}}`: the body is over 4096 bytes.
+       - `429` `{"error": {"code": "rate_limited", ...}, "retry_after": n}`
+         with `Retry-After: n`: more than one poll a second on an approved
+         grant. Wait n seconds.
+       - `500` `{"error": {"code": "internal", ...}}`: retry after 2 seconds.
+    6. **Use the token.** It is `mtxt_` followed by 43 base64url characters
+       (48 in all), valid until `expires_at` (180 days). Store it in the OS
+       keychain. Send it on every other call as
+       `Authorization: Bearer <token>`. A 401 with code `unauthorized` means
+       the token is unknown, expired or revoked: delete it and connect again.
+    7. **Disconnect** with `DELETE /api/v1/recorder/tokens/{token_id}` and
+       the token itself: 204, then delete it from the keychain. Another
+       token's id is 404; a recorder revokes only its own token.
 
     The recorder and the server share only this file and the types generated
     from it.
   license:
     name: PolyForm Noncommercial 1.0.0
     url: https://polyformproject.org/licenses/noncommercial/1.0.0/
+x-recorder-flow:
+  connect_url: https://{host}/connect?challenge={challenge}&name={device_name}
+  name_encoding: RFC 3986 percent-encoding of the UTF-8 bytes; '+' is also read as a space
+  device_name:
+    normalisation: NFC, then trim Unicode White_Space
+    min_code_points: 1
+    max_code_points: 64
+    prohibited_categories: [Cc, Cf, Zl, Zp]
+    recorder_shortening: remove prohibited code points, NFC, trim, truncate to 64 code points, trim; empty becomes "Recorder"
+  verifier:
+    make: 32 random bytes, base64url without padding (43 characters)
+    accepted_pattern: '^[A-Za-z0-9._~-]{43,128}$'
+  challenge:
+    make: base64url without padding of SHA-256(ASCII bytes of verifier)
+    pattern: '^[A-Za-z0-9_-]{43}$'
+  pairing_code:
+    make: first 30 bits of SHA-256(ASCII bytes of challenge), six 5-bit groups most significant first, Crockford base32
+    alphabet: 0123456789ABCDEFGHJKMNPQRSTVWXYZ
+    format: XXX-XXX
+    example:
+      challenge: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+      first_bytes_hex: 0d299b1e
+      bits: 55207623
+      code: 1MM-SP7
+  poll:
+    path: /api/v1/recorder/token
+    interval_seconds: 2
+    give_up_after_seconds: 600
+    max_body_bytes: 4096
+    retry_after: integer seconds
+  token:
+    pattern: '^mtxt_[A-Za-z0-9_-]{43}$'
+    header: 'Authorization: Bearer <token>'
+    lifetime_days: 180
 servers:
   - url: /api/v1
     description: Relative to the install's own hostname.
@@ -47,7 +138,12 @@ paths:
         - 410: `expired` (the grant passed its 10 minutes or was already
           used) or `denied` (the user chose Cancel, or the verifier does not
           hash to the challenge). Stop polling; connect again.
-        - 429: more than one poll a second for this grant; wait `Retry-After`.
+        - 429: more than one poll a second on an approved grant; wait
+          `Retry-After` seconds.
+
+        The body is checked before anything else, so 400 and a wrong
+        verifier cost the server nothing; a challenge with no grant costs
+        one read.
       security: []
       requestBody:
         required: true
@@ -88,7 +184,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '429':
-          description: More than one poll a second for this grant (`rate_limited`).
+          description: More than one poll a second on an approved grant (`rate_limited`).
           headers:
             Retry-After:
               description: Seconds to wait.
@@ -113,17 +209,19 @@ paths:
       summary: Disconnect a recorder. The token stops working at once.
       description: |
         The recorder disconnects itself with its own `token_id` (a "Sign out"
-        in the recorder). Any of the caller's own recorder tokens may be
-        revoked; revoking one already revoked is 204 again. After revoking its
-        own token the recorder deletes it from the keychain; every later call
-        with it is 401.
+        in the recorder). With a bearer token, `{id}` must be the id of that
+        same token; any other id is 404, so a recorder never revokes another
+        of the user's recorders. With the library's session cookie, any of
+        the user's own recorder tokens may be revoked, and one already
+        revoked is 204 again. After revoking its own token the recorder
+        deletes it from the keychain; every later call with it is 401.
       responses:
         '204':
           description: Revoked.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
-          description: No recorder token with this id belongs to the caller (`not_found`).
+          description: With a bearer token, `{id}` is not the calling token; with the session, no recorder token with this id belongs to the caller (`not_found`).
           content:
             application/json:
               schema:
