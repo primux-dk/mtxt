@@ -37,13 +37,20 @@ export function mp3Frame(h: Uint8Array): { len: number; samples: number; rate: n
   const bitrateIndex = h[2]! >> 4;
   const rateIndex = (h[2]! >> 2) & 3;
   const padding = (h[2]! >> 1) & 1;
-  if (version === 1 || layer === 4 || bitrateIndex === 0 || bitrateIndex === 15 || rateIndex === 3) {
+  if (
+    version === 1 ||
+    layer === 4 ||
+    bitrateIndex === 0 ||
+    bitrateIndex === 15 ||
+    rateIndex === 3
+  ) {
     return null;
   }
   const kbps = MP3_BITRATES[`${version === 3 ? 1 : 2}-${layer}`]![bitrateIndex - 1]!;
   const rate = MP3_RATES[version]![rateIndex]!;
   const bitrate = kbps * 1000;
-  if (layer === 1) return { len: (Math.floor((12 * bitrate) / rate) + padding) * 4, samples: 384, rate };
+  if (layer === 1)
+    return { len: (Math.floor((12 * bitrate) / rate) + padding) * 4, samples: 384, rate };
   const samples = layer === 3 && version !== 3 ? 576 : 1152;
   return { len: Math.floor(((samples / 8) * bitrate) / rate) + padding, samples, rate };
 }
@@ -71,7 +78,11 @@ export async function indexFrames(open: OpenAudio, kind: 'mp3' | 'adts') {
     // ID3v2 at the start: a ten-byte header with a syncsafe size.
     const head = await reader.peek(10);
     if (head.byteLength === 10 && ascii(head, 0, 3) === 'ID3') {
-      const size = ((head[6]! & 0x7f) << 21) | ((head[7]! & 0x7f) << 14) | ((head[8]! & 0x7f) << 7) | (head[9]! & 0x7f);
+      const size =
+        ((head[6]! & 0x7f) << 21) |
+        ((head[7]! & 0x7f) << 14) |
+        ((head[8]! & 0x7f) << 7) |
+        (head[9]! & 0x7f);
       await reader.skip(10 + size + (head[5]! & 0x10 ? 10 : 0));
     }
     let samples = 0;

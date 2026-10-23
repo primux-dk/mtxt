@@ -169,7 +169,12 @@ function sampleTable(moov: Uint8Array, trakIndex?: number) {
     if (!entry || entry.type !== 'mp4a') throw new UnsupportedAudio(`MP4 audio ${entry?.type}`);
     // An audio sample entry: 28 bytes, 16 more for QuickTime version 1, 36 for version 2.
     const version = mv.getUint16(entry.start + 8);
-    const esds = child(moov, entry.start + 28 + (version === 1 ? 16 : version === 2 ? 36 : 0), entry.end, 'esds');
+    const esds = child(
+      moov,
+      entry.start + 28 + (version === 1 ? 16 : version === 2 ? 36 : 0),
+      entry.end,
+      'esds',
+    );
     if (!esds) throw new UnsupportedAudio('MP4 audio without esds');
     const fields = adtsFields(audioSpecificConfig(moov, esds.start, esds.end));
 
@@ -268,7 +273,10 @@ export async function indexMp4(open: OpenAudio, size: number) {
   };
 }
 
-export function adtsHeader(meta: Pick<Mp4Meta, 'profile' | 'rateIndex' | 'channels'>, payload: number) {
+export function adtsHeader(
+  meta: Pick<Mp4Meta, 'profile' | 'rateIndex' | 'channels'>,
+  payload: number,
+) {
   const len = payload + 7;
   return Uint8Array.from([
     0xff,

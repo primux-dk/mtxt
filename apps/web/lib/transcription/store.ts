@@ -231,8 +231,12 @@ export const rawPath = (installId: string, recordingId: string, provider: string
  * `raw_path` from the plan on, so a delete or retention takes the pieces
  * along even while the transcript is still pending.
  */
-export const piecePrefix = (installId: string, recordingId: string, provider: string, tag: string) =>
-  `transcripts/${installId}/${recordingId}/${provider}-${tag}/`;
+export const piecePrefix = (
+  installId: string,
+  recordingId: string,
+  provider: string,
+  tag: string,
+) => `transcripts/${installId}/${recordingId}/${provider}-${tag}/`;
 
 /** Segment rows as JSON arrays under the per-statement size, each checked against D1's bound. */
 function segmentBatches(result: SttResult, speakerIds: Map<number, string>): string[] {

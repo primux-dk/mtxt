@@ -62,7 +62,12 @@ function tokens(piece: StitchPiece): { tokens: Token[]; segments: SttSegment[] }
     // Words come in order; a word belongs to the segment its middle lies in, or the nearest after.
     while (w < words.length && mid(words[w]!) <= segment.endMs) {
       const word = words[w++]!;
-      own.push({ ...word, speaker: word.speaker ?? segment.speaker, segment: index, norm: normalise(word.text) });
+      own.push({
+        ...word,
+        speaker: word.speaker ?? segment.speaker,
+        segment: index,
+        norm: normalise(word.text),
+      });
     }
     if (!own.length) {
       const parts = segment.text.split(/\s+/).filter((p) => normalise(p));
@@ -163,7 +168,11 @@ export function stitch(pieces: readonly StitchPiece[]): SttResult {
   const keepFrom = prepared.map(() => 0);
   const keepTo = prepared.map((p) => p.tokens.length);
   for (let k = 0; k + 1 < pieces.length; k++) {
-    const cut = seamCut(prepared[k]!.tokens.slice(keepFrom[k]), prepared[k + 1]!.tokens, pieces[k]!.seamEndMs);
+    const cut = seamCut(
+      prepared[k]!.tokens.slice(keepFrom[k]),
+      prepared[k + 1]!.tokens,
+      pieces[k]!.seamEndMs,
+    );
     keepTo[k] = keepFrom[k]! + cut.a;
     keepFrom[k + 1] = cut.b;
   }
@@ -174,7 +183,9 @@ export function stitch(pieces: readonly StitchPiece[]): SttResult {
   prepared.forEach((p, k) => {
     const kept = p.tokens.slice(keepFrom[k], Math.max(keepFrom[k]!, keepTo[k]!));
     segments.push(...rebuild(p.segments, p.tokens, kept));
-    words.push(...kept.map(({ startMs, endMs, text, speaker }) => ({ startMs, endMs, text, speaker })));
+    words.push(
+      ...kept.map(({ startMs, endMs, text, speaker }) => ({ startMs, endMs, text, speaker })),
+    );
     for (const s of pieces[k]!.result.speakers) {
       const known = speakers.get(s.index);
       if (!known || (!known.label && s.label)) speakers.set(s.index, s);
@@ -188,7 +199,9 @@ export function stitch(pieces: readonly StitchPiece[]): SttResult {
     language: [...languages].sort((x, y) => y[1] - x[1])[0]?.[0] ?? '',
     model: pieces[0]?.result.model ?? '',
     segments,
-    speakers: [...speakers.values()].filter((s) => used.has(s.index)).sort((x, y) => x.index - y.index),
+    speakers: [...speakers.values()]
+      .filter((s) => used.has(s.index))
+      .sort((x, y) => x.index - y.index),
     ...(words.length ? { words } : {}),
     raw: { pieces: pieces.length },
   };

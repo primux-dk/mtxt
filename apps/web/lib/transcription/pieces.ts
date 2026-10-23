@@ -119,7 +119,11 @@ export async function runPieces(run: PiecesRun): Promise<PiecesOutcome> {
   for (let k = done; k < plan.pieces.length; k++) {
     if (k > done && Date.now() - run.startedAt > PIECE_BUDGET_MS) {
       await release(db, installId, claim.transcriptId, claim.token);
-      await deps.queue.send({ type: 'transcribe', recording_id: recording.id, install_id: installId });
+      await deps.queue.send({
+        type: 'transcribe',
+        recording_id: recording.id,
+        install_id: installId,
+      });
       log.log(`Piece ${k + 1} of ${plan.pieces.length} goes to the next delivery`, recording.id);
       return { kind: 'continued' };
     }

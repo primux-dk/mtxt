@@ -7,7 +7,16 @@
   end-of-stream, every CRC computed again. A page that continues a packet
   from the page before is never a piece's first. One logical stream only.
 */
-import { ascii, concat, fromBase64, StreamReader, toBase64, UnsupportedAudio, view, type OpenAudio } from './bytes';
+import {
+  ascii,
+  concat,
+  fromBase64,
+  StreamReader,
+  toBase64,
+  UnsupportedAudio,
+  view,
+  type OpenAudio,
+} from './bytes';
 import type { PlannedPiece } from './plan';
 import { Units } from './plan';
 

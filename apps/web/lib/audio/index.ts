@@ -87,8 +87,14 @@ async function index(format: AudioFormat, open: OpenAudio, size: number) {
 }
 
 /** Reads the file once and plans its pieces. Throws UnsupportedAudio for a file it cannot cut. */
-export async function planCut(open: OpenAudio, size: number, limits: PieceLimits): Promise<CutPlan> {
-  const head = new Uint8Array(await new Response(await open({ offset: 0, length: 64 })).arrayBuffer());
+export async function planCut(
+  open: OpenAudio,
+  size: number,
+  limits: PieceLimits,
+): Promise<CutPlan> {
+  const head = new Uint8Array(
+    await new Response(await open({ offset: 0, length: 64 })).arrayBuffer(),
+  );
   const format = sniff(head);
   if (!format) throw new UnsupportedAudio('unknown container');
   const { units, headerBytes, meta, base } = await index(format, open, size);
@@ -133,7 +139,9 @@ export async function buildPiece(
       return buildMp4(plan.meta as Mp4Meta, piece, open, cache);
     case 'mp3':
     case 'adts': {
-      const [bytes] = await pickRanges(open, [{ pos: piece.byteStart, len: piece.byteEnd - piece.byteStart }]);
+      const [bytes] = await pickRanges(open, [
+        { pos: piece.byteStart, len: piece.byteEnd - piece.byteStart },
+      ]);
       return bytes!;
     }
     case 'wav': {

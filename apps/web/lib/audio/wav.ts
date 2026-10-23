@@ -115,6 +115,9 @@ export function wavHeader(meta: WavMeta, dataBytes: number): Uint8Array {
   return out;
 }
 
-export function wavPieceHeader(meta: WavMeta, piece: PlannedPiece & { byteStart: number; byteEnd: number }) {
+export function wavPieceHeader(
+  meta: WavMeta,
+  piece: PlannedPiece & { byteStart: number; byteEnd: number },
+) {
   return wavHeader(meta, piece.byteEnd - piece.byteStart);
 }

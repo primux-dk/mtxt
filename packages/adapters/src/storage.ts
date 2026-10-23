@@ -76,10 +76,14 @@ export async function deleteStored(
 ): Promise<void> {
   if (!path.endsWith('/')) return storage.delete(path);
   if (!storage.list) throw new Error('This store cannot list a prefix');
+  // Every key first, then the deletes: a listing is never read while it changes.
+  const keys: string[] = [];
   let cursor: string | undefined;
   do {
     const page = await storage.list(path, cursor ? { cursor } : undefined);
-    if (page.keys.length) await storage.delete(page.keys);
+    keys.push(...page.keys);
     cursor = page.cursor;
   } while (cursor);
+  // R2 deletes at most 1,000 keys a call.
+  for (let i = 0; i < keys.length; i += 1000) await storage.delete(keys.slice(i, i + 1000));
 }

@@ -3,11 +3,18 @@
   Clusters of unknown size, no Cues). The index walks the element tree and
   notes every block of the first audio track. A piece is a new file: the
   EBML header as it was, a Segment with a fresh Info (the timecode scale
-  only, no duration), Tracks with that one track, and the piece's blocks
+  and the piece's own duration), Tracks with that one track, and the piece's blocks
   regrouped into new Clusters whose timecodes start at 0. Blocks are copied,
   never decoded; a BlockGroup's Block becomes a SimpleBlock.
 */
-import { concat, fromBase64, StreamReader, toBase64, UnsupportedAudio, type OpenAudio } from './bytes';
+import {
+  concat,
+  fromBase64,
+  StreamReader,
+  toBase64,
+  UnsupportedAudio,
+  type OpenAudio,
+} from './bytes';
 import type { PlannedPiece } from './plan';
 import { Units } from './plan';
 
@@ -30,6 +37,7 @@ const ID = {
   TrackNumber: 0xd7,
   TrackType: 0x83,
   TimecodeScale: 0x2ad7b1,
+  Duration: 0x4489,
   Cluster: 0x1f43b675,
   Timecode: 0xe7,
   SimpleBlock: 0xa3,
@@ -99,7 +107,13 @@ async function readHead(reader: StreamReader) {
   const size = vint(idBytes, idLength);
   const pos = reader.pos;
   await reader.skip(idLength + sizeLength);
-  return { id: id.value, size: size.value, unknown: size.unknown, pos, headLength: idLength + sizeLength };
+  return {
+    id: id.value,
+    size: size.value,
+    unknown: size.unknown,
+    pos,
+    headLength: idLength + sizeLength,
+  };
 }
 
 /** A block's header: track number, timecode relative to its cluster, flags, header length. */
@@ -323,7 +337,17 @@ export async function buildWebm(
     clusters.push(element(ID.Cluster, ...parts));
     start = end;
   }
-  const info = element(ID.Info, element(ID.TimecodeScale, uintBytes(meta.scale)));
+  // The duration in ticks, as a float: the last block's time plus one block, so a reader need not scan.
+  const last = blocks.at(-1)!.tc - base;
+  const step =
+    blocks.length > 1 ? last - (blocks.at(-2)!.tc - base) : Math.round(20e6 / meta.scale);
+  const duration = new Uint8Array(8);
+  new DataView(duration.buffer).setFloat64(0, last + step);
+  const info = element(
+    ID.Info,
+    element(ID.TimecodeScale, uintBytes(meta.scale)),
+    element(ID.Duration, duration),
+  );
   const tracks = element(ID.Tracks, fromBase64(meta.track));
   return concat([fromBase64(meta.ebml), element(ID.Segment, info, tracks, ...clusters)]);
 }

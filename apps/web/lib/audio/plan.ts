@@ -87,11 +87,7 @@ function lowerBound(values: readonly number[], x: number): number {
  * The pieces for a file. One piece when the whole file fits. A unit that
  * alone breaks a limit, or limits too tight to make progress, are refused.
  */
-export function planPieces(
-  units: Units,
-  headerBytes: number,
-  limits: PieceLimits,
-): PlannedPiece[] {
+export function planPieces(units: Units, headerBytes: number, limits: PieceLimits): PlannedPiece[] {
   const n = units.length;
   if (!n) throw new UnsupportedAudio('no audio units');
   if (limits.maxMs <= 2 * limits.overlapMs + limits.searchMs) {

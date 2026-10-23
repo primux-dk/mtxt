@@ -35,6 +35,45 @@ describe('storage cleanup', () => {
     expect(entries(sqlite)).toEqual([{ path: 'b.webm', attempts: 1 }]);
   });
 
+  it('deletes a prefix page by page: a transcript sent in pieces (packet 17)', async () => {
+    const { db, sqlite } = testDb();
+    const keys = new Set([
+      'transcripts/t/r/w-1/plan.json',
+      ...Array.from({ length: 5 }, (_, i) => `transcripts/t/r/w-1/piece-00${i}.json`),
+      'transcripts/t/r/w-2/plan.json',
+      'transcripts/t/r/assemblyai-x.json',
+    ]);
+    const storage = {
+      delete: async (key: string | string[]) => {
+        for (const k of [key].flat()) keys.delete(k);
+      },
+      // Two keys a page, so the cursor is followed.
+      list: async (prefix: string, options?: { cursor?: string }) => {
+        const all = [...keys].filter((k) => k.startsWith(prefix)).sort();
+        const from = Number(options?.cursor ?? 0);
+        return {
+          keys: all.slice(from, from + 2),
+          ...(from + 2 < all.length ? { cursor: String(from + 2) } : {}),
+        };
+      },
+    };
+    const list = cleanupEntries(['transcripts/t/r/w-1/', 'transcripts/t/r/assemblyai-x.json']);
+    await db.batch([recordCleanup(db, INSTALL, list)!]);
+    expect(await finishCleanup(db, storage, INSTALL, list, quiet)).toEqual({
+      deleted: 2,
+      failed: 0,
+    });
+    expect([...keys]).toEqual(['transcripts/t/r/w-2/plan.json']);
+    expect(entries(sqlite)).toEqual([]);
+    // A store that cannot list keeps the entry for a person to look at.
+    const blind = cleanupEntries(['transcripts/t/r/w-2/']);
+    await db.batch([recordCleanup(db, INSTALL, blind)!]);
+    expect(await finishCleanup(db, { delete: async () => {} }, INSTALL, blind, quiet)).toEqual({
+      deleted: 0,
+      failed: 1,
+    });
+  });
+
   it('retries nightly up to the limit, then says it gave up', async () => {
     const { db, sqlite } = testDb();
     await db.batch([recordCleanup(db, INSTALL, cleanupEntries(['stuck.webm', 'fine.webm']))!]);
