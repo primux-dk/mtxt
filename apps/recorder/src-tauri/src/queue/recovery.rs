@@ -21,6 +21,8 @@ pub fn inspect_file(path: &Path) -> FileCheck {
     if meta.is_file() && meta.len() == 0 {
         return FileCheck::Empty;
     }
+    // Empty only when the whole file parsed and held no audio packet; a
+    // damaged or short stream is an error, whatever was counted before it.
     let seen = match crate::audio::ogg_opus::inspect(path) {
         Ok(s) => s,
         Err(e) => return FileCheck::Error(e.to_string()),
@@ -75,6 +77,17 @@ mod tests {
         assert!(matches!(inspect_file(&path), FileCheck::Error(_)));
         // A missing file is not empty either.
         assert!(matches!(inspect_file(&dir.path().join("gone.ogg")), FileCheck::Error(_)));
+    }
+
+    #[test]
+    fn a_damaged_first_page_is_kept_as_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("r.ogg");
+        recording(&path, 200);
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[22] ^= 0xff;
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(matches!(inspect_file(&path), FileCheck::Error(ref e) if e.contains("damaged")), "{:?}", inspect_file(&path));
     }
 
     #[test]

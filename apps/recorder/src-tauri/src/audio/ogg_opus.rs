@@ -37,7 +37,9 @@ impl OggOpusWriter {
         let mut serial_bytes = [0u8; 4];
         let _ = getrandom::fill(&mut serial_bytes);
         let serial = u32::from_le_bytes(serial_bytes);
-        let mut writer = PacketWriter::new(BufWriter::new(file));
+        // Pages stay in memory until the flush after each page, which writes whole
+        // pages in one call: a killed process does not leave half a page behind.
+        let mut writer = PacketWriter::new(BufWriter::with_capacity(256 * 1024, file));
         writer.write_packet(opus_head(pre_skip as u16), serial, PacketWriteEndInfo::EndPage, 0)?;
         writer.write_packet(opus_tags(), serial, PacketWriteEndInfo::EndPage, 0)?;
         writer.inner_mut().flush()?;
@@ -148,7 +150,7 @@ pub fn duration_of(path: &Path) -> std::io::Result<f64> {
     Ok(granule.saturating_sub(pre_skip) as f64 / f64::from(RATE))
 }
 
-/// What a full read of a recording file found.
+/// What a complete read of a recording file found.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Inspection {
     /// Opus packets after the two headers.
@@ -156,10 +158,21 @@ pub struct Inspection {
     pub duration_s: f64,
 }
 
-/// Read the whole file through an Ogg reader. An I/O error is an error: the
-/// caller keeps the file and says it could not be read. A damaged page at the
-/// end (a crash in the middle of a write) ends the count without an error.
-pub fn inspect(path: &Path) -> std::io::Result<Inspection> {
+#[derive(Debug, thiserror::Error)]
+pub enum InspectError {
+    /// The file could not be read.
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+    /// The Ogg stream is damaged or ends early: a bad checksum, a bad page, a
+    /// torn last page. The file may hold audio; nothing may treat it as empty.
+    #[error("the Ogg stream is damaged after {packets} packets: {reason}")]
+    Damaged { packets: u64, reason: String },
+}
+
+/// Read the whole file through an Ogg reader. `Ok` only when every page
+/// parsed to the end of the file; anything else is an error, and the caller
+/// keeps the file.
+pub fn inspect(path: &Path) -> Result<Inspection, InspectError> {
     let file = File::open(path)?;
     let mut reader = ogg::PacketReader::new(std::io::BufReader::new(file));
     let mut packets = 0u64;
@@ -177,13 +190,10 @@ pub fn inspect(path: &Path) -> std::io::Result<Inspection> {
                 packets += 1;
             }
             Ok(None) => break,
-            // A torn last page reads as an early end of file, not as a failed read.
-            Err(ogg::OggReadError::ReadError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-            Err(ogg::OggReadError::ReadError(e)) => return Err(e),
-            Err(e) => {
-                log::warn!("{}: the Ogg stream ends in a damaged page: {e}", path.display());
-                break;
+            Err(ogg::OggReadError::ReadError(e)) if e.kind() != std::io::ErrorKind::UnexpectedEof => {
+                return Err(InspectError::Io(e))
             }
+            Err(e) => return Err(InspectError::Damaged { packets, reason: e.to_string() }),
         }
     }
     Ok(Inspection { audio_packets: packets.saturating_sub(2), duration_s: granule.saturating_sub(pre_skip) as f64 / f64::from(RATE) })
@@ -253,14 +263,30 @@ mod tests {
         let seen = inspect(&path).unwrap();
         assert_eq!(seen.audio_packets, 100);
         assert!((seen.duration_s - 2.0).abs() < 1e-6);
-        // Half a page torn off the end still reads up to the damage.
+        // Half a page torn off the end: damaged, not a short file.
         let len = std::fs::metadata(&path).unwrap().len();
         std::fs::OpenOptions::new().write(true).open(&path).unwrap().set_len(len - 100).unwrap();
-        assert_eq!(inspect(&path).unwrap().audio_packets, 50);
-        // Headers only: no audio.
+        assert!(matches!(inspect(&path), Err(InspectError::Damaged { packets: 52, .. })));
+        // Headers only, read to the end: no audio.
         let empty = dir.path().join("empty.ogg");
         OggOpusWriter::create(&empty).unwrap().sync().unwrap();
         assert_eq!(inspect(&empty).unwrap().audio_packets, 0);
-        assert!(inspect(&dir.path().join("missing.ogg")).is_err());
+        assert!(matches!(inspect(&dir.path().join("missing.ogg")), Err(InspectError::Io(_))));
+    }
+
+    #[test]
+    fn a_damaged_first_page_is_an_error_even_with_audio_after_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("first.ogg");
+        let mut w = OggOpusWriter::create(&path).unwrap();
+        for _ in 0..200 {
+            w.write_frame(&vec![0.1f32; FRAME * 2]).unwrap();
+        }
+        w.finish().unwrap();
+        // Break the CRC of the first page (bytes 22..26 of its header).
+        let mut bytes = std::fs::read(&path).unwrap();
+        bytes[22] ^= 0xff;
+        std::fs::write(&path, &bytes).unwrap();
+        assert!(matches!(inspect(&path), Err(InspectError::Damaged { packets: 0, .. })), "{:?}", inspect(&path));
     }
 }
