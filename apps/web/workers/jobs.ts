@@ -1,5 +1,6 @@
 import {
   cloudflareAdapters,
+  pruneOAuthGrants,
   pruneRecorderRows,
   readSettings,
   retentionBatch,
@@ -103,6 +104,9 @@ export async function runRetention(job: RetentionJob, env: CloudflareEnv) {
     // Recorder grants that expired over a day ago, tokens revoked or expired over 90 days ago.
     const pruned = await pruneRecorderRows(db, installId, new Date(job.now));
     console.log(`Recorder rows: ${pruned.grants} grants, ${pruned.tokens} tokens deleted`);
+    // MCP authorization codes that expired over a day ago.
+    const codes = await pruneOAuthGrants(db, installId, new Date(job.now));
+    console.log(`OAuth codes: ${codes} deleted`);
     // Webhook deliveries finished over 30 days ago go; one whose message was lost is sent again.
     const swept = await sweepDeliveries({ db, installId, queue }, new Date(job.now));
     console.log(`Webhook deliveries: ${swept.pruned} pruned, ${swept.requeued} queued again`);

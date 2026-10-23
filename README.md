@@ -11,7 +11,7 @@ Meetings only. No dictation.
 1. **Company login.** OIDC against Entra ID or Google Workspace. No local users.
 2. **Desktop recorder.** Microphone plus system audio on Mac and Windows, bot-free, so a participant in someone else's Teams or Meet still gets a recording. Our own code, with [Vibe](https://github.com/thewh1teagle/vibe), [anarlog](https://github.com/fastrepl/anarlog) and [Meetily](https://github.com/Zackriya-Solutions/meetily) as references for capture and local models.
 3. **Live transcript.** Optional, off by default, a local model in the recorder. A preview, never the record.
-4. **Other capture.** Record in the browser, upload a file, and pull Teams or Meet recordings for meetings the company organised.
+4. **Other capture.** Record in the browser or upload a file.
 5. **Swappable speech-to-text.** AssemblyAI, Azure Speech, ElevenLabs Scribe, or a local Whisper or Parakeet model. One per install, chosen by the company's own contract.
 6. **Keyterms and corrections.** A company dictionary. Danish first.
 7. **Speakers.** Diarization, renaming, and labels that can link to a colleague in the directory.

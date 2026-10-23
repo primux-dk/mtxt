@@ -6,9 +6,13 @@ import { auditEvents, meetings, type AuditAction, type Visibility } from './sche
 export const OPENED_WINDOW_MS = 60 * 60 * 1000;
 
 /** What `details` holds, per action. User ids, so a renamed colleague shows under the new name. */
-/** A row written for a call with a personal API token: `via: 'api'` and the token's name. */
+/**
+ * A row written for a REST call: `via: 'api'` with a personal API token, or
+ * `via: 'mcp'` through the MCP server (docs/spec.md "MCP"), and the token's
+ * or the MCP client's name.
+ */
 export interface ViaApi {
-  via: 'api';
+  via: 'api' | 'mcp';
   token: string;
 }
 
@@ -23,8 +27,10 @@ export type AuditDetails =
   | ({ format: 'md' | 'docx' | 'json' | 'transcript' | 'text' } & ViaApi)
   /** `webhook_sent`: the endpoint's label (null when it has none) and the event it took. */
   | { endpoint: string | null; event: string }
-  /** `api_token_created` and `api_token_revoked`: the token's name and scope. */
-  | { name: string; scope: string | null };
+  /** `api_token_created` and `api_token_revoked`: the token's name and scope; `kind: 'mcp'` for an MCP connection. */
+  | { name: string; scope: string | null; kind?: 'mcp' }
+  /** `mcp_write`: an MCP tool's write that has no action of its own (a recap save), and the version it made. */
+  | ({ tool: string; version: number } & ViaApi);
 
 export interface AuditEventInput {
   userId: string;

@@ -136,6 +136,20 @@ export const API_TOKEN_DEFAULT_DAYS = 365;
 export const API_RATE_LIMIT = 60;
 export const API_RATE_WINDOW_MS = 60 * 1000;
 
+/*
+  MCP connections (docs/spec.md "MCP"): an OAuth access token of the same
+  shape, in the same table as `kind = 'mcp'`, with a refresh token beside it.
+*/
+
+/** An MCP access token works this long; the client refreshes it. */
+export const MCP_ACCESS_LIFETIME_MS = 60 * 60 * 1000;
+/** A connection ends this long after it was last refreshed. */
+export const MCP_CONNECTION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+/** An authorization code is exchanged within this. */
+export const OAUTH_CODE_LIFETIME_MS = 5 * 60 * 1000;
+/** Working MCP connections per user, counted apart from API tokens. */
+export const MAX_MCP_CONNECTIONS = 25;
+
 /**
  * Whether one more request fits the token's window: a fixed minute from
  * the window's first request. `retryAfter` is whole seconds until the

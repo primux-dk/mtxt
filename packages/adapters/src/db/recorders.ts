@@ -167,6 +167,9 @@ export async function pollGrant(
           scope: value(null, 'scope'),
           rateWindowAt: value(null, 'rate_window_at'),
           rateCount: value(0, 'rate_count'),
+          clientId: value(null, 'client_id'),
+          refreshHash: value(null, 'refresh_hash'),
+          accessExpiresAt: value(null, 'access_expires_at'),
         })
         .from(g)
         .where(live),
@@ -222,6 +225,8 @@ export async function findRecorderUser(
   });
   if (!token || !safeEqual(token.tokenHash, tokenHash)) return null;
   if (token.revokedAt || token.expiresAt.getTime() <= now.getTime()) return null;
+  // An MCP connection's access token lapses within the hour; its client refreshes it.
+  if (token.accessExpiresAt && token.accessExpiresAt.getTime() <= now.getTime()) return null;
   const user = await findUser(db, installId, token.userId);
   if (!user) return null;
   const stale = now.getTime() - LAST_USED_EVERY_MS;
@@ -329,7 +334,9 @@ export async function revokeToken(
           action: value(recorder ? 'recorder_disconnected' : 'api_token_revoked', 'action'),
           details: (recorder
             ? sql<string>`json_object('device', ${tk.deviceName})`
-            : sql<string>`json_object('name', ${tk.deviceName}, 'scope', ${tk.scope})`
+            : input.kind === 'mcp'
+              ? sql<string>`json_object('name', ${tk.deviceName}, 'scope', ${tk.scope}, 'kind', 'mcp')`
+              : sql<string>`json_object('name', ${tk.deviceName}, 'scope', ${tk.scope})`
           ).as('details'),
           at: value(now.getTime(), 'at'),
         })

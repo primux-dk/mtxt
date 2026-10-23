@@ -9,6 +9,7 @@
   database row and a token made for one meeting or format opens nothing
   else. The export route checks the permission state again at fetch time.
 */
+import { b64url, derivedKey, fromB64url } from '../derived-key';
 import { LINK_TTL_S } from './rules';
 
 export const GRANT_FORMATS = ['transcript', 'md', 'docx'] as const;
@@ -29,27 +30,9 @@ const TOKEN = new RegExp(
   `^v1\\.(${ID})\\.(transcript|md|docx)\\.(\\d{1,12})\\.(${ID})\\.([A-Za-z0-9_-]{43})$`,
 );
 
-const b64url = (bytes: ArrayBuffer) =>
-  btoa(String.fromCharCode(...new Uint8Array(bytes)))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replace(/=+$/, '');
-const fromB64url = (text: string) => {
-  const normal = text.replaceAll('-', '+').replaceAll('_', '/');
-  const binary = atob(normal + '='.repeat((4 - (normal.length % 4)) % 4));
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
-};
-
-/** The grant key: HMAC-SHA256 of a fixed label under SETTINGS_KEY, so no other use of the key signs the same. */
-async function grantKey(settingsKey: string, usage: 'sign' | 'verify'): Promise<CryptoKey> {
-  const raw = fromB64url(settingsKey.trim());
-  if (raw.length !== 32) throw new Error('SETTINGS_KEY must be 32 bytes of base64.');
-  const root = await crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
-  ]);
-  const derived = await crypto.subtle.sign('HMAC', root, encoder.encode('mtxt:export-grant:v1'));
-  return crypto.subtle.importKey('raw', derived, { name: 'HMAC', hash: 'SHA-256' }, false, [usage]);
-}
+/** The grant key: its own label under SETTINGS_KEY, so no other use of the key signs the same. */
+const grantKey = (settingsKey: string, usage: 'sign' | 'verify') =>
+  derivedKey(settingsKey, 'mtxt:export-grant:v1', usage);
 
 const body = (g: Grant) => `v1.${g.meetingId}.${g.format}.${g.expiresAt}.${g.endpointId}`;
 

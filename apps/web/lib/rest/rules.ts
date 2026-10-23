@@ -16,12 +16,14 @@ export type Verdict =
 /**
  * Who may call a REST endpoint. A personal API token, `read_write` for a
  * write; the session cookie only where the library itself calls the route
- * (`session`, the recap editor's save). A recorder's token is refused: it is
- * for the recorder contract alone.
+ * (`session`, the recap editor's save); an MCP connection's token only
+ * while the MCP server runs one of its tools (`mcp`), with the same scope
+ * rule. A recorder's token is refused: it is for the recorder contract
+ * alone.
  */
 export function authorise(
   token: { kind: TokenKind; scope: ApiTokenScope | null } | undefined,
-  need: { write: boolean; session: boolean },
+  need: { write: boolean; session: boolean; mcp?: boolean },
 ): Verdict {
   if (!token) {
     return need.session
@@ -33,7 +35,15 @@ export function authorise(
           message: 'Send a personal API token as Authorization: Bearer <token>.',
         };
   }
-  if (token.kind !== 'api') {
+  if (token.kind === 'mcp' && !need.mcp) {
+    return {
+      ok: false,
+      status: 403,
+      code: 'forbidden',
+      message: "An MCP connection's token works only through the MCP server at /mcp.",
+    };
+  }
+  if (token.kind === 'recorder') {
     return {
       ok: false,
       status: 403,
@@ -46,7 +56,10 @@ export function authorise(
       ok: false,
       status: 403,
       code: 'insufficient_scope',
-      message: 'This token may only read. Make a token with the read_write scope to write.',
+      message:
+        token.kind === 'mcp'
+          ? 'This MCP connection may only read. Connect again and choose Read and write to change meetings.'
+          : 'This token may only read. Make a token with the read_write scope to write.',
     };
   }
   return { ok: true };

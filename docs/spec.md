@@ -17,7 +17,7 @@ The interface is written in English and translated. English is the source of eve
 | 1   | Company login            | OIDC against Entra ID or Google Workspace. No local users, no passwords.                                                                                                                                                              |
 | 2   | Desktop recorder         | Mic plus system audio on Mac and Windows, bot-free. Signed in with the company login, uploads when the meeting ends. Our own Tauri 2 and Rust app, with Vibe, anarlog and Meetily as references.                                      |
 | 3   | Live transcript          | Text on screen while the meeting runs, in a small floating window, always on top. A per-user setting with an admin default, off by default. Runs a local model in the recorder. A preview only; the server transcript is the record.  |
-| 4   | Other capture            | Record in the browser, upload a file, share from a voice recorder. Pull Teams and Meet recordings for meetings the company organised.                                                                                                 |
+| 4   | Other capture            | Record in the browser, upload a file, share from a voice recorder.                                                                                                                                                                    |
 | 5   | STT adapter              | AssemblyAI, Azure Speech, ElevenLabs Scribe, local Whisper or Parakeet. One per install, swappable.                                                                                                                                   |
 | 6   | Keyterms and corrections | One company dictionary per install: product names, people, jargon. CSV import. Danish first.                                                                                                                                          |
 | 7   | Speakers                 | Diarization, renaming, voice memory per install where the provider allows it. Labels can link to a directory user.                                                                                                                    |
@@ -31,8 +31,9 @@ Not in scope: dictation of any kind, hotkeys, push-to-talk; a bot that joins cal
 
 1. **Desktop recorder.** The only route that covers a meeting someone else organised. Our own code: Core Audio process tap on Mac, WASAPI loopback on Windows, whisper.cpp and Parakeet for the live preview, the way Vibe, anarlog and Meetily do it.
 2. **Browser and upload.** A recorder in the browser and file upload, in v0.1. A phone app later.
-3. **Pull platform recordings.** Teams recordings through Microsoft Graph (`getAllRecordings`, application permission `OnlineMeetingRecording.Read.All`, admin consent plus an application access policy; organiser's recordings only). Meet recordings through the Meet REST API and a Drive download. Only for meetings the company organised.
-4. **Meeting bot.** Avoided. Visible, brittle, per-minute cost.
+3. **Meeting bot.** Avoided. Visible, brittle, per-minute cost.
+
+Pulling Teams or Meet recordings from the company's cloud storage is not a route: removed 2026-10-23 (`decisions.md`).
 
 ## Settings page
 
@@ -53,7 +54,7 @@ The whole admin surface. If a setting is not here, it does not exist. The page i
 | Keyterms                | One list per install, CSV import                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Live transcript         | On by default: yes or no. Users can switch it for themselves                                                                                                                                                                                                                                                                                                                                                                                         |
 | Default visibility      | private, shared, company                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Recording sources       | Desktop, upload, browser, OneDrive (Teams), Drive (Meet)                                                                                                                                                                                                                                                                                                                                                                                             |
+| Recording sources       | Desktop, upload, browser                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Recap templates         | Several per install, markdown, admin edits, user picks per meeting                                                                                                                                                                                                                                                                                                                                                                                   |
 | Retention               | Audio N days, transcripts and recaps N days                                                                                                                                                                                                                                                                                                                                                                                                          |
 | MCP server              | Enabled: yes or no                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -141,7 +142,7 @@ meetings         id, owner_id, title, title_folded, started_at, visibility (priv
                  keep (bool), template_id, archived_at, deleted_at,  -- archived: out of the views, restorable
                  webhook_consent_at                                   -- the owner's "Send to connected systems"; null after Private
 meeting_shares   meeting_id, user_id                       -- "shared" visibility only
-recordings       id, meeting_id, uploaded_by, source (desktop|browser|upload|teams|meet|device),
+recordings       id, meeting_id, uploaded_by, source (desktop|browser|upload|device),
                  is_primary, duration_s, sha256, size_bytes, content_type, storage_path,
                  status (uploading|confirmed|transcribing|transcribed|failed), failure, failure_reason,
                  created_at, confirmed_at, delete_audio_at
@@ -172,7 +173,7 @@ settings         product_name, company_name, theme_accent, theme_primary, identi
                  recap_provider (workers-ai|anthropic|openai|azure-openai), recap_model, recap_api_key (sealed),
                  language, interface_language, live_transcript_default,
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
-                 recording_sources (JSON array of desktop|upload|browser|teams|meet),
+                 recording_sources (JSON array of desktop|upload|browser),
                  admin_emails (JSON array), admin_bootstrap_claimed_at,
                  webhook_auto_send (off|company|shared), time_zone (IANA name)
 audit_events     id, user_id, meeting_id, meeting_title, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write
@@ -254,5 +255,5 @@ An install can feed its meetings into a company's own systems (a CRM, a case sys
 
 1. **v0.1 library, for the author's own use** in the Primux Cloudflare account. Login, upload, browser recorder, one speech-to-text adapter plus Workers AI Whisper tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention. Built as of 2026-10-23 and running at `app.mtxt.co`.
 2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting. Built for macOS as of 2026-10-23. The Windows recorder (WASAPI loopback, MSI and NSIS installers, unsigned) is built in packet 19 and passes CI on `windows-latest`; its checks on a real Windows machine are in `apps/recorder/README.md`.
-3. **v0.3.** MCP server, wrapping the REST API (personal API tokens and `/api/v1` built as of 2026-10-23, packet 16). OneDrive and Drive pickup. Next as of 2026-10-23, together with Workers AI Whisper in chunks, so that a recording over 25 MiB transcribes there too.
+3. **v0.3.** MCP server, wrapping the REST API (personal API tokens and `/api/v1` built as of 2026-10-23, packet 16). Next as of 2026-10-23, together with Workers AI Whisper in chunks, so that a recording over 25 MiB transcribes there too.
 4. **Release.** README, a wrangler deploy that targets any Cloudflare account, a short post. Customers come after the author has used it for a while. As of 2026-10-23 the deploy tooling exists (`deploy/`); the post and the first customer wait.

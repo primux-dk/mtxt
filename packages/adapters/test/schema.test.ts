@@ -56,6 +56,7 @@ describe('schema', () => {
       'keyterms',
       'meeting_shares',
       'meetings',
+      'oauth_grants',
       'recap_images',
       'recap_jobs_seen',
       'recap_outbox',
@@ -223,6 +224,7 @@ describe('schema', () => {
       '0009_webhooks.sql',
       '0010_api_tokens.sql',
       '0011_decision_due.sql',
+      '0012_mcp_oauth.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);

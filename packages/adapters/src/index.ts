@@ -163,6 +163,16 @@ export {
   type RecorderConnection,
 } from './db/recorders';
 export {
+  countMcpConnections,
+  createOAuthCode,
+  pruneOAuthGrants,
+  redeemOAuthCode,
+  refreshMcpToken,
+  revokeMcpToken,
+  type IssueResult,
+  type OAuthCodeInput,
+} from './db/mcp';
+export {
   createApiToken,
   listApiTokens,
   takeApiRequest,
@@ -183,7 +193,11 @@ export {
   hashRecorderToken,
   LAST_USED_EVERY_MS,
   MAX_API_TOKENS,
+  MAX_MCP_CONNECTIONS,
   MAX_PENDING_GRANTS,
+  MCP_ACCESS_LIFETIME_MS,
+  MCP_CONNECTION_LIFETIME_MS,
+  OAUTH_CODE_LIFETIME_MS,
   newRecorderToken,
   PAIRING_ALPHABET,
   pairingCode,

@@ -2,19 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { Visibility } from '@mtxt/adapters/db/schema';
+import { CAPTURE_SOURCES as SOURCES, type Visibility } from '@mtxt/adapters/db/schema';
 import { Input } from '@/components/ui/input';
 import { describedBy, Field, FieldError, Section, Toggle } from './fields';
 import { controlProps, TabForm } from './tab-form';
 
-const SOURCES = ['desktop', 'upload', 'browser', 'teams', 'meet'] as const;
-const SOURCE_LABELS = {
-  desktop: 'desktop',
-  upload: 'upload',
-  browser: 'browser',
-  teams: 'onedrive',
-  meet: 'drive',
-} as const;
 const VISIBILITY_LABELS: Record<Visibility, string> = {
   private: 'visibility.private',
   shared: 'settings.defaults.visibilityShared',
@@ -34,7 +26,7 @@ export interface SharingValues {
  * The Sharing and retention tab: default visibility, recording sources,
  * retention, the MCP server and which meetings webhooks send by themselves.
  */
-export function SharingForm({ values }: { values: SharingValues }) {
+export function SharingForm({ values, mcpUrl }: { values: SharingValues; mcpUrl: string }) {
   const t = useTranslations('settings');
   const tAll = useTranslations();
   const [mcp, setMcp] = useState(values.mcpEnabled);
@@ -91,7 +83,7 @@ export function SharingForm({ values }: { values: SharingValues }) {
                       defaultChecked={values.recordingSources.includes(source)}
                       className="size-4 accent-[var(--accent-strong)]"
                     />
-                    {t(`sources.${SOURCE_LABELS[source]}`)}
+                    {t(`sources.${source}`)}
                   </label>
                 ))}
               </div>
@@ -132,6 +124,32 @@ export function SharingForm({ values }: { values: SharingValues }) {
               pressed={mcp}
               onChange={setMcp}
             />
+            <div className="mt-4 grid gap-2 text-xs text-muted-foreground" data-testid="mcp-setup">
+              <p>
+                {t.rich('mcp.url', {
+                  url: () => (
+                    <code className="font-mono text-[13px] text-foreground [overflow-wrap:anywhere]">
+                      {mcpUrl}
+                    </code>
+                  ),
+                })}
+              </p>
+              <ul className="grid list-disc gap-1 pl-4">
+                <li>{t('mcp.claude')}</li>
+                <li>
+                  {t.rich('mcp.claudeCode', {
+                    command: () => (
+                      <code className="font-mono [overflow-wrap:anywhere]">
+                        claude mcp add --transport http mtxt {mcpUrl}
+                      </code>
+                    ),
+                  })}
+                </li>
+                <li>{t('mcp.chatgpt')}</li>
+                <li>{t('mcp.cursor')}</li>
+              </ul>
+              <p>{t('mcp.signIn')}</p>
+            </div>
           </Section>
 
           <Section id="auto-send" heading={t('webhooks.heading')} help={t('webhooks.help')}>
