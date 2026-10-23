@@ -1,12 +1,9 @@
 'use server';
 
 import { and, eq, ne, sql } from 'drizzle-orm';
-import { foldTitle, schema, VISIBILITIES, type Visibility } from '@mtxt/adapters';
-import { HttpError } from '@/lib/http-error';
+import { foldTitle, schema, type Visibility } from '@mtxt/adapters';
 import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
-import { changeShare, changeVisibility } from '@/lib/meetings/sharing';
-import { widens } from '@/lib/webhooks/rules';
-import { queueMeetingEventQuietly } from '@/lib/webhooks/store';
+import { applyShare, applyVisibility } from '@/lib/meetings/sharing';
 import type { Colleague } from '@/lib/meetings/queries';
 
 const u = schema.users;
@@ -18,17 +15,8 @@ export async function setVisibility(
   visibility: Visibility,
 ): Promise<ActionResult> {
   return outcome(() =>
-    asOwner(meetingId, async ({ db, installId, queue, meeting }) => {
-      if (!VISIBILITIES.includes(visibility))
-        throw new HttpError(400, 'invalid_request', 'Not a visibility.');
-      const changed = await changeVisibility(db, installId, meeting, visibility);
-      // Only when access widens, and only when the meeting may be sent now (lib/webhooks/rules.ts).
-      if (changed === 'changed' && widens(meeting.visibility, visibility)) {
-        await queueMeetingEventQuietly(
-          { db, installId, queue },
-          { event: 'meeting.shared', meetingId: meeting.id },
-        );
-      }
+    asOwner(meetingId, async (ctx) => {
+      await applyVisibility(ctx, ctx.meeting, visibility);
     }),
   );
 }
@@ -40,17 +28,8 @@ export async function setShare(
   shared: boolean,
 ): Promise<ActionResult> {
   return outcome(() =>
-    asOwner(meetingId, async ({ db, installId, queue, meeting }) => {
-      if (shared && meeting.visibility !== 'shared')
-        throw new HttpError(400, 'invalid_request', 'Set the meeting to Shared first.');
-      const changed = await changeShare(db, installId, meeting, userId, shared);
-      // A reader added widens access; a reader removed does not.
-      if (changed === 'changed' && shared) {
-        await queueMeetingEventQuietly(
-          { db, installId, queue },
-          { event: 'meeting.shared', meetingId: meeting.id },
-        );
-      }
+    asOwner(meetingId, async (ctx) => {
+      await applyShare(ctx, ctx.meeting, userId, shared);
     }),
   );
 }

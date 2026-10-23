@@ -99,6 +99,7 @@ export {
   OPENED_WINDOW_MS,
   type AuditDetails,
   type AuditEventInput,
+  type ViaApi,
 } from './db/audit';
 export { foreignRows, foreignRowsSql } from './db/integrity';
 export {

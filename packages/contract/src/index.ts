@@ -42,7 +42,7 @@ export const CHUNK_SIZE_BYTES = 8 * 1024 * 1024;
 /** The largest file v0.1 accepts: 2 GB, 256 chunks. */
 export const MAX_RECORDING_BYTES = 2 * 1024 * 1024 * 1024;
 
-/** The error codes v0.1 sends in `error.code` (openapi.yaml ErrorBody). */
+/** The error codes the API sends in `error.code` (openapi.yaml ErrorBody). */
 export const ERROR_CODES = [
   'unauthorized',
   'forbidden',
@@ -62,6 +62,8 @@ export const ERROR_CODES = [
   'expired',
   'denied',
   'internal',
+  'insufficient_scope',
+  'conflict',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

@@ -7,6 +7,8 @@ import {
   findRecorderUser,
   findUser,
   hashRecorderToken,
+  type ApiTokenScope,
+  type TokenKind,
   type User,
 } from '@mtxt/adapters';
 import { getAdapters } from '../install';
@@ -20,6 +22,17 @@ export interface SessionUser {
   isAdmin: boolean;
   /** Set when the caller is a desktop recorder: the id of the bearer token it authenticated with. */
   recorderTokenId?: string;
+  /** Set for any bearer token: which token, of which kind, and an API token's scope and name. */
+  token?: BearerToken;
+}
+
+export interface BearerToken {
+  id: string;
+  kind: TokenKind;
+  /** An API token's scope; null for a recorder. */
+  scope: ApiTokenScope | null;
+  /** The device name, or the API token's name, for the audit row's `token`. */
+  name: string;
 }
 
 /**
@@ -45,8 +58,9 @@ const sessionUser = (user: User): SessionUser => ({
 });
 
 /**
- * The caller of an API route: a desktop recorder's bearer token when the
- * request carries an Authorization header, else the session cookie. A header
+ * The caller of an API route: a bearer token (a desktop recorder's or a
+ * personal API token, `token.kind`) when the request carries an
+ * Authorization header, else the session cookie. A header
  * that is there but not a working token is no one, cookie or not, so a
  * recorder with a revoked token gets 401 rather than someone's session. The
  * token's user row decides, the same as for a cookie (docs/spec.md
@@ -55,11 +69,22 @@ const sessionUser = (user: User): SessionUser => ({
 export const getApiUser = cache(async (): Promise<SessionUser | null> => {
   const authorization = (await headers()).get('authorization');
   if (authorization === null) return getSessionUser();
-  const token = bearerToken(authorization);
-  if (!token) return null;
+  const bearer = bearerToken(authorization);
+  if (!bearer) return null;
   const { db, installId } = await getAdapters();
-  const found = await findRecorderUser(db, installId, await hashRecorderToken(token));
-  return found ? { ...sessionUser(found.user), recorderTokenId: found.tokenId } : null;
+  const found = await findRecorderUser(db, installId, await hashRecorderToken(bearer));
+  if (!found) return null;
+  const token: BearerToken = {
+    id: found.tokenId,
+    kind: found.kind,
+    scope: found.scope,
+    name: found.name,
+  };
+  return {
+    ...sessionUser(found.user),
+    ...(found.kind === 'recorder' ? { recorderTokenId: found.tokenId } : {}),
+    token,
+  };
 });
 
 /** A page that needs a session sends the reader to the login page, and back after. */

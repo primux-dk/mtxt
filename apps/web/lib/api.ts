@@ -35,13 +35,17 @@ export async function recordingContext(): Promise<RecordingContext> {
 
 /**
  * Runs an API handler with the caller (a recorder's bearer token or the
- * session cookie), turning errors into contract responses.
+ * session cookie), turning errors into contract responses. A personal API
+ * token is refused here: it reaches only the REST API (lib/rest/handler.ts).
  */
 export async function api(handler: (user: SessionUser) => Promise<Response>): Promise<Response> {
   try {
     const user = await getApiUser();
     // In the contract's error shape; the middleware sends most of these away first.
     if (!user) throw new HttpError(401, 'unauthorized', 'Sign in with the company login.');
+    if (user.token?.kind === 'api') {
+      throw new HttpError(403, 'forbidden', 'An API token cannot use this endpoint.');
+    }
     return await handler(user);
   } catch (error) {
     return errorResponse(error);
