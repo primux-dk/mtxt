@@ -182,6 +182,32 @@ async function insertDelivery(
   return rows[0]?.id ?? null;
 }
 
+/**
+ * Moves an unsent `recap.saved` delivery to `at`, in one UPDATE, and gives
+ * it the latest version's dedupe key unless another delivery holds that key.
+ * Its queued message comes early, finds it not due, and sends itself on
+ * (deliver.ts); the payload is built when it goes, from the latest version.
+ */
+async function postponeSaved(
+  db: Db,
+  installId: string,
+  input: { endpointId: string; meetingId: string; dedupeKey: string | null; at: Date },
+): Promise<boolean> {
+  const rows = await db.all<{ id: string }>(sql`
+    update webhook_deliveries
+    set next_attempt_at = ${input.at.getTime()},
+      dedupe_key = case
+        when ${input.dedupeKey} is null or exists (select 1 from webhook_deliveries x
+          where x.install_id = ${installId} and x.endpoint_id = ${input.endpointId}
+            and x.dedupe_key = ${input.dedupeKey})
+        then dedupe_key else ${input.dedupeKey} end
+    where install_id = ${installId} and endpoint_id = ${input.endpointId}
+      and event = 'recap.saved' and meeting_id = ${input.meetingId}
+      and status = 'pending' and attempts = 0
+    returning id`);
+  return rows.length > 0;
+}
+
 /** Writes the deliveries and sends their messages. A message the queue refused is sent by the nightly sweep. */
 async function queueFor(
   deps: QueueDeps,
@@ -191,6 +217,16 @@ async function queueFor(
   const at = new Date(Date.now() + (input.delayS ?? 0) * 1000);
   let queued = 0;
   for (const endpoint of endpoints) {
+    // `recap.saved` is debounced: a save moves the unsent delivery to a minute after itself.
+    if (input.payload.event === 'recap.saved' && input.meetingId) {
+      const moved = await postponeSaved(deps.db, deps.installId, {
+        endpointId: endpoint.id,
+        meetingId: input.meetingId,
+        dedupeKey: input.dedupeKey ?? null,
+        at,
+      });
+      if (moved) continue;
+    }
     const id = await insertDelivery(deps.db, deps.installId, {
       endpointId: endpoint.id,
       payload: input.payload,

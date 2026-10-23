@@ -625,8 +625,45 @@ describe('deliveries', () => {
     expect(posts).toHaveLength(2);
   });
 
+  it('debounces recap.saved: each save moves the unsent delivery to a minute after itself', async () => {
+    const save = (version: string) =>
+      queueMeetingEvent(q(), {
+        event: 'recap.saved',
+        meetingId: 'm-company',
+        dedupeKey: `saved:${version}`,
+        delayS: 60,
+      });
+    expect(await save('v2')).toBe(1);
+    const first = deliveries()[0]!.next_attempt_at;
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.delaySeconds).toBe(60);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    // A later save: no new delivery, no new message, a later due time and the latest key.
+    expect(await save('v3')).toBe(0);
+    expect(sent).toHaveLength(1);
+    const row = raw
+      .prepare(`select next_attempt_at as due, dedupe_key as key from webhook_deliveries`)
+      .get() as { due: number; key: string };
+    expect(row.due).toBeGreaterThan(first);
+    expect(row.key).toBe('saved:v3');
+    // As if the second save came 59 s after the first.
+    row.due = first + 59_000;
+    raw.exec(`update webhook_deliveries set next_attempt_at = ${row.due}`);
+    // The first save's message comes at its minute, finds the delivery not due, and sends itself on.
+    clock = new Date(first);
+    await runLast();
+    expect(posts).toHaveLength(0);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]!.job).toMatchObject({ attempt: 1 });
+    clock = new Date(row.due);
+    await runLast();
+    expect(posts).toHaveLength(1);
+    expect(deliveries()[0]).toMatchObject({ status: 'delivered', attempts: 1 });
+  });
+
   it('joins an unsent event to the same endpoint, and sends a transcript once', async () => {
-    const event = { event: 'recap.saved' as const, meetingId: 'm-company', delayS: 60 };
+    const event = { event: 'meeting.shared' as const, meetingId: 'm-company', delayS: 60 };
+    raw.exec(`update webhook_endpoints set events = json_insert(events, '$[#]', 'meeting.shared')`);
     expect(await queueMeetingEvent(q(), event)).toBe(1);
     expect(await queueMeetingEvent(q(), event)).toBe(0);
     expect(sent[0]!.delaySeconds).toBe(60);
@@ -638,7 +675,7 @@ describe('deliveries', () => {
     expect(await queueMeetingEvent(q(), once)).toBe(1);
     await runLast();
     expect(await queueMeetingEvent(q(), once)).toBe(0);
-    expect(deliveries().map((row) => row.event)).toEqual(['recap.saved', 'meeting.transcribed']);
+    expect(deliveries().map((row) => row.event)).toEqual(['meeting.shared', 'meeting.transcribed']);
   });
 
   it('skips an endpoint that is disabled or does not take the event', async () => {
