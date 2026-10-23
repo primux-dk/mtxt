@@ -132,5 +132,8 @@
   "recorder.error.write": "Optagelsen kunne ikke skrives · Den bliver i listen med Gem et andet sted",
   "recorder.ask.insideQueue": "Vælg en mappe uden for optagerens egne filer",
   "macos.microphoneUsage": "Optageren optager din mikrofon under et møde, du starter.",
-  "macos.audioCaptureUsage": "Optageren optager den mødelyd, din Mac afspiller, så de andre deltagere kommer med i optagelsen."
+  "macos.audioCaptureUsage": "Optageren optager den mødelyd, din Mac afspiller, så de andre deltagere kommer med i optagelsen.",
+  "recorder.queue.unsaved": "Ikke gemt på denne Mac: {error}",
+  "recorder.queue.interrupted": "Afbrudt optagelse",
+  "recorder.queue.upload": "Overfør"
 }

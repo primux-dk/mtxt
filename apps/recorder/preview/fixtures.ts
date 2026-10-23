@@ -24,6 +24,8 @@ const item = (
   local_error: null,
   can_save: false,
   recovered: false,
+  needs_review: false,
+  unsaved: null,
   gaps: 0,
   ...over,
 });

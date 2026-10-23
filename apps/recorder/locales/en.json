@@ -132,5 +132,8 @@
   "recorder.error.write": "Could not write the recording · It stays in the list with Save elsewhere",
   "recorder.ask.insideQueue": "Choose a folder outside the recorder's own files",
   "macos.microphoneUsage": "The recorder records your microphone during a meeting you start.",
-  "macos.audioCaptureUsage": "The recorder records the meeting audio your Mac plays, so the other participants are in the recording."
+  "macos.audioCaptureUsage": "The recorder records the meeting audio your Mac plays, so the other participants are in the recording.",
+  "recorder.queue.unsaved": "Not saved on this Mac: {error}",
+  "recorder.queue.interrupted": "Interrupted recording",
+  "recorder.queue.upload": "Upload"
 }

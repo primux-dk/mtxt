@@ -40,6 +40,8 @@ export interface QueueItem {
   local_error: string | null;
   can_save: boolean;
   recovered: boolean;
+  needs_review: boolean;
+  unsaved: string | null;
   gaps: number;
 }
 

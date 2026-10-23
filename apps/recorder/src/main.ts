@@ -311,6 +311,31 @@ export function statusOf(q: QueueItem): StatusView {
           action: () => invoke('remove_recording', { id: q.id }),
         }
       : { icon: 'warning', cls: 'warn', text: t('recorder.queue.rejected'), extra: save };
+  // A change that is not on the disk comes first: nothing else happens to the
+  // entry until it is written.
+  if (q.unsaved) {
+    return {
+      icon: 'warning',
+      cls: 'warn',
+      text: t('recorder.queue.unsaved', { error: q.unsaved }),
+      extra: [{ text: t('common.tryAgain'), run: () => invoke('retry_save') }],
+    };
+  }
+  // A recording recovery finished uploads only when the user says so.
+  if (q.needs_review && q.status === 'uploading') {
+    return {
+      icon: 'info',
+      cls: 'muted',
+      text: t('recorder.queue.interrupted'),
+      extra: [
+        {
+          text: t('recorder.queue.upload'),
+          run: () => invoke('review', { id: q.id }).catch(showError),
+        },
+        ...save,
+      ],
+    };
+  }
   // A waiting recording that this connection may not upload says why first.
   if (q.blocked && q.status !== 'ask_user') {
     switch (q.blocked.kind) {
