@@ -12,6 +12,8 @@ import {
   limitChunkBody,
   limitRecapBody,
   limitWebhookBody,
+  nonCanonicalApiPath,
+  nonCanonicalNotFound,
   recapTooLarge,
   smallBodyTooLarge,
   type Guarded,
@@ -33,6 +35,8 @@ function refused(guarded: Guarded, tooLarge: () => Response): Response | null {
 
 export default {
   async fetch(request, env, ctx) {
+    // One accepted form per API path: a slash variant would pass the body bounds below.
+    if (nonCanonicalApiPath(new URL(request.url).pathname)) return nonCanonicalNotFound();
     const chunk = limitChunkBody(request);
     if (chunk instanceof Response) return chunk;
     const guarded = limitWebhookBody(chunk.request);

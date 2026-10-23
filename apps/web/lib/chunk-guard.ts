@@ -9,6 +9,31 @@ import { CHUNK_SIZE_BYTES } from '@mtxt/contract';
 */
 const CHUNK_PATH = /^\/api\/v1\/recordings\/[^/]+\/chunks\/[^/]+$/;
 
+/**
+ * The path every guard matches: percent-encoded slashes decoded, runs of
+ * slashes collapsed, trailing slashes dropped. Next.js serves a route under
+ * its slash variants too, so a guard that matched the raw path could be
+ * passed by `/recap/` or `//recap` (packet 5 review). The Worker entry
+ * refuses the variants themselves (`nonCanonicalApiPath`).
+ */
+export function guardPath(pathname: string): string {
+  const path = pathname.replace(/%2f/gi, '/').replace(/\/{2,}/g, '/');
+  return path.length > 1 ? path.replace(/\/+$/, '') : path;
+}
+
+/** An `/api/` path that is not in its one accepted form: a trailing slash, `//`, or an encoded slash. */
+export function nonCanonicalApiPath(pathname: string): boolean {
+  if (!pathname.startsWith('/api/') && !/^\/+api(\/|%2f)/i.test(pathname)) return false;
+  return /%2f/i.test(pathname) || /\/{2,}/.test(pathname) || /.\/$/.test(pathname);
+}
+
+/** The 404 for a non-canonical API path, in the contract's error shape. */
+export const nonCanonicalNotFound = () =>
+  Response.json(
+    { error: { code: 'not_found', message: 'No such path. Use it without a trailing slash.' } },
+    { status: 404, headers: { 'cache-control': 'no-store' } },
+  );
+
 export const chunkTooLarge = () =>
   Response.json(
     { error: { code: 'too_large', message: `A chunk is at most ${CHUNK_SIZE_BYTES} bytes.` } },
@@ -24,7 +49,7 @@ export interface Guarded {
 export function limitChunkBody(request: Request): Guarded | Response {
   const pass: Guarded = { request, overrun: () => null };
   if (request.method !== 'PUT' || !request.body) return pass;
-  if (!CHUNK_PATH.test(new URL(request.url).pathname)) return pass;
+  if (!CHUNK_PATH.test(guardPath(new URL(request.url).pathname))) return pass;
   const declared = request.headers.get('content-length');
   if (declared !== null && Number(declared) > CHUNK_SIZE_BYTES) return chunkTooLarge();
   return limitBody(request, CHUNK_SIZE_BYTES);
@@ -61,12 +86,12 @@ export const webhookTooLarge = smallTooLarge(WEBHOOK_PATH);
 
 /** The 413 for whichever small-body route the request was for. */
 export const smallBodyTooLarge = (request: Request) =>
-  smallTooLarge(new URL(request.url).pathname)();
+  smallTooLarge(guardPath(new URL(request.url).pathname))();
 
 export function limitWebhookBody(request: Request): Guarded | Response {
   const pass: Guarded = { request, overrun: () => null };
   if (request.method !== 'POST' || !request.body) return pass;
-  const path = new URL(request.url).pathname;
+  const path = guardPath(new URL(request.url).pathname);
   const bound = SMALL_BODIES[path];
   if (!bound) return pass;
   const declared = request.headers.get('content-length');
@@ -123,7 +148,7 @@ const RECAP_SAVE_PATH = /^\/api\/v1\/meetings\/[^/]+\/recap$/;
 const RECAP_IMAGE_PATH = /^\/api\/v1\/meetings\/[^/]+\/recap\/images$/;
 
 function recapBound(request: Request) {
-  const path = new URL(request.url).pathname;
+  const path = guardPath(new URL(request.url).pathname);
   if (request.method === 'PUT' && RECAP_SAVE_PATH.test(path))
     return { max: RECAP_SAVE_MAX_BYTES, what: 'A recap save' };
   if (request.method === 'POST' && RECAP_IMAGE_PATH.test(path))

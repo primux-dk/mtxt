@@ -360,6 +360,23 @@ test('the Worker entry refuses a recap save over 512 KiB and an image over 8 MiB
   });
   expect(image.status()).toBe(413);
   expect((await image.json()).error.code).toBe('too_large');
+  // A slash variant is not a way around the bound: the entry refuses it before reading.
+  for (const path of [
+    `/api/v1/meetings/${meetingId}/recap/`,
+    `/api/v1/meetings/${meetingId}//recap`,
+    `/api/v1/meetings/${meetingId}%2Frecap`,
+  ]) {
+    const variant = await request.put(path, {
+      headers: { ...colleague, 'content-type': 'application/json' },
+      data: JSON.stringify({ base_version_id: null, body_md: 'x'.repeat(600 * 1024) }),
+    });
+    expect(variant.status(), path).toBe(404);
+    const small = await request.put(path, {
+      headers: { ...colleague, 'content-type': 'application/json' },
+      data: JSON.stringify({ base_version_id: null, body_md: '# Nej' }),
+    });
+    expect(small.status(), path).toBe(404);
+  }
 });
 
 test('the / menu inserts a callout and a table; @ mentions a colleague; a tick saves at once', async ({
