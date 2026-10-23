@@ -377,7 +377,10 @@
       "empty": "Referatmodellen svarede uden tekst.",
       "config": "En indstilling, som referatmodellen skal bruge, mangler eller er forkert.",
       "no_transcript": "Der er ingen transskription at skrive ud fra.",
-      "internal": "Installationen fik en fejl, mens den skrev referatet."
+      "internal": "Installationen fik en fejl, mens den skrev referatet.",
+      "template_too_long": "Skabelonen er for lang til referatmodellens kontekst. Gør den kortere under Indstillinger, eller vælg en model med mere kontekst.",
+      "too_long": "Mødet er for langt til referatmodellen, også i resumerede dele.",
+      "incomplete_draft": "Referatmodellens udkast blev afbrudt eller manglede et afsnit fra skabelonen, to gange."
     }
   },
   "recorder": {

@@ -32,15 +32,6 @@ export interface Call {
   maxTokens: number;
 }
 
-export type Plan =
-  | { kind: 'single'; call: Call }
-  | {
-      kind: 'chunked';
-      parts: Call[];
-      /** The final call, given the parts' summaries in order. */
-      draft: (summaries: string[]) => Call;
-    };
-
 /** The template used when the install has none. Headings in English; the model writes in the transcript's language. */
 export const FALLBACK_TEMPLATE = `# Summary
 
@@ -126,13 +117,45 @@ function summarySystem(language: string, keyterms: readonly string[]): string {
 const userMessage = (template: string, transcriptHeading: string, body: string) =>
   `Template:\n\n${template.trim()}\n\n${transcriptHeading}\n\n${body}`;
 
-/** Splits lines into parts of at most `budget` estimated tokens; a line longer than that is its own part. */
+/**
+ * A line of at most `budget` estimated tokens: a longer one is cut at
+ * sentence ends, a sentence still too long at spaces, and a word still too
+ * long by characters. The speaker's name goes on every piece.
+ */
+export function splitLine(line: string, budget: number): string[] {
+  if (estimateTokens(line) <= budget) return [line];
+  const speaker = /^([^:[\]]{1,60}): /.exec(line)?.[1];
+  const text = speaker ? line.slice(speaker.length + 2) : line;
+  const prefix = speaker ? `${speaker}: ` : '';
+  const room = Math.max(1, budget - estimateTokens(prefix));
+  const pieces: string[] = [];
+  let current = '';
+  const push = (piece: string) => {
+    if (current && estimateTokens(`${current} ${piece}`) > room) {
+      pieces.push(current);
+      current = '';
+    }
+    current = current ? `${current} ${piece}` : piece;
+  };
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    if (estimateTokens(sentence) <= room) push(sentence);
+    else
+      for (const word of sentence.split(/\s+/)) {
+        if (estimateTokens(word) <= room) push(word);
+        else for (let i = 0; i < word.length; i += room * 3) push(word.slice(i, i + room * 3));
+      }
+  }
+  if (current) pieces.push(current);
+  return pieces.map((piece) => prefix + piece);
+}
+
+/** Splits lines into parts of at most `budget` estimated tokens, a long line split first. */
 export function splitLines(lines: readonly string[], budget: number): string[][] {
   const parts: string[][] = [];
   let current: string[] = [];
   let size = 0;
   let minute: string | null = null;
-  for (const line of lines) {
+  for (const line of lines.flatMap((l) => splitLine(l, Math.max(1, Math.floor(budget / 2))))) {
     const cost = estimateTokens(line) + 1;
     if (current.length && size + cost > budget) {
       parts.push(current);
@@ -152,48 +175,94 @@ export function splitLines(lines: readonly string[], budget: number): string[][]
   return parts;
 }
 
-/** The calls that draft this recap: one, or a summary per part and then the draft. */
-export function buildPlan(input: PromptInput): Plan {
+/** The estimated tokens of a call, its answer's cap included: what must fit the model's context. */
+export const callTokens = (call: Call) =>
+  estimateTokens(call.system) + estimateTokens(call.user) + call.maxTokens;
+
+export const SUMMARY_HEADING = 'Summaries of consecutive parts of the transcript, in order:';
+
+/**
+ * What one draft may spend. `scale` shrinks the room for transcript and
+ * summaries (a second try after an incomplete draft); the template and the
+ * answer's cap keep theirs. Null when the template cannot fit even alone.
+ */
+export function planBudgets(input: PromptInput, scale = 1) {
   const template = input.template.trim() || FALLBACK_TEMPLATE;
   const system = systemPrompt(input.language, input.keyterms);
-  const lines = transcriptLines(input.segments);
-  const transcript = lines.join('\n');
-  const fixed = estimateTokens(system) + estimateTokens(template) + MARGIN;
-  const room = input.contextTokens - RECAP_MAX_TOKENS - fixed;
-  if (estimateTokens(transcript) <= room) {
-    return {
-      kind: 'single',
-      call: {
-        system,
-        user: userMessage(template, 'Transcript:', transcript),
-        maxTokens: RECAP_MAX_TOKENS,
-      },
-    };
-  }
-  const summarySys = summarySystem(input.language, input.keyterms);
-  const partRoom = Math.max(
-    1000,
-    input.contextTokens - SUMMARY_MAX_TOKENS - estimateTokens(summarySys) - MARGIN,
+  const summary = summarySystem(input.language, input.keyterms);
+  const headingTokens = estimateTokens(SUMMARY_HEADING) + 20;
+  const finalRoom = Math.floor(
+    (input.contextTokens -
+      RECAP_MAX_TOKENS -
+      estimateTokens(system) -
+      estimateTokens(userMessage(template, SUMMARY_HEADING, '')) -
+      MARGIN) *
+      scale,
   );
-  const parts = splitLines(lines, partRoom);
+  const partRoom = Math.floor(
+    (input.contextTokens - SUMMARY_MAX_TOKENS - estimateTokens(summary) - MARGIN - headingTokens) *
+      scale,
+  );
+  // Room for less than a few minutes of transcript is no room.
+  if (finalRoom < 500 || partRoom < 500) return null;
+  return { template, system, summary, finalRoom, partRoom };
+}
+
+/** The final call: the template, then the transcript, or the summaries of its parts. */
+export function draftCall(
+  budgets: NonNullable<ReturnType<typeof planBudgets>>,
+  body: string,
+  summarised: boolean,
+): Call {
   return {
-    kind: 'chunked',
-    parts: parts.map((part, i) => ({
-      system: summarySys,
-      user: `Part ${i + 1} of ${parts.length} of the transcript:\n\n${part.join('\n')}`,
-      maxTokens: SUMMARY_MAX_TOKENS,
-    })),
-    draft: (summaries) => ({
-      system,
-      user: userMessage(
-        template,
-        `The transcript was too long to read at once. These are summaries of its ${summaries.length} parts, in order:`,
-        summaries.map((s, i) => `Part ${i + 1}:\n\n${s.trim()}`).join('\n\n'),
-      ),
-      maxTokens: RECAP_MAX_TOKENS,
-    }),
+    system: budgets.system,
+    user: userMessage(budgets.template, summarised ? SUMMARY_HEADING : 'Transcript:', body),
+    maxTokens: RECAP_MAX_TOKENS,
   };
 }
+
+/** One summary call: a part of the transcript, or (`level` 2 and up) a run of earlier summaries. */
+export function summaryCall(
+  budgets: NonNullable<ReturnType<typeof planBudgets>>,
+  part: readonly string[],
+  index: number,
+  count: number,
+  level: number,
+): Call {
+  const what = level === 1 ? 'of the transcript' : 'of the summaries of the transcript';
+  return {
+    system: budgets.summary,
+    user: `Part ${index + 1} of ${count} ${what}:\n\n${part.join('\n')}`,
+    maxTokens: SUMMARY_MAX_TOKENS,
+  };
+}
+
+/** The template's headings, which a finished draft must keep (none for the plain fallback). */
+export function requiredHeadings(template: string): string[] {
+  if (!template.trim()) return [];
+  return headingsOf(template);
+}
+
+/** The headings of a markdown text, normalised for comparison; code blocks are skipped. */
+export function headingsOf(markdown: string): string[] {
+  const out: string[] = [];
+  let fenced = false;
+  for (const line of markdown.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    if (fenced) continue;
+    const match = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    if (match) out.push(normalizeHeading(match[1]!));
+  }
+  return out;
+}
+
+const normalizeHeading = (text: string) =>
+  text
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\s:.]+$/, '')
+    .trim()
+    .toLocaleLowerCase();
 
 /** The model's answer as markdown: a wrapping code fence and any preamble before the first heading go. */
 export function cleanAnswer(text: string): string {

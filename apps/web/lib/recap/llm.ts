@@ -23,6 +23,9 @@ export const RECAP_REASONS = [
   'empty',
   'config',
   'no_transcript',
+  'template_too_long',
+  'too_long',
+  'incomplete_draft',
   'internal',
 ] as const;
 export type RecapReason = (typeof RECAP_REASONS)[number];

@@ -23,7 +23,22 @@ import { liftDecisions, type MeetingSpeaker } from './decisions';
 import { RecapError, type RecapLlm } from './llm';
 import { parseMarkdown, toMarkdown } from './markdown';
 import { contextTokens } from './models';
-import { buildPlan, cleanAnswer, FALLBACK_TEMPLATE, type PromptSegment } from './prompt';
+import {
+  callTokens,
+  cleanAnswer,
+  draftCall,
+  estimateTokens,
+  headingsOf,
+  planBudgets,
+  requiredHeadings,
+  splitLine,
+  splitLines,
+  summaryCall,
+  transcriptLines,
+  type Call,
+  type PromptInput,
+  type PromptSegment,
+} from './prompt';
 import { beginDraft, failDraft, holdsDraft, writeVersion } from './store';
 
 export const MAX_ATTEMPTS = 3;
@@ -90,7 +105,7 @@ export async function transcriptFor(db: Db, installId: string, meetingId: string
   };
 }
 
-/** The template body: the meeting's, else the install's default, else the plain one. */
+/** The template body: the meeting's, else the install's default, else '' (the prompt's plain one). */
 export async function templateFor(db: Db, installId: string, templateId: string | null) {
   const tm = schema.templates;
   const chosen = templateId
@@ -103,25 +118,83 @@ export async function templateFor(db: Db, installId: string, templateId: string 
     (await db.query.templates.findFirst({
       where: and(eq(tm.installId, installId), eq(tm.isDefault, true)),
     }));
-  return { id: template?.id ?? null, bodyMd: template?.bodyMd ?? FALLBACK_TEMPLATE };
+  // No template at all: '' here, and the prompt uses its plain one with nothing required.
+  return { id: template?.id ?? null, bodyMd: template?.bodyMd ?? '' };
 }
 
-/** Calls the model for every step of the plan; the draft's markdown and its version note. */
-export async function draftRecap(
+/** Rounds of summaries of summaries before a draft gives up as too long. */
+const MAX_LEVELS = 5;
+
+/**
+ * One draft at the given scale of the budgets: the transcript whole when it
+ * fits, else summaries of its parts, and summaries of those, until the final
+ * call fits the model's context with the template and the answer's cap.
+ * Every call is checked against the context with the same estimator.
+ */
+async function draftOnce(
   llm: RecapLlm,
-  input: Parameters<typeof buildPlan>[0],
-): Promise<{ markdown: string; note: string | null }> {
-  const plan = buildPlan(input);
-  const answer = async (call: { system: string; user: string; maxTokens: number }) => {
-    const out = await llm.complete(call);
+  input: PromptInput,
+  scale: number,
+): Promise<{ markdown: string; truncated: boolean; parts: number }> {
+  const budgets = planBudgets(input, scale);
+  if (!budgets) throw new RecapError('template_too_long');
+  const call = async (c: Call) => {
+    if (callTokens(c) > input.contextTokens) throw new RecapError('internal');
+    const out = await llm.complete(c);
     const text = cleanAnswer(out.text);
     if (!text) throw new RecapError('empty', true, undefined, llm.provider);
-    return text;
+    return { text, truncated: out.truncated };
   };
-  if (plan.kind === 'single') return { markdown: await answer(plan.call), note: null };
-  const summaries: string[] = [];
-  for (const part of plan.parts) summaries.push(await answer(part));
-  return { markdown: await answer(plan.draft(summaries)), note: chunkedNote(plan.parts.length) };
+  const lines = transcriptLines(input.segments).flatMap((l) => splitLine(l, budgets.finalRoom));
+  const transcript = lines.join('\n');
+  if (estimateTokens(transcript) <= budgets.finalRoom) {
+    const out = await call(draftCall(budgets, transcript, false));
+    return { markdown: out.text, truncated: out.truncated, parts: 0 };
+  }
+  let texts = lines;
+  let parts = 0;
+  for (let level = 1; ; level++) {
+    if (level > MAX_LEVELS) throw new RecapError('too_long');
+    const groups = splitLines(texts, budgets.partRoom);
+    if (level > 1 && groups.length >= texts.length) throw new RecapError('too_long');
+    const summaries: string[] = [];
+    for (const [i, group] of groups.entries()) {
+      summaries.push((await call(summaryCall(budgets, group, i, groups.length, level))).text);
+    }
+    if (level === 1) parts = groups.length;
+    texts = summaries.map((summary, i) => `Part ${i + 1}: ${summary.replace(/\s*\n\s*/g, ' ')}`);
+    const body = texts.join('\n\n');
+    if (estimateTokens(body) <= budgets.finalRoom) {
+      const out = await call(draftCall(budgets, body, true));
+      return { markdown: out.text, truncated: out.truncated, parts };
+    }
+  }
+}
+
+/** Whether a draft is finished: not cut off at the cap, and with every heading of the template. */
+export function draftComplete(markdown: string, truncated: boolean, template: string) {
+  if (truncated) return false;
+  const have = new Set(headingsOf(markdown));
+  return requiredHeadings(template).every((heading) => have.has(heading));
+}
+
+/**
+ * The draft's markdown and its version note. A draft cut off at the cap, or
+ * missing a heading of the template, is tried once more with half the room
+ * for the transcript; a second incomplete one fails as `incomplete_draft`
+ * and is never stored as finished.
+ */
+export async function draftRecap(
+  llm: RecapLlm,
+  input: PromptInput,
+): Promise<{ markdown: string; note: string | null }> {
+  for (const scale of [1, 0.5]) {
+    const out = await draftOnce(llm, input, scale);
+    if (draftComplete(out.markdown, out.truncated, input.template)) {
+      return { markdown: out.markdown, note: out.parts ? chunkedNote(out.parts) : null };
+    }
+  }
+  throw new RecapError('incomplete_draft');
 }
 
 export async function runRecap(deps: RecapDeps, job: RecapJob, attempt: number): Promise<void> {

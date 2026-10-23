@@ -72,8 +72,7 @@ export async function fakeRecapControl(request: Request) {
 
 /** A recap from the request's template and transcript, the way a model would shape it. */
 export function fakeDraft(user: string): string {
-  const template =
-    /Template:\n\n([\s\S]*?)\n\n(?:Transcript:|The transcript was too long)/.exec(user)?.[1] ?? '';
+  const template = /Template:\n\n([\s\S]*?)\n\n(?:Transcript:|Summaries of)/.exec(user)?.[1] ?? '';
   const lines = user
     .split('\n')
     .filter((l) => /^[^[\s][^:]{0,60}: /.test(l) && !l.startsWith('Part '))

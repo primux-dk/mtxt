@@ -377,7 +377,10 @@
       "empty": "The recap model answered with no text.",
       "config": "A setting the recap model needs is missing or wrong.",
       "no_transcript": "There is no transcript to draft from.",
-      "internal": "The installation had an error while it drafted the recap."
+      "internal": "The installation had an error while it drafted the recap.",
+      "template_too_long": "The template is too long for the recap model's context. Shorten it in Settings, or choose a model with more context.",
+      "too_long": "The meeting is too long for the recap model, even in summarised parts.",
+      "incomplete_draft": "The recap model's draft was cut off or left out a section of the template, twice."
     }
   },
   "recorder": {

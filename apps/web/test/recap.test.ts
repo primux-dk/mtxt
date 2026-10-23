@@ -3,17 +3,20 @@ import type { DatabaseSync } from 'node:sqlite';
 import { seal, type Db } from '@mtxt/adapters';
 import { decisionRows, liftDecisions } from '../lib/recap/decisions';
 import { fakeDraft } from '../lib/recap/fake-llm';
-import { chunkedNote, MAX_ATTEMPTS, runRecap, type RecapDeps } from '../lib/recap/job';
-import { RecapError, recapLlm, type RecapLlm } from '../lib/recap/llm';
+import { chunkedNote, draftRecap, MAX_ATTEMPTS, runRecap, type RecapDeps } from '../lib/recap/job';
+import { RecapError, recapLlm, type Completion, type RecapLlm } from '../lib/recap/llm';
 import { parseMarkdown, toMarkdown } from '../lib/recap/markdown';
 import { RECAP_MAX_TOKENS } from '../lib/recap/models';
 import {
-  buildPlan,
+  callTokens,
   cleanAnswer,
-  estimateTokens,
+  splitLine,
   splitLines,
+  SUMMARY_HEADING,
   systemPrompt,
   transcriptLines,
+  type Call,
+  type PromptInput,
 } from '../lib/recap/prompt';
 import {
   beginDraft,
@@ -43,28 +46,46 @@ const segments = (n: number, every = 20_000) =>
   }));
 
 describe('the prompt builder', () => {
-  it('keeps the template whole and writes the transcript as Speaker: text with a minute line', () => {
-    const plan = buildPlan({
-      template: TEMPLATE,
-      segments: segments(7),
-      keyterms: ['linje 2'],
-      language: 'da',
-      contextTokens: 131_000,
-    });
-    expect(plan.kind).toBe('single');
-    if (plan.kind !== 'single') return;
-    expect(plan.call.maxTokens).toBe(RECAP_MAX_TOKENS);
-    expect(plan.call.user).toContain(TEMPLATE.trim());
-    expect(plan.call.user.indexOf(TEMPLATE.trim())).toBeLessThan(
-      plan.call.user.indexOf('Transcript:'),
-    );
-    expect(plan.call.user).toContain('[00:00]\nJonas Skov: Sætning nummer 1');
-    expect(plan.call.user).toContain('[01:00]\nAnne Holm: Sætning nummer 4');
-    expect(plan.call.system).toContain('Write in Danish');
-    expect(plan.call.system).toContain('keep every heading of the template');
-    expect(plan.call.system).toContain('(unclear)');
-    expect(plan.call.system).toContain('Do not invent');
-    expect(plan.call.system).toContain('linje 2');
+  const input = (over: Partial<PromptInput> = {}): PromptInput => ({
+    template: TEMPLATE,
+    segments: segments(7),
+    keyterms: ['linje 2'],
+    language: 'da',
+    contextTokens: 131_000,
+    ...over,
+  });
+  /** A model that answers from the request, and records every call. */
+  const recording = (answer?: (call: Call) => Completion) => {
+    const calls: Call[] = [];
+    const llm: RecapLlm = {
+      provider: 'workers-ai',
+      model: 'test',
+      async complete(call) {
+        calls.push(call);
+        if (answer) return answer(call);
+        return call.user.startsWith('Part ')
+          ? { text: `Resumé: ${call.user.slice(0, 200)}`, truncated: false }
+          : { text: fakeDraft(call.user), truncated: false };
+      },
+    };
+    return { llm, calls };
+  };
+
+  it('keeps the template whole and writes the transcript as Speaker: text with a minute line', async () => {
+    const { llm, calls } = recording();
+    await draftRecap(llm, input());
+    expect(calls).toHaveLength(1);
+    const call = calls[0]!;
+    expect(call.maxTokens).toBe(RECAP_MAX_TOKENS);
+    expect(call.user).toContain(TEMPLATE.trim());
+    expect(call.user.indexOf(TEMPLATE.trim())).toBeLessThan(call.user.indexOf('Transcript:'));
+    expect(call.user).toContain('[00:00]\nJonas Skov: Sætning nummer 1');
+    expect(call.user).toContain('[01:00]\nAnne Holm: Sætning nummer 4');
+    expect(call.system).toContain('Write in Danish');
+    expect(call.system).toContain('keep every heading of the template');
+    expect(call.system).toContain('(unclear)');
+    expect(call.system).toContain('Do not invent');
+    expect(call.system).toContain('linje 2');
   });
 
   it('puts a minute line only when the minute changes, and drops empty segments', () => {
@@ -78,35 +99,97 @@ describe('the prompt builder', () => {
     ).toEqual(['[00:00]', 'A: en', 'to', '[1:01:00]', 'B: tre']);
   });
 
-  it('summarises a transcript too long for the context in parts, then drafts from the summaries', () => {
-    const many = segments(4000);
-    const plan = buildPlan({
-      template: TEMPLATE,
-      segments: many,
-      keyterms: [],
-      language: 'da',
-      contextTokens: 24_000,
-    });
-    expect(plan.kind).toBe('chunked');
-    if (plan.kind !== 'chunked') return;
-    expect(plan.parts.length).toBeGreaterThan(2);
-    for (const part of plan.parts) {
-      expect(estimateTokens(part.system + part.user) + part.maxTokens).toBeLessThanOrEqual(24_000);
-      // Every part says when it starts.
-      expect(part.user.split('\n')[2]).toMatch(/^\[\d/);
-    }
+  it('summarises a transcript too long for the context in parts, then drafts from the summaries', async () => {
+    const { llm, calls } = recording();
+    const out = await draftRecap(llm, input({ segments: segments(4000), contextTokens: 24_000 }));
+    const parts = calls.filter((c) => c.user.startsWith('Part '));
+    expect(parts.length).toBeGreaterThan(2);
+    for (const call of calls) expect(callTokens(call)).toBeLessThanOrEqual(24_000);
+    for (const part of parts) expect(part.user.split('\n')[2]).toMatch(/^\[\d/);
     // Every line is in exactly one part (minute lines may repeat at a part's start).
-    const all = plan.parts
-      .flatMap((p) => p.user.split('\n').slice(2))
-      .filter((l) => !l.startsWith('['));
+    const all = parts.flatMap((p) => p.user.split('\n').slice(2)).filter((l) => !l.startsWith('['));
     expect(all).toHaveLength(4000);
-    const draft = plan.draft(plan.parts.map((_, i) => `Resumé ${i + 1}`));
-    expect(draft.user).toContain(TEMPLATE.trim());
-    expect(draft.user).toContain(`summaries of its ${plan.parts.length} parts`);
-    expect(draft.maxTokens).toBe(RECAP_MAX_TOKENS);
+    const final = calls.at(-1)!;
+    expect(final.user).toContain(TEMPLATE.trim());
+    expect(final.user).toContain(SUMMARY_HEADING);
+    expect(out.note).toBe(chunkedNote(parts.length));
   });
 
-  it('splits by line and never splits a line', () => {
+  it('fits one 41,500-word segment into a 24,000-token model, cut at sentences', async () => {
+    const words = Array.from({ length: 41_500 }, (_, i) =>
+      i % 12 === 11 ? 'ordren.' : 'kapacitet',
+    );
+    const { llm, calls } = recording();
+    await draftRecap(
+      llm,
+      input({
+        segments: [{ startMs: 0, speaker: 'Jonas Skov', text: words.join(' ') }],
+        contextTokens: 24_000,
+      }),
+    );
+    expect(calls.length).toBeGreaterThan(2);
+    for (const call of calls) expect(callTokens(call)).toBeLessThanOrEqual(24_000);
+    // The pieces end at sentences and keep the speaker.
+    const first = calls[0]!.user.split('\n')[3]!;
+    expect(first).toMatch(/^Jonas Skov: kapacitet/);
+    expect(first).toMatch(/ordren\.$/);
+  });
+
+  it('summarises the summaries until the final call fits beside a 19,992-character template', async () => {
+    const template = `# Referat\n\n${'## Afsnit med en lang forklaring\n\n'.repeat(1000)}`.slice(
+      0,
+      19_992,
+    );
+    // Summaries as long as the cap allows, so one round is not enough.
+    const { llm, calls } = recording((call) =>
+      call.user.startsWith('Part ')
+        ? { text: 'resumé '.repeat(500), truncated: false }
+        : { text: template, truncated: false },
+    );
+    await draftRecap(llm, input({ template, segments: segments(20_000), contextTokens: 24_000 }));
+    for (const call of calls) expect(callTokens(call)).toBeLessThanOrEqual(24_000);
+    expect(calls.some((c) => c.user.includes('of the summaries of the transcript'))).toBe(true);
+  });
+
+  it('fails with a fixed reason when the template cannot fit even alone', async () => {
+    const { llm } = recording();
+    await expect(
+      draftRecap(llm, input({ template: '# A\n'.repeat(30_000), contextTokens: 24_000 })),
+    ).rejects.toMatchObject({ reason: 'template_too_long' });
+  });
+
+  it('tries a cut-off draft once more with half the room, then fails as incomplete', async () => {
+    let n = 0;
+    const once = recording((call) =>
+      n++ === 0
+        ? { text: '# Produktionsmøde\n\n## Status\n', truncated: true }
+        : { text: fakeDraft(call.user), truncated: false },
+    );
+    const out = await draftRecap(once.llm, input());
+    expect(once.calls).toHaveLength(2);
+    expect(out.markdown).toContain('## Næste skridt');
+    const always = recording(() => ({ text: '# Produktionsmøde\n', truncated: true }));
+    await expect(draftRecap(always.llm, input())).rejects.toMatchObject({
+      reason: 'incomplete_draft',
+    });
+    expect(always.calls).toHaveLength(2);
+  });
+
+  it("refuses a draft that lacks one of the template's headings", async () => {
+    const missing = recording(() => ({
+      text: '# Produktionsmøde\n\n## Status\n\nOK.\n',
+      truncated: false,
+    }));
+    await expect(draftRecap(missing.llm, input())).rejects.toMatchObject({
+      reason: 'incomplete_draft',
+    });
+    // The plain template asks for no headings: the model may write them in the transcript's language.
+    const plain = recording(() => ({ text: '# Resumé\n\nOK.\n', truncated: false }));
+    expect((await draftRecap(plain.llm, input({ template: '' }))).markdown).toBe('# Resumé\n\nOK.');
+  });
+
+  it('splits a line too long for a part at sentence ends', () => {
+    expect(splitLine('A: En. To. Tre.', 3)).toEqual(['A: En.', 'A: To.', 'A: Tre.']);
     expect(splitLines(['[00:00]', 'a'.repeat(30), 'b'.repeat(30), 'c'.repeat(30)], 25)).toEqual([
       ['[00:00]', 'a'.repeat(30)],
       ['[00:00]', 'b'.repeat(30)],
@@ -282,6 +365,21 @@ describe('the recap job', () => {
     const ok = fakeLlm(async (call) => ({ text: fakeDraft(call.user), truncated: false }));
     await runRecap(deps(db, ok), job('meet-1', started!.token), 1);
     expect((await loadRecap(db, INSTALL, 'meet-1'))?.current?.number).toBe(1);
+  });
+
+  it('never stores a cut-off draft: the recap fails as incomplete_draft with no version', async () => {
+    const { db, raw } = await testDb();
+    seedTranscript(raw);
+    const cut = fakeLlm(async () => ({
+      text: '# Produktionsmøde\n\n## Status\n\nVi',
+      truncated: true,
+    }));
+    await runRecap(deps(db, cut), job(), 1);
+    expect(await loadRecap(db, INSTALL, 'meet-1')).toMatchObject({
+      status: 'failed',
+      failureReason: 'incomplete_draft',
+      current: null,
+    });
   });
 
   it('regenerates on top of a human version, and an older draft cannot write over a newer one', async () => {
