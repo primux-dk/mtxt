@@ -746,7 +746,7 @@
       "logPage": {
         "back": "Back to settings",
         "title": "Delivery log · {name}",
-        "subheading": "The last 50 deliveries to this endpoint. Titles and answers only, never content.",
+        "subheading": "The last 50 deliveries to this endpoint. A delivery gets six attempts, then it is parked. Titles and answers only, never content.",
         "url": "URL",
         "count": "{count, plural, one {# delivery} other {# deliveries}}",
         "noMeeting": "No meeting",

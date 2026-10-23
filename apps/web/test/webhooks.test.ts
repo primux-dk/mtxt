@@ -227,7 +227,7 @@ describe('outbound addresses', () => {
 });
 
 describe('the rules', () => {
-  it('waits 1 min, 10 min, 1 h, 6 h and 24 h, and parks after the sixth attempt', () => {
+  it('makes six attempts: the first and five retries after 1 min, 10 min, 1 h, 6 h and 24 h, then parks', () => {
     expect(BACKOFF_S).toEqual([60, 600, 3600, 21_600, 86_400]);
     expect(MAX_ATTEMPTS).toBe(6);
     expect([1, 2, 3, 4, 5, 6, 7].map(backoffAfter)).toEqual([

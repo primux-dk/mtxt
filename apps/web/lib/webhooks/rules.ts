@@ -5,7 +5,7 @@
 */
 import type { Visibility, WebhookAutoSend, WebhookEvent } from '@mtxt/adapters';
 
-/** Waits after a failed attempt 1, 2, 3, 4 and 5; the sixth failure parks the delivery. */
+/** Six attempts: the first, then these waits after failed attempts 1 to 5; the sixth failure parks. */
 export const BACKOFF_S = [60, 600, 3600, 21_600, 86_400] as const;
 export const MAX_ATTEMPTS = BACKOFF_S.length + 1;
 /** The longest delay a queue message takes (Cloudflare Queues: 12 hours); a longer wait is two hops. */

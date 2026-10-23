@@ -746,7 +746,7 @@
       "logPage": {
         "back": "Tilbage til indstillinger",
         "title": "Leveringslog · {name}",
-        "subheading": "De seneste 50 leveringer til dette endpoint. Kun titler og svar, aldrig indhold.",
+        "subheading": "De seneste 50 leveringer til dette endpoint. En levering får seks forsøg, derefter parkeres den. Kun titler og svar, aldrig indhold.",
         "url": "URL",
         "count": "{count, plural, one {# levering} other {# leveringer}}",
         "noMeeting": "Intet møde",

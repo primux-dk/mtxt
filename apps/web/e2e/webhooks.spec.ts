@@ -528,6 +528,7 @@ test('the sixth failed attempt parks the delivery', async ({ page, request }) =>
   await expect(row).toContainText('Parked', { timeout: 20_000 });
   await expect(row).toContainText('6 of 6');
   await expect(row.getByRole('status')).toHaveCount(0);
+  await expect(page.getByText('A delivery gets six attempts, then it is parked.')).toBeVisible();
   // Parked is not the end: Retry now is still there.
   await expect(row.getByRole('button', { name: /Retry now/ })).toBeVisible();
   expect((await attemptsOf(request, id)).length).toBe(6);
