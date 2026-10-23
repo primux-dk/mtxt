@@ -1,7 +1,8 @@
 // One install = one Worker in the owning company's own Cloudflare account.
 // No account id here: wrangler takes it from the logged-in account or
 // CLOUDFLARE_ACCOUNT_ID. The ids below are placeholders; a deploy replaces them
-// with the install's own (see README "Run it").
+// with the install's own: deploy/install.mjs writes them into a git-ignored
+// wrangler.<install>.jsonc next to this file (deploy/README.md).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "mtxt",
@@ -45,7 +46,16 @@
   ],
   "queues": {
     "producers": [{ "binding": "JOBS", "queue": "mtxt-jobs" }],
-    "consumers": [{ "queue": "mtxt-jobs", "max_batch_size": 1, "max_retries": 5 }],
+    // A message that fails five deliveries goes to the dead-letter queue, not away
+    // (the transcribe job gives up after three provider errors on its own).
+    "consumers": [
+      {
+        "queue": "mtxt-jobs",
+        "max_batch_size": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "mtxt-jobs-dlq",
+      },
+    ],
   },
   // Workers AI, for the Whisper speech-to-text provider. Always remote; local dev and the
   // e2e run use `wrangler dev --local`, where calling it fails and the job records why.
