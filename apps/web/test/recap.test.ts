@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
 import { seal, type Db } from '@mtxt/adapters';
-import { decisionRows, liftDecisions } from '../lib/recap/decisions';
+import { seedSql } from '@mtxt/adapters/db/seed';
+import { decisionRows, liftDecisions, withDueDates } from '../lib/recap/decisions';
 import { fakeDraft } from '../lib/recap/fake-llm';
 import { chunkedNote, draftRecap, MAX_ATTEMPTS, runRecap, type RecapDeps } from '../lib/recap/job';
 import { RecapError, recapLlm, type Completion, type RecapLlm } from '../lib/recap/llm';
@@ -225,10 +226,42 @@ describe('lifting decisions', () => {
     expect(out).toContain('- [ ] Ikke en beslutning');
     const rows = decisionRows(doc, new Map([['sp-2', 'u-linked']]));
     expect(rows).toEqual([
-      { position: 0, text: 'Saml tallene @Anne Holm', ownerUserId: 'u-anne', done: false },
-      { position: 1, text: 'Test skiftet @Speaker 3', ownerUserId: 'u-linked', done: true },
-      { position: 2, text: 'Ingen ejer', ownerUserId: null, done: false },
+      {
+        position: 0,
+        text: 'Saml tallene @Anne Holm',
+        ownerUserId: 'u-anne',
+        done: false,
+        dueOn: null,
+      },
+      {
+        position: 1,
+        text: 'Test skiftet @Speaker 3',
+        ownerUserId: 'u-linked',
+        done: true,
+        dueOn: null,
+      },
+      { position: 2, text: 'Ingen ejer', ownerUserId: null, done: false, dueOn: null },
     ]);
+  });
+
+  it("takes a model's ~date into the due date, after the owner or before it", () => {
+    const md = `## Beslutninger\n\n- [ ] Saml tallene @Anne Holm ~2026-10-30\n- [ ] Test ~2026-11-02 skiftet @Speaker 3\n- [ ] Forkert ~2026-02-31\n- [ ] Ingen frist\n`;
+    const doc = liftDecisions(parseMarkdown(md), speakers);
+    expect(toMarkdown(doc)).toContain(
+      '<!-- decisions -->\n- [ ] Saml tallene [@Anne Holm](mtxt:user/u-anne) ~2026-10-30\n- [ ] Test skiftet [@Speaker 3](mtxt:speaker/sp-2) ~2026-11-02\n- [ ] Forkert \\~2026-02-31\n- [ ] Ingen frist\n<!-- /decisions -->',
+    );
+    expect(decisionRows(doc).map((r) => [r.text, r.dueOn])).toEqual([
+      ['Saml tallene @Anne Holm', '2026-10-30'],
+      ['Test skiftet @Speaker 3', '2026-11-02'],
+      ['Forkert ~2026-02-31', null],
+      ['Ingen frist', null],
+    ]);
+  });
+
+  it('decides each due date from the words, against the meeting day', () => {
+    const md = `<!-- decisions -->\n- [ ] Test skiftet på torsdag ~2026-10-23\n- [ ] Saml tallene ~2026-11-02\n- [ ] Næste fredag ~2026-10-23\n- [ ] Gammel ~2026-01-01\n<!-- /decisions -->\n`;
+    const doc = withDueDates(parseMarkdown(md), '2026-10-22');
+    expect(decisionRows(doc).map((r) => r.dueOn)).toEqual(['2026-10-29', '2026-11-02', null, null]);
   });
 
   it('leaves a draft with no checklist alone, and a block that is already there', () => {
@@ -318,6 +351,42 @@ describe('the recap job', () => {
     // The same transcript's job again changes nothing.
     await runRecap(deps(db, llm, new Set(['tr-meet-1'])), job(), 1);
     expect(await listVersions(db, INSTALL, recap!.id)).toHaveLength(1);
+  });
+
+  it('lifts due dates from the words, counted from the meeting day on the install time zone', async () => {
+    const { db, raw } = await testDb();
+    seedTranscript(raw);
+    raw.exec(seedSql(INSTALL, { timeZone: 'Europe/Copenhagen' }));
+    // Wednesday 21 October 22:30 UTC is Thursday 22 October 00:30 in Copenhagen.
+    raw.exec(
+      `UPDATE meetings SET started_at = ${Date.UTC(2026, 9, 21, 22, 30)} WHERE id = 'meet-1'`,
+    );
+    const calls: string[] = [];
+    const llm = fakeLlm(async (call) => {
+      calls.push(call.user);
+      return {
+        text: fakeDraft(call.user, [
+          'Vi tester skiftet på torsdag @Anne Holm',
+          'Jeg samler tallene i morgen @Jonas Skov ~2026-10-22',
+          'Planen sendes ud @Jonas Skov ~2026-11-02',
+          'Vi tager den næste fredag ~2026-10-23',
+        ]),
+        truncated: false,
+      };
+    });
+    await runRecap(deps(db, llm), job(), 1);
+    expect(calls[0]).toMatch(/^Meeting date: Thursday 2026-10-22\n\nTemplate:/);
+    const recap = await loadRecap(db, INSTALL, 'meet-1');
+    const rows = await listDecisions(db, INSTALL, recap!.id);
+    expect(rows.map((r) => [r.text, r.dueOn])).toEqual([
+      ['Vi tester skiftet på torsdag @Anne Holm', '2026-10-29'],
+      ['Jeg samler tallene i morgen @Jonas Skov', '2026-10-23'],
+      ['Planen sendes ud @Jonas Skov', '2026-11-02'],
+      ['Vi tager den næste fredag', null],
+    ]);
+    expect(recap?.current?.bodyMd).toContain(
+      '- [ ] Vi tester skiftet på torsdag [@Anne Holm](mtxt:user/u-anne) ~2026-10-29\n',
+    );
   });
 
   it('says in the version note when it drafted from summaries of parts', async () => {

@@ -8,7 +8,8 @@
   It drafts deterministically from the request: the template's headings in
   order, each filled from the transcript, the decisions as a checklist with
   the speaker as owner, and a note callout. A control call makes the next
-  calls fail, or answer slowly.
+  calls fail, or answer slowly, or gives the decisions' words (packet 15's
+  "på torsdag" check), as a model that heard them would write them.
 */
 import { getAdapters, getEnv } from '../install';
 
@@ -27,6 +28,8 @@ interface Control {
   delayMs: number;
   /** Calls answered so far, for the chunking check. */
   calls: number;
+  /** The decisions to write instead of the first two lines of the transcript, owner and all. */
+  decisions?: string[];
 }
 
 async function allowed(request: Request) {
@@ -65,17 +68,23 @@ export async function fakeRecapControl(request: Request) {
     mode: body.mode === 'error' || body.mode === 'unauthorised' ? body.mode : 'completed',
     delayMs: Number.isInteger(body.delayMs) ? Math.min(body.delayMs!, 30_000) : 0,
     calls: 0,
+    ...(Array.isArray(body.decisions)
+      ? { decisions: body.decisions.filter((d) => typeof d === 'string').slice(0, 10) }
+      : {}),
   };
   await writeJson(`${PREFIX}/control.json`, next);
   return Response.json(next);
 }
 
 /** A recap from the request's template and transcript, the way a model would shape it. */
-export function fakeDraft(user: string): string {
+export function fakeDraft(user: string, decisions?: readonly string[]): string {
   const template = /Template:\n\n([\s\S]*?)\n\n(?:Transcript:|Summaries of)/.exec(user)?.[1] ?? '';
   const lines = user
     .split('\n')
-    .filter((l) => /^[^[\s][^:]{0,60}: /.test(l) && !l.startsWith('Part '))
+    .filter(
+      (l) =>
+        /^[^[\s][^:]{0,60}: /.test(l) && !l.startsWith('Part ') && !l.startsWith('Meeting date: '),
+    )
     .map((l) => {
       const at = l.indexOf(': ');
       return { speaker: l.slice(0, at), text: l.slice(at + 2) };
@@ -86,7 +95,8 @@ export function fakeDraft(user: string): string {
   headings.forEach((heading, i) => {
     out.push(heading, '');
     if (/beslutning|decision/i.test(heading)) {
-      lines.slice(0, 2).forEach((l) => out.push(`- [ ] ${l.text} @${l.speaker}`));
+      if (decisions?.length) decisions.forEach((d) => out.push(`- [ ] ${d}`));
+      else lines.slice(0, 2).forEach((l) => out.push(`- [ ] ${l.text} @${l.speaker}`));
       if (!lines.length) out.push('- [ ] Ingen beslutninger (unclear)');
     } else if (i === 0) {
       out.push('> [!NOTE]', `> ${said(0)}`);
@@ -110,5 +120,5 @@ export async function fakeRecapRoute(request: Request) {
   if (body.user.startsWith('Part ')) {
     return Response.json({ text: body.user.split('\n').slice(2, 40).join('\n'), truncated: false });
   }
-  return Response.json({ text: fakeDraft(body.user), truncated: false });
+  return Response.json({ text: fakeDraft(body.user, state.decisions), truncated: false });
 }
