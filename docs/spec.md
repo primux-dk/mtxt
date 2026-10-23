@@ -210,7 +210,7 @@ Each write is an audit row. There is no service identity in v1.
 
 ## Phases
 
-1. **v0.1 library, for the author's own use** in the Primux Cloudflare account. Login, upload, browser recorder, one speech-to-text adapter plus Workers AI Whisper tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention.
-2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting.
-3. **v0.3.** MCP server. OneDrive and Drive pickup.
-4. **Release.** README, a wrangler deploy that targets any Cloudflare account, a short post. Customers come after the author has used it for a while.
+1. **v0.1 library, for the author's own use** in the Primux Cloudflare account. Login, upload, browser recorder, one speech-to-text adapter plus Workers AI Whisper tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention. Built as of 2026-10-23 and running at `app.mtxt.co`.
+2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting. Built for macOS as of 2026-10-23; the Windows recorder is next.
+3. **v0.3.** MCP server. OneDrive and Drive pickup. Next as of 2026-10-23, together with Workers AI Whisper in chunks, so that a recording over 25 MiB transcribes there too.
+4. **Release.** README, a wrangler deploy that targets any Cloudflare account, a short post. Customers come after the author has used it for a while. As of 2026-10-23 the deploy tooling exists (`deploy/`); the post and the first customer wait.

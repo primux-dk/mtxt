@@ -1,10 +1,10 @@
 # mtxt
 
-Meeting transcription a company hosts itself. A small recorder on each employee's machine, one Docker app on the company's own server, and every meeting becomes a transcript and an editable recap in the company's library: private or shared inside the company, and open to the company's AI tools through MCP.
+Meeting transcription a company hosts itself. A small recorder on each employee's machine, one web app in the company's own Cloudflare account, and every meeting becomes a transcript and an editable recap in the company's library: private or shared inside the company, and open to the company's AI tools through MCP.
 
 Meetings only. No dictation.
 
-**Status: specified; the v0.1 build has started.** The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). The first install is the author's own. Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
+**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log and search. The MCP server comes next. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the macOS recorder builds; Windows comes later. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -46,6 +46,7 @@ Every page needs a company login. `apps/web/.dev.vars` holds `AUTH_SECRET`, `SET
 - `pnpm stt:compare --recording <id> --provider workers-ai` runs a second provider on a transcribed recording, stores it as a comparison transcript the app never shows, and prints both word counts and a word diff. `--persist-to` and `--vars` point it at other local state, `--remote` at the deployed install.
 - `pnpm test` runs the unit tests (Vitest). `pnpm test:e2e` builds the e2e Worker (`build:e2e`, which adds a test-only sign-in), starts `wrangler dev` on a fresh local install with the placeholder secrets in `apps/web/e2e/e2e.vars` and runs the Playwright tests; it needs Chromium for Playwright 1.63 (`pnpm --filter @mtxt/web exec playwright install chromium`).
 - Retention runs nightly from a Cron Trigger (03:00 UTC, `wrangler.jsonc`). Locally, `wrangler dev --test-scheduled` (the e2e run uses it) runs it on `GET /__scheduled`.
+- `pnpm --filter @mtxt/web check:locales` fails on a key missing in either language, a key the app does not use, or an em dash in either messages file; the unit tests run it too.
 - `pnpm typecheck`, `pnpm lint`, `pnpm check:licenses` and `pnpm check:generated` are what CI runs. After `pnpm build:cf`, `pnpm --filter @mtxt/web check:no-fakes` checks that the deployed Worker carries none of the e2e run's fake providers. `E2E_PORT` moves the e2e server off 8788 when another checkout uses it. `pnpm --filter @mtxt/web check:d1-upgrade` applies the migrations to a populated local D1 and fails if a row is lost.
 - After a schema change in `packages/adapters/src/db/schema.ts`, run `pnpm generate` and commit the new migration. After editing `packages/contract/openapi.yaml`, the same command regenerates the contract types.
 - `/design` serves the design guidelines rendered with the install's own theme values.
@@ -65,6 +66,10 @@ pnpm deploy:smoke meetings.acme.com --product "Acme Meetings"
 ```
 
 [deploy/README.md](deploy/README.md) is the runbook: prerequisites, the app registration and its redirect URI, rotating secrets, updating, backing up D1, removing an install, and what stays in the EU.
+
+## Recorder
+
+The desktop recorder is `apps/recorder`, a Tauri 2 app in Rust: microphone and system audio, the company login through the browser, a queued upload, and an optional live transcript from a local model. It builds for macOS 14.2 and later, on a Mac, with `pnpm recorder:build`; Windows comes later. [apps/recorder/README.md](apps/recorder/README.md) covers the build, signing, tests and how it works.
 
 ## Licence
 
