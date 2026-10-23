@@ -4,7 +4,7 @@ Meeting transcription a company hosts itself. A small recorder on each employee'
 
 Meetings only. No dictation.
 
-**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search and outbound webhooks. The MCP server comes next. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the macOS recorder builds; Windows comes later. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
+**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search, outbound webhooks and a REST API with personal API tokens. The MCP server comes next and wraps that API. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the macOS recorder builds; Windows comes later. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -102,6 +102,49 @@ async function verifyMtxt(rawBody: string, header: string | null, secret: string
   return crypto.subtle.verify('HMAC', key, mac, new TextEncoder().encode(`${t}.${rawBody}`));
 }
 ```
+
+## API
+
+A company's own system reads meetings, transcripts and recaps through a REST API as one user, with that user's personal API token. It sees what the user sees and nothing more; an admin's token sees nothing extra. Webhooks say when something changed; the API fetches it. [packages/contract/openapi.yaml](packages/contract/openapi.yaml) is the reference, enough to write a client from.
+
+Make a token in the library:
+
+1. Open the menu under your name at the foot of the sidebar and choose **API tokens**.
+2. Choose **New token**, give it the name of the system it is for, pick **Read only** or **Read and write**, and how long it lasts (30 days, 90 days or 1 year).
+3. Choose **Create token**, then **Copy**. The token is shown this once; the server keeps only its hash. Revoke it in the same dialog when it is no longer needed or has leaked.
+
+Then, with the install's hostname:
+
+```sh
+export MTXT=https://meetings.example.com
+export TOKEN=mtxt_...
+
+# The meetings you may read, newest first; pass next_cursor back as cursor for the next page.
+curl -s "$MTXT/api/v1/meetings?limit=20" -H "Authorization: Bearer $TOKEN"
+
+# One meeting's transcript: JSON with speakers and segments, or plain text.
+curl -s "$MTXT/api/v1/meetings/$ID/transcript" -H "Authorization: Bearer $TOKEN"
+curl -s "$MTXT/api/v1/meetings/$ID/transcript?format=text" -H "Authorization: Bearer $TOKEN"
+
+# The recap: JSON (body, version, decisions), markdown, or Word.
+curl -s "$MTXT/api/v1/meetings/$ID/recap" -H "Authorization: Bearer $TOKEN"
+curl -s "$MTXT/api/v1/meetings/$ID/recap?format=markdown" -H "Authorization: Bearer $TOKEN"
+curl -s -o recap.docx "$MTXT/api/v1/meetings/$ID/recap?format=docx" -H "Authorization: Bearer $TOKEN"
+```
+
+| Call                                      | Scope        | What it does                                                                                              |
+| ----------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/meetings`                    | `read`       | Meetings you may read. `view` (`all`, `mine`, `shared`, `company`, `archived`), `q`, `status`, `since`, `cursor`, `limit` |
+| `GET /api/v1/meetings/{id}`               | `read`       | One meeting with its recordings, transcript and recap state, and its readers if it is yours               |
+| `GET /api/v1/meetings/{id}/transcript`    | `read`       | `?format=json` (default) or `text`                                                                        |
+| `GET /api/v1/meetings/{id}/recap`         | `read`       | `?format=json` (default), `markdown` or `docx`                                                            |
+| `GET /api/v1/search?q=`                   | `read`       | Titles, transcripts and recaps, best match first, with a snippet                                          |
+| `PUT /api/v1/meetings/{id}/recap`         | `read_write` | Save a new version on `base_version_id`; 409 with the current version when it moved on                    |
+| `PATCH /api/v1/meetings/{id}`             | `read_write` | Set `title`, `visibility` or `keep` on your own meeting                                                   |
+| `POST /api/v1/meetings/{id}/shares`       | `read_write` | Add a reader by `user_id` or `email` to your own Shared meeting                                           |
+| `DELETE /api/v1/meetings/{id}/shares/{userId}` | `read_write` | Remove a reader                                                                                      |
+
+60 requests a minute per token; the 61st is 429 with `Retry-After`. Every GET answers with an `ETag`; send it back as `If-None-Match` for a 304 when nothing changed. Each read of one meeting through the API is in the audit log with the token's name.
 
 ## Deploy
 
