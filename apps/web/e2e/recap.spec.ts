@@ -316,6 +316,70 @@ test('a refused tick rolls back and says so; unrelated text stays (rule 2)', asy
   expect(recapRow(meetingId)!.body_md).toContain('Prosa der bliver. Igen.');
 });
 
+test('a refused save rolls back its own ticks, even after an earlier save landed (rule 2)', async ({
+  page,
+}) => {
+  await page.goto(`/meetings/${meetingId}`);
+  await expect(status(page)).toContainText('Saved');
+  const tick = page.getByRole('checkbox', { name: /^Mark as done: / }).first();
+  const was = await tick.isChecked();
+  // The first save (prose) is held; the second (with the tick) is refused.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let puts = 0;
+  await page.route('**/api/v1/meetings/*/recap', async (route) => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    puts++;
+    if (puts === 1) {
+      await held;
+      return route.continue();
+    }
+    return route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'forbidden', message: 'No.' } }),
+    });
+  });
+  await newLineAfterHeading(page);
+  await page.keyboard.type('Gemt før afkrydsningen.');
+  await expect.poll(() => puts, { timeout: 10_000 }).toBe(1);
+  await tick.click();
+  release();
+  await expect.poll(() => puts, { timeout: 10_000 }).toBe(2);
+  await expect(tick).toBeChecked({ checked: was });
+  await expect(status(page)).toContainText('the tick was undone');
+  expect(recapRow(meetingId)!.body_md).toContain('Gemt før afkrydsningen.');
+  const [row] = d1<{ done: number }>(
+    `select d.done from decisions d join recaps r on r.id = d.recap_id where r.meeting_id = '${meetingId}' and d.position = 0`,
+  );
+  expect(Boolean(row!.done)).toBe(was);
+  await page.unroute('**/api/v1/meetings/*/recap');
+});
+
+test('after the server turns an unknown mention into text, typing goes on where the caret was', async ({
+  page,
+}) => {
+  await page.goto(`/meetings/${meetingId}`);
+  await newLineAfterHeading(page);
+  await editor(page).evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData(
+      'text/html',
+      '<p>Spørg <span data-type="mention" data-id="user:nobody-here" data-label="Unknown">@Unknown</span> AFTER</p>',
+    );
+    el.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  await expect(editor(page).locator('.mention', { hasText: '@Unknown' })).toHaveCount(1);
+  // The save stores "@Unknown" as text; the editor takes it, and the caret stays after AFTER.
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+  await expect(editor(page).locator('.mention', { hasText: '@Unknown' })).toHaveCount(0);
+  await page.keyboard.type('-HERE');
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+  expect(recapRow(meetingId)!.body_md).toContain('Spørg @Unknown AFTER-HERE');
+});
+
 test('a pasted image from elsewhere becomes its alt text, with no request to its host', async ({
   page,
 }) => {
