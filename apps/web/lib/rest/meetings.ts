@@ -350,6 +350,7 @@ export async function recapJson(db: Db, installId: string, meetingId: string) {
       position: d.position,
       text: d.text,
       done: d.done,
+      dueOn: d.dueOn,
       ownerId: u.id,
       ownerName: u.name,
     })
@@ -367,6 +368,7 @@ export async function recapJson(db: Db, installId: string, meetingId: string) {
       text: x.text,
       done: x.done,
       owner: x.ownerId ? { id: x.ownerId, name: x.ownerName ?? '' } : null,
+      due_on: x.dueOn,
     })),
   };
 }

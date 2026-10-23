@@ -149,6 +149,7 @@ export async function listDecisions(db: Db, installId: string, recapId: string) 
       position: dc.position,
       text: dc.text,
       done: dc.done,
+      dueOn: dc.dueOn,
       ownerUserId: dc.ownerUserId,
       ownerName: schema.users.name,
     })
@@ -230,7 +231,14 @@ export async function writeVersion(
         : sql`r.current_version_id is null`;
   const landed = sql`exists (select 1 from recap_versions x where x.id = ${id} and x.install_id = ${installId})`;
   const json = JSON.stringify(
-    rows.map((r) => [crypto.randomUUID(), r.position, r.text, r.ownerUserId, r.done ? 1 : 0]),
+    rows.map((r) => [
+      crypto.randomUUID(),
+      r.position,
+      r.text,
+      r.ownerUserId,
+      r.done ? 1 : 0,
+      r.dueOn,
+    ]),
   );
 
   const results = await db.batch([
@@ -255,7 +263,7 @@ export async function writeVersion(
     db.insert(dc).select(
       sql`select json_extract(value, '$[0]'), ${installId}, ${input.recapId},
           json_extract(value, '$[1]'), json_extract(value, '$[2]'), json_extract(value, '$[3]'),
-          json_extract(value, '$[4]')
+          json_extract(value, '$[4]'), json_extract(value, '$[5]')
         from json_each(${json}) where ${landed}`,
     ),
   ]);

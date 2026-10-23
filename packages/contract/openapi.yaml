@@ -1362,7 +1362,7 @@ components:
     Decision:
       type: object
       additionalProperties: false
-      required: [position, text, done, owner]
+      required: [position, text, done, owner, due_on]
       properties:
         position:
           type: integer
@@ -1376,6 +1376,10 @@ components:
             - $ref: '#/components/schemas/NamedUser'
             - type: 'null'
           description: The colleague the item first mentions, if any.
+        due_on:
+          type: [string, 'null']
+          format: date
+          description: The due date, a calendar day with no time or zone; null when none is set.
     Recap:
       type: object
       additionalProperties: false
@@ -1392,7 +1396,8 @@ components:
           description: |
             Markdown. A callout is a GitHub alert, a toggle `<details>`, the
             table of contents `<!-- toc -->`, the decisions block a task list
-            between `<!-- decisions -->` and `<!-- /decisions -->`, a mention
+            between `<!-- decisions -->` and `<!-- /decisions -->` whose item
+            may end in its due date, `~2026-10-30`, a mention
             `[@Name](mtxt:user/<id>)` or `mtxt:speaker/<id>`.
         decisions:
           type: array

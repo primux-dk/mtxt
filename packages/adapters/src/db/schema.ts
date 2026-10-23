@@ -481,6 +481,8 @@ export const decisions = sqliteTable(
     text: text('text').notNull(),
     ownerUserId: text('owner_user_id').references(() => users.id),
     done: bool('done').notNull().default(false),
+    /** The due date, `YYYY-MM-DD`: a calendar day with no time and no zone. Null when none is set. */
+    dueOn: text('due_on'),
   },
   (t) => [index('decisions_recap').on(t.recapId), index('decisions_owner').on(t.ownerUserId)],
 );
@@ -590,6 +592,8 @@ export const settings = sqliteTable(
     webhookAutoSend: text('webhook_auto_send', { enum: WEBHOOK_AUTO_SEND })
       .notNull()
       .default('off'),
+    /** IANA time zone: the day a meeting falls on, for the recap's due dates. Checked by the app. */
+    timeZone: text('time_zone').notNull().default('UTC'),
   },
   () => [
     inValues('settings', 'identity_provider', IDENTITY_PROVIDERS),

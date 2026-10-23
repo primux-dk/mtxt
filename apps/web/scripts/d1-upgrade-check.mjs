@@ -179,6 +179,12 @@ try {
     throw new Error('A recorder token does not default to kind recorder.');
   const auto = query(`SELECT webhook_auto_send FROM settings LIMIT 1`)[0];
   if (auto && auto.webhook_auto_send !== 'off') throw new Error('Send automatically is not off.');
+  // Packet 15 (0011): decisions keep their rows with no due date; the time zone starts at UTC.
+  const undated = query(`SELECT id, due_on FROM decisions ORDER BY position`);
+  if (undated.length !== 2 || undated.some((d) => d.due_on !== null))
+    throw new Error('The decisions did not survive the due date column.');
+  const zone = query(`SELECT time_zone FROM settings LIMIT 1`)[0];
+  if (zone && zone.time_zone !== 'UTC') throw new Error('The time zone does not start at UTC.');
   console.log('D1 upgrade check passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });
