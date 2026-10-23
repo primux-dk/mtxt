@@ -27,6 +27,15 @@ const RASMUS = { email: 'rasmus.krogh@example.com', name: 'Rasmus Krogh', admin:
 /** Rule 13: the longest device name the page takes. */
 const LONG_NAME = 'Konferencerummet på 2. sal, bygning C, Æblehaven 14, Åbenrå 6200';
 
+/** The pairing code as the contract derives it (x-recorder-flow.pairing_code). */
+function pairing(challenge: string) {
+  const bits = createHash('sha256').update(challenge, 'ascii').digest().readUInt32BE(0) >>> 2;
+  const code = [25, 20, 15, 10, 5, 0]
+    .map((shift) => '0123456789ABCDEFGHJKMNPQRSTVWXYZ'[(bits >>> shift) & 31])
+    .join('');
+  return `${code.slice(0, 3)}-${code.slice(3)}`;
+}
+
 function pkce() {
   const verifier = randomBytes(32).toString('base64url');
   return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
@@ -78,6 +87,15 @@ test('signed out, connect, sign in, approve; the recorder polls, uploads, and Di
     new RegExp(`^Connect ${device} to .+\\?$`),
   );
   await expect(page.getByText('Signed in as')).toBeVisible();
+  // The pairing code the recorder shows too, and the warning above the buttons.
+  await expect(page.getByTestId('pairing-code')).toHaveText(
+    `Pairing code ${pairing(challenge)}. It must match the code your recorder shows.`,
+  );
+  await expect(
+    page.getByText(
+      'Only approve a connection you just started in your own recorder. If you did not, press Cancel.',
+    ),
+  ).toBeVisible();
   await expect(page.getByText(LONE.email)).toBeVisible();
   // Rule 10: Approve is the one primary.
   await expect(page.locator('[data-variant="primary"]')).toHaveCount(1);
@@ -200,7 +218,7 @@ test('a wrong verifier, Cancel and an expired grant get 410 and a next step; a f
   expect(right.status()).toBe(200);
   const { token, token_id } = (await right.json()) as { token: string; token_id: string };
 
-  // Cancel: the page says what to do next; the recorder gets 410 denied, and 429 inside a second.
+  // Cancel: the page says what to do next; the recorder gets 410 denied, from one read each time.
   const second = pkce();
   await page.goto(connectUrl(second.challenge, 'Lones iMac'));
   await page.getByRole('button', { name: 'Cancel' }).click();
@@ -209,9 +227,28 @@ test('a wrong verifier, Cancel and an expired grant get 410 and a next step; a f
   const denied = await poll(request, second);
   expect(denied.status()).toBe(410);
   expect((await denied.json()).error.code).toBe('denied');
-  const fast = await poll(request, second);
+  expect((await poll(request, second)).status()).toBe(410);
+
+  // An approved grant polled twice inside a second: 429 with Retry-After, no token.
+  const busy = pkce();
+  await page.goto(connectUrl(busy.challenge, 'Lones iMac'));
+  await page.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.getByRole('heading', { name: 'Approved' })).toBeVisible();
+  // A poll just let through, as the database sees it (set ahead: the d1 call itself takes over a second).
+  d1(
+    `update recorder_grants set last_poll_at = ${Date.now() + 30_000} where challenge = '${busy.challenge}'`,
+  );
+  const fast = await poll(request, busy);
   expect(fast.status()).toBe(429);
-  expect(fast.headers()['retry-after']).toBe('1');
+  const wait = (await fast.json()) as { retry_after: number };
+  expect(Number(fast.headers()['retry-after'])).toBe(wait.retry_after);
+  expect(wait.retry_after).toBeGreaterThanOrEqual(1);
+  // Once the second has passed, the same grant issues its token: a sibling recorder for later.
+  d1(`update recorder_grants set last_poll_at = 0 where challenge = '${busy.challenge}'`);
+  const issued = await poll(request, busy);
+  expect(issued.status()).toBe(200);
+  const sibling = (await issued.json()) as { token: string; token_id: string };
+  expect(sibling.token).toMatch(/^mtxt_/);
 
   // Expired: past its 10 minutes, the page and the poll both say so.
   const third = pkce();
@@ -232,11 +269,18 @@ test('a wrong verifier, Cancel and an expired grant get 410 and a next step; a f
   await page.goto(connectUrl(third.challenge, `${LONG_NAME}x`));
   await expect(page.getByRole('heading', { name: 'This link does not work' })).toBeVisible();
 
-  // The recorder disconnects itself; another user's token id is 404; then 401.
+  // The recorder disconnects itself only: an unknown id and a sibling recorder's id are 404.
   const notMine = await request.delete('/api/v1/recorder/tokens/no-such-token', {
     headers: bearer(token),
   });
   expect(notMine.status()).toBe(404);
+  const notSibling = await request.delete(`/api/v1/recorder/tokens/${sibling.token_id}`, {
+    headers: bearer(token),
+  });
+  expect(notSibling.status()).toBe(404);
+  expect(d1(`select revoked_at from recorder_tokens where id = '${sibling.token_id}'`)).toEqual([
+    { revoked_at: null },
+  ]);
   const self = await request.delete(`/api/v1/recorder/tokens/${token_id}`, {
     headers: bearer(token),
   });
