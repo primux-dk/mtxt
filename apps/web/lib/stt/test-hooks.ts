@@ -1,6 +1,6 @@
 /*
-  The e2e run's stand-ins for the providers: a fake AssemblyAI and a fake
-  Workers AI, served by routes that exist only in an e2e build
+  The e2e run's stand-ins for the providers: a fake AssemblyAI, a fake
+  ElevenLabs and a fake Workers AI, served by routes that exist only in an e2e build
   (the route.e2e.ts files under app/api/test). The queue consumer is bundled by
   wrangler, not by Next.js, so the build-time flag the test sign-in uses
   does not reach it; these overrides are honoured only when the Worker runs
@@ -24,12 +24,18 @@ function localUrl(value: string | undefined): string | undefined {
 export interface TestEnv {
   AUTH_TEST_MODE?: string;
   ASSEMBLYAI_BASE_URL?: string;
+  ELEVENLABS_BASE_URL?: string;
   WORKERS_AI_FAKE_URL?: string;
 }
 
 /** The fake AssemblyAI's base URL, in a test run only. */
 export function fakeAssemblyAiUrl(env: TestEnv): string | undefined {
   return env.AUTH_TEST_MODE === '1' ? localUrl(env.ASSEMBLYAI_BASE_URL) : undefined;
+}
+
+/** The fake ElevenLabs' base URL, in a test run only. */
+export function fakeElevenLabsUrl(env: TestEnv): string | undefined {
+  return env.AUTH_TEST_MODE === '1' ? localUrl(env.ELEVENLABS_BASE_URL) : undefined;
 }
 
 /** A Whisper that answers from the fake route, in a test run only. */
@@ -55,7 +61,11 @@ export function fakeSpeech(env: TestEnv): SpeechModels | undefined {
   };
 }
 
-/** Both overrides at once, for lib/transcription/deps.ts. */
+/** Every override at once, for lib/transcription/deps.ts. */
 export function e2eOverrides(env: TestEnv) {
-  return { speech: fakeSpeech(env), assemblyAiBaseUrl: fakeAssemblyAiUrl(env) };
+  return {
+    speech: fakeSpeech(env),
+    assemblyAiBaseUrl: fakeAssemblyAiUrl(env),
+    elevenLabsBaseUrl: fakeElevenLabsUrl(env),
+  };
 }

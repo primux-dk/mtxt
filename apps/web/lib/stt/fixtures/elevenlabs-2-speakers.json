@@ -1,0 +1,385 @@
+{
+  "language_code": "dan",
+  "language_probability": 0.98,
+  "text": "Godmorgen alle sammen. Lad os tage linje 2 først. Vi nåede de 240 enheder i går. Ugeplanen holder. Godt, så tager vi Ærø bagefter.",
+  "words": [
+    {
+      "text": "Godmorgen",
+      "start": 0.24,
+      "end": 0.81,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 0.81,
+      "end": 0.88,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "alle",
+      "start": 0.88,
+      "end": 1.1,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 1.1,
+      "end": 1.14,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "sammen.",
+      "start": 1.14,
+      "end": 1.72,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 1.72,
+      "end": 1.98,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "Lad",
+      "start": 1.98,
+      "end": 2.12,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 2.12,
+      "end": 2.16,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "os",
+      "start": 2.16,
+      "end": 2.28,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 2.28,
+      "end": 2.32,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "tage",
+      "start": 2.32,
+      "end": 2.58,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 2.58,
+      "end": 2.62,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "linje",
+      "start": 2.62,
+      "end": 2.94,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 2.94,
+      "end": 2.98,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "2",
+      "start": 2.98,
+      "end": 3.2,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 3.2,
+      "end": 3.26,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "først.",
+      "start": 3.26,
+      "end": 3.84,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 3.84,
+      "end": 4.4,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "Vi",
+      "start": 4.4,
+      "end": 4.52,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 4.52,
+      "end": 4.56,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "nåede",
+      "start": 4.56,
+      "end": 4.9,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 4.9,
+      "end": 4.94,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "de",
+      "start": 4.94,
+      "end": 5.02,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 5.02,
+      "end": 5.06,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "240",
+      "start": 5.06,
+      "end": 5.7,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 5.7,
+      "end": 5.74,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "enheder",
+      "start": 5.74,
+      "end": 6.2,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 6.2,
+      "end": 6.24,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "i",
+      "start": 6.24,
+      "end": 6.3,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 6.3,
+      "end": 6.34,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "går.",
+      "start": 6.34,
+      "end": 6.8,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 6.8,
+      "end": 8.9,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "Ugeplanen",
+      "start": 8.9,
+      "end": 9.52,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 9.52,
+      "end": 9.58,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "holder.",
+      "start": 9.58,
+      "end": 10.14,
+      "type": "word",
+      "speaker_id": "speaker_1",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 10.14,
+      "end": 10.62,
+      "type": "spacing",
+      "speaker_id": "speaker_1",
+      "logprob": 0.0
+    },
+    {
+      "text": "Godt,",
+      "start": 10.62,
+      "end": 10.96,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 10.96,
+      "end": 11.02,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "så",
+      "start": 11.02,
+      "end": 11.14,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 11.14,
+      "end": 11.18,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "tager",
+      "start": 11.18,
+      "end": 11.46,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 11.46,
+      "end": 11.5,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "vi",
+      "start": 11.5,
+      "end": 11.58,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 11.58,
+      "end": 11.64,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "Ærø",
+      "start": 11.64,
+      "end": 12.02,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    },
+    {
+      "text": " ",
+      "start": 12.02,
+      "end": 12.08,
+      "type": "spacing",
+      "speaker_id": "speaker_0",
+      "logprob": 0.0
+    },
+    {
+      "text": "bagefter.",
+      "start": 12.08,
+      "end": 12.86,
+      "type": "word",
+      "speaker_id": "speaker_0",
+      "logprob": -0.04
+    }
+  ],
+  "transcription_id": "fake-scribe-0001",
+  "audio_duration_secs": 13.4
+}

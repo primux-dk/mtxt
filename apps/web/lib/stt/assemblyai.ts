@@ -20,6 +20,7 @@ import {
   type SttWord,
   type Submitted,
 } from './types';
+import { call, failure, readJson, type FetchFn } from './http';
 
 export const ASSEMBLYAI_EU = 'https://api.eu.assemblyai.com';
 export const ASSEMBLYAI_WEBHOOK_HEADER = 'X-Mtxt-Webhook-Secret';
@@ -157,58 +158,14 @@ export function mapAssemblyAi(json: AaiTranscript, requestedLanguage: string): S
   };
 }
 
-type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
-
 /** Deadlines per call (docs/decisions.md, packet 4 review). */
 export const ASSEMBLYAI_TIMEOUTS = { uploadMs: 10 * 60_000, requestMs: 60_000 };
-
-/** An HTTP failure as a fixed reason. The body is not read: it may echo the request. */
-export function failure(status: number, call: string): SttError {
-  if (status === 401 || status === 403)
-    return new SttError('stt_auth', 'unauthorised', false, status, call);
-  if (status === 429) return new SttError('stt_failed', 'rate_limited', true, status, call);
-  if (status >= 500) return new SttError('stt_failed', 'provider_error', true, status, call);
-  if ([400, 413, 415, 422].includes(status)) {
-    return new SttError('stt_failed', 'bad_audio', false, status, call);
-  }
-  return new SttError('stt_failed', 'provider_error', false, status, call);
-}
 
 /** AssemblyAI's `error` text on a failed transcript, reduced to a reason and never kept. */
 export const reasonForError = (text: string | null | undefined) =>
   /audio|file|decod|duration|short|corrupt|format|codec|silence/i.test(text ?? '')
     ? ('bad_audio' as const)
     : ('provider_error' as const);
-
-/** A response body as JSON; a malformed one is a provider error, never its text in a message. */
-async function readJson<T>(response: Response, what: string): Promise<T> {
-  try {
-    return (await response.json()) as T;
-  } catch (error) {
-    const timeout =
-      (error as Error)?.name === 'TimeoutError' || (error as Error)?.name === 'AbortError';
-    throw new SttError(
-      'stt_failed',
-      timeout ? 'timeout' : 'provider_error',
-      true,
-      response.status,
-      what,
-    );
-  }
-}
-
-/** One call under a deadline. A network error or the deadline is worth another try. */
-async function call(fetchFn: FetchFn, url: string, init: RequestInit, what: string, ms: number) {
-  try {
-    return await fetchFn(url, { ...init, signal: AbortSignal.timeout(ms) });
-  } catch (error) {
-    const name = (error as Error)?.name;
-    if (name === 'TimeoutError' || name === 'AbortError') {
-      throw new SttError('stt_failed', 'timeout', true, undefined, what);
-    }
-    throw new SttError('stt_failed', 'provider_error', true, undefined, what);
-  }
-}
 
 export function assemblyAi(options: {
   apiKey: string;
