@@ -37,6 +37,10 @@ describe('the Word export', () => {
     expect(xml).toContain('Ansvarlig');
     expect(xml).toContain('☐ </w:t>');
     expect(xml).toContain('Test det nye skift torsdag.');
+    // The decision's due date follows its text, in grey.
+    expect(xml).toMatch(
+      /<w:color w:val="666666"\/>.*?<w:t xml:space="preserve">  ·  Due 29 Oct 2026<\/w:t>/s,
+    );
     expect(xml).toMatch(/☑ <\/w:t>.*Saml kapacitetstallene\./s);
     expect(xml).toContain('@Søren Bak');
     expect(xml).toContain('@Speaker 3');
@@ -49,6 +53,19 @@ describe('the Word export', () => {
     expect(xml.match(/Næste skridt/g)?.length).toBeGreaterThanOrEqual(2);
     expect(zip.file('word/numbering.xml')).toBeTruthy();
     expect(xml).toContain('[Tavlen efter mødet]');
+  });
+
+  it("writes a decision's due date with the label it is given, and none without one", async () => {
+    const doc = parseMarkdown(
+      '<!-- decisions -->\n- [ ] Test ~2026-10-30\n- [ ] Uden frist\n- [ ] ~2026-11-02\n<!-- /decisions -->\n',
+    );
+    const { xml } = await open(
+      await recapDocx({ doc, title: 'Møde', dueLabel: (due) => `Frist ${due}` }),
+    );
+    expect(xml).toContain('>  ·  Frist 2026-10-30</w:t>');
+    // An item with no text gets the date alone.
+    expect(xml).toContain('>Frist 2026-11-02</w:t>');
+    expect(xml.match(/Frist/g)).toHaveLength(2);
   });
 
   it('embeds an image the meeting holds', async () => {

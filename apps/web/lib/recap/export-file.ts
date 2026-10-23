@@ -1,6 +1,9 @@
 import 'server-only';
 import { and, eq, inArray } from 'drizzle-orm';
-import { schema, type Db, type Meeting, type StorageAdapter } from '@mtxt/adapters';
+import { createTranslator } from 'next-intl';
+import { readSettings, schema, type Db, type Meeting, type StorageAdapter } from '@mtxt/adapters';
+import da from '@/messages/da.json';
+import en from '@/messages/en.json';
 import { recapDocx } from './docx';
 import { MENTION_ID } from './extensions';
 import { attachment, EXPORT_TYPES, exportFileName, type ExportFormat } from './export';
@@ -9,9 +12,25 @@ import { parseMarkdown } from './markdown';
 import { loadRecap } from './store';
 
 /**
+ * "Due 30 Oct 2026" in the install's interface language. The file is the
+ * same for every reader (its ETag is a hash of it), so not the reader's.
+ */
+function dueLabel(language: 'en' | 'da') {
+  const t = createTranslator({ locale: language, messages: language === 'da' ? da : en });
+  const format = new Intl.DateTimeFormat(language === 'da' ? 'da-DK' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return (due: string) =>
+    t('recap.decision.due', { date: format.format(new Date(`${due}T00:00:00Z`)) });
+}
+
+/**
  * The recap's current version as a download: the stored markdown, or Word
- * built from the same document with colleagues under their current names
- * and only this meeting's images. Null when the recap has no version. Used
+ * built from the same document with colleagues under their current names,
+ * due dates in the install's language and only this meeting's images. Null when the recap has no version. Used
  * by the export button's route and by the webhook's signed links.
  */
 export async function recapFile(
@@ -42,6 +61,7 @@ export async function recapFile(
           .where(and(eq(schema.users.installId, installId), inArray(schema.users.id, [...ids])))
       : [];
     const byId = new Map(names.map((u) => [`user:${u.id}`, u.name]));
+    const settings = await readSettings(db, installId);
     bytes = await recapDocx({
       doc,
       title: meeting.title,
@@ -51,6 +71,7 @@ export async function recapFile(
         meeting.startedAt,
       ),
       mentionName: (mention) => byId.get(mention),
+      dueLabel: dueLabel(settings.interfaceLanguage),
       image: async (src) => {
         // Only this meeting's own images.
         const [, meetingId, file] = /\/meetings\/([^/]+)\/recap\/images\/([^/]+)$/.exec(src) ?? [];

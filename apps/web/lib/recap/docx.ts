@@ -1,7 +1,8 @@
 /*
   The recap as a Word document, built with `docx` (MIT) from the same
   document the editor shows (lib/recap/markdown.ts parses the stored body).
-  Headings, paragraphs and their marks, lists, checklists as ☐ and ☑,
+  Headings, paragraphs and their marks, lists, checklists as ☐ and ☑ (a
+  decision with its due date after the text, in grey),
   tables, callouts as shaded paragraphs, a toggle as its summary in bold
   and then its body, the table of contents as the list of headings,
   mentions as plain names, and images from the meeting's own storage.
@@ -28,7 +29,7 @@ import {
   type ParagraphChild,
 } from 'docx';
 import type { Mark, Node as PmNode } from '@tiptap/pm/model';
-import { IMAGE_SRC } from './extensions';
+import { dueDate, IMAGE_SRC } from './extensions';
 
 export interface DocxInput {
   doc: PmNode;
@@ -40,7 +41,12 @@ export interface DocxInput {
   image?: (src: string) => Promise<{ bytes: Uint8Array; type: 'png' | 'jpg' | 'gif' } | null>;
   /** The current name for a mention id (`user:<id>`); the label written in the recap otherwise. */
   mentionName?: (id: string) => string | undefined;
+  /** A decision's due date (`YYYY-MM-DD`) as words: "Due 30 Oct 2026" when not given. */
+  dueLabel?: (due: string) => string;
 }
+
+const englishDue = (due: string) =>
+  `Due ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${due}T00:00:00Z`))}`;
 
 const MONO = 'Consolas';
 const HEADINGS = [
@@ -184,15 +190,23 @@ async function listItems(
     for (let j = 0; j < item.childCount; j++) {
       const child = item.child(j);
       if (j === 0 && child.isTextblock) {
+        const due = item.type.name === 'decisionItem' ? dueDate(item.attrs.due) : null;
+        const runs = inline(child, ctx);
+        if (due) {
+          const label = (ctx.input.dueLabel ?? englishDue)(due);
+          runs.push(
+            new TextRun({ text: `${runs.length ? '  ·  ' : ''}${label}`, color: '666666' }),
+          );
+        }
         out.push(
           kind === 'check'
-            ? paragraph(inline(child, ctx), {
+            ? paragraph(runs, {
                 ...style,
                 numbering: undefined,
                 indent: (style.indent ?? 0) + INDENT,
                 prefix: item.attrs.checked ? '☑ ' : '☐ ',
               })
-            : paragraph(inline(child, ctx), {
+            : paragraph(runs, {
                 ...style,
                 indent: undefined,
                 numbering: { reference: kind, level: Math.min(level, 3), instance },
