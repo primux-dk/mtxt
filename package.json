@@ -20,7 +20,9 @@
     "db:seed": "pnpm --filter @mtxt/web db:seed",
     "check:licenses": "node scripts/check-licenses.mjs",
     "check:generated": "pnpm generate && git diff --exit-code -- packages/contract/src/types.ts packages/adapters/migrations apps/web/cloudflare-env.d.ts && test -z \"$(git status --porcelain -- packages/adapters/migrations)\"",
-    "stt:compare": "pnpm --filter @mtxt/web stt:compare"
+    "stt:compare": "pnpm --filter @mtxt/web stt:compare",
+    "deploy:install": "node deploy/install.mjs",
+    "deploy:smoke": "node deploy/smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
