@@ -46,6 +46,44 @@ describe('recap markdown', () => {
     }
     expect(toMarkdown(doc)).toBe(FIXTURE);
     expect(parseMarkdown(toMarkdown(doc)).eq(doc)).toBe(true);
+    const dues: unknown[] = [];
+    doc.descendants((n) => {
+      if (n.type.name === 'decisionItem') dues.push(n.attrs.due);
+      return true;
+    });
+    expect(dues).toEqual(['2026-10-29', null]);
+  });
+
+  it("keeps a decision's due date as `~YYYY-MM-DD` at the end of its first line", () => {
+    const due = (md: string) => {
+      const out: unknown[] = [];
+      parseMarkdown(md).descendants((n) => {
+        if (n.type.name === 'decisionItem') out.push([n.attrs.due, n.firstChild?.textContent]);
+        return true;
+      });
+      return out;
+    };
+    const block = (items: string) => `<!-- decisions -->\n${items}\n<!-- /decisions -->\n`;
+    // After the owner, alone, and on an item with more lines below it.
+    // textContent leaves out the mention: what is left of the text is "Test ".
+    expect(due(block('- [ ] Test [@Anne](mtxt:user/u1) ~2026-10-30'))).toEqual([
+      ['2026-10-30', 'Test '],
+    ]);
+    expect(due(block('- [x] ~2026-11-02'))).toEqual([['2026-11-02', '']]);
+    const nested = block('- [ ] Test ~2026-10-30\n\n  Mere tekst.');
+    expect(due(nested)).toEqual([['2026-10-30', 'Test']]);
+    expect(normalizeMarkdown(nested)).toBe(nested);
+    // Not a date, not last, escaped, or outside the decisions block: text, as it was written.
+    expect(due(block('- [ ] Test ~2026-02-31'))).toEqual([[null, 'Test ~2026-02-31']]);
+    expect(due(block('- [ ] Test ~2026-10-30 i morgen'))).toEqual([
+      [null, 'Test ~2026-10-30 i morgen'],
+    ]);
+    expect(due(block('- [ ] Test \\~2026-10-30'))).toEqual([[null, 'Test ~2026-10-30']]);
+    expect(due(block('- [ ] Test~2026-10-30'))).toEqual([[null, 'Test~2026-10-30']]);
+    expect(normalizeMarkdown('- [ ] Test ~2026-10-30\n')).toBe('- [ ] Test \\~2026-10-30\n');
+    // A tilde typed into the text is escaped, so it stays text after a save.
+    const typed = block('- [ ] Test \\~2026-10-30');
+    expect(normalizeMarkdown(typed)).toBe(typed);
   });
 
   it('reads plain text without markdown syntax', () => {

@@ -80,6 +80,14 @@ export const DecisionList = Node.create({
   },
 });
 
+/** `value` when it is a real calendar date written `YYYY-MM-DD`, else null: 2026-02-31 is not one. */
+export function dueDate(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return y >= 1000 && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? value : null;
+}
+
 export const DecisionItem = Node.create({
   name: 'decisionItem',
   content: 'paragraph block*',
@@ -91,6 +99,13 @@ export const DecisionItem = Node.create({
         keepOnSplit: false,
         parseHTML: (el) => el.getAttribute('data-checked') === 'true',
         renderHTML: (attrs) => ({ 'data-checked': attrs.checked ? 'true' : 'false' }),
+      },
+      /** The due date, `YYYY-MM-DD`, or null. Markdown: ` ~2026-10-30` at the end of the item's first line. */
+      due: {
+        default: null as string | null,
+        keepOnSplit: false,
+        parseHTML: (el) => dueDate(el.getAttribute('data-due')),
+        renderHTML: (attrs) => (attrs.due ? { 'data-due': attrs.due } : {}),
       },
     };
   },
