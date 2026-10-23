@@ -271,6 +271,82 @@ describe('validateSettings', () => {
   });
 });
 
+describe('validateSettings, one tab at a time (packet 14)', () => {
+  /** Only the named fields, as one tab's form sends them. */
+  const only = (names: string[], overrides: Record<string, string | string[] | null> = {}) => {
+    const full = form(overrides);
+    const data = new FormData();
+    for (const [key, value] of full.entries()) if (names.includes(key)) data.append(key, value);
+    return data;
+  };
+
+  it('saves the General tab alone, and leaves every other column out of the patch', () => {
+    const data = only([
+      'productName',
+      'companyName',
+      'themeAccent',
+      'themePrimary',
+      'interfaceLanguage',
+    ]);
+    const result = validateSettings(data, configured, SELF, ['general']);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.keys(result.patch).sort()).toEqual([
+      'companyName',
+      'interfaceLanguage',
+      'productName',
+      'themeAccent',
+      'themePrimary',
+    ]);
+    // The keyterm list, the stored keys and the admin list stay as they are.
+    expect(result.keyterms).toBeUndefined();
+    expect(result.clearSttKey).toBe(false);
+    expect(result.clearRecapKey).toBe(false);
+  });
+
+  it("reports only the tab's own fields", () => {
+    // A form with every field broken: the Sharing tab hears only about its own.
+    const broken = form({
+      productName: '',
+      adminEmails: 'x',
+      retentionAudioDays: '0',
+      keyterms: 'a,b',
+    });
+    const result = validateSettings(broken, configured, SELF, ['sharing']);
+    expect(result.ok ? {} : Object.keys(result.errors)).toEqual(['retentionAudioDays']);
+  });
+
+  it('writes the keyterm list and the key state only from the Transcription tab', () => {
+    const data = only(
+      ['sttProvider', 'sttApiKey', 'sttRegion', 'aiGatewayId', 'language', 'keyterms'],
+      {
+        sttProvider: 'workers-ai-whisper',
+      },
+    );
+    const result = validateSettings(data, configured, SELF, ['transcription']);
+    expect(result).toMatchObject({
+      ok: true,
+      patch: { sttProvider: 'workers-ai-whisper', liveTranscriptDefault: false },
+      keyterms: [{ term: 'Primux' }, { term: 'linje 2' }],
+      clearSttKey: true,
+      clearRecapKey: false,
+    });
+  });
+
+  it('checks the admin list only on the Login tab, where it still keeps the signed-in admin', () => {
+    const login = only(['identityProvider', 'oidcTenantId', 'oidcClientId', 'adminEmails'], {
+      adminEmails: 'anne@example.com',
+    });
+    expect(validateSettings(login, configured, SELF, ['login'])).toMatchObject({
+      ok: false,
+      errors: { adminEmails: { code: 'keepSelf' } },
+    });
+    const recap = only(['recapProvider', 'recapModel']);
+    const result = validateSettings(recap, configured, SELF, ['recap']);
+    expect(result.ok && Object.keys(result.patch).sort()).toEqual(['recapModel', 'recapProvider']);
+  });
+});
+
 describe('validateTemplate', () => {
   const others = [{ name: 'Produktionsmøde' }];
 

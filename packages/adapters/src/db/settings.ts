@@ -48,13 +48,14 @@ export async function bootstrapIdentity(db: Db, installId: string, values: Ident
 
 /**
  * Saves the settings page: the row, the keyterm list and the admin flag on
- * every user, in one batch. `patch` holds only the columns the page changed;
- * a secret left blank on the page is not in it.
+ * every user, in one batch. `patch` holds only the columns of the settings
+ * tab that was saved (packet 14); a secret left blank there is not in it.
+ * `terms` replaces the keyterm list when given.
  */
 export async function saveSettings(
   db: Db,
   installId: string,
-  patch: Omit<Partial<NewSettings>, 'installId'> & Pick<NewSettings, 'productName'>,
+  patch: Omit<Partial<NewSettings>, 'installId'>,
   terms?: readonly { term: string; boost: number | null }[],
 ) {
   // A saved admin list ends the first-admin bootstrap for good.
