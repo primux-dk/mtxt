@@ -20,10 +20,13 @@ export function FilterPills({
   label,
   pills,
   param = 'filter',
+  className,
 }: {
   label: string;
   pills: Pill[];
   param?: string;
+  /** Replaces the default block margins, for a list that places the pills in its own row. */
+  className?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -46,7 +49,7 @@ export function FilterPills({
     <div
       role="group"
       aria-label={label}
-      className="my-6 flex flex-wrap gap-2 max-shell:my-5 max-shell:gap-1.5"
+      className={cn('flex flex-wrap gap-2 max-shell:gap-1.5', className ?? 'my-6 max-shell:my-5')}
     >
       {pills.map((pill) => {
         const pressed = pill.value === selected;

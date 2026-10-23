@@ -12,6 +12,7 @@ export function SearchBox({
   label,
   placeholder,
   hidden = {},
+  className,
 }: {
   action: string;
   name?: string;
@@ -20,13 +21,15 @@ export function SearchBox({
   placeholder: string;
   /** Other URL state to keep when searching, for example the view. */
   hidden?: Record<string, string | undefined>;
+  /** Replaces the default width. */
+  className?: string;
 }) {
   return (
     <form
       action={action}
       method="get"
       role="search"
-      className="w-[420px] max-w-full max-shell:w-full"
+      className={className ?? 'w-[420px] max-w-full max-shell:w-full'}
     >
       {Object.entries(hidden).map(([key, value]) =>
         value ? <input key={key} type="hidden" name={key} value={value} /> : null,

@@ -57,9 +57,6 @@
     },
     "uploadAudio": "Upload audio",
     "newMeeting": "New meeting",
-    "mine": {
-      "subheading": "Meetings you recorded or uploaded."
-    },
     "filters": {
       "label": "Filters"
     },
@@ -110,12 +107,6 @@
         "body": "An archived meeting leaves the library views and waits here until you restore it."
       }
     },
-    "shared": {
-      "subheading": "Meetings colleagues shared with you."
-    },
-    "company": {
-      "subheading": "Meetings shared with the whole company."
-    },
     "range": "{from}–{to} of {total, plural, one {# meeting} other {# meetings}}",
     "pagination": {
       "label": "Pages",
@@ -124,9 +115,9 @@
       "page": "Page {page}"
     },
     "archived": {
-      "title": "Archived",
-      "subheading": "Out of the other views until you restore them.",
-      "link": "Archived meetings",
+      "title": "Archived meetings",
+      "link": "Archived",
+      "back": "Back to My meetings",
       "restore": "Restore",
       "restoreLabel": "Restore {title}",
       "restoreFailed": "Not restored. Try again."

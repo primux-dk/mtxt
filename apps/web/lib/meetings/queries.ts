@@ -200,6 +200,15 @@ export async function listMeetings(
   };
 }
 
+/** How many meetings the user has archived: the library header's "Archived" link (packet 12). */
+export async function countArchived(db: Db, installId: string, user: CurrentUser): Promise<number> {
+  const where = viewScope(installId, user, { view: 'archived', sort: 'date', page: 1 });
+  const [row] = await db.all<{ n: number }>(
+    sql`select count(*) as n from meetings m where ${where}`,
+  );
+  return Number(row?.n ?? 0);
+}
+
 /**
  * The speakers of a page of meetings, in one query: the colleague's name
  * when a speaker is linked, else the label. Install-scoped on both sides.
