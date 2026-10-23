@@ -5,6 +5,7 @@ import { foldTitle, schema, VISIBILITIES, type Visibility } from '@mtxt/adapters
 import { HttpError } from '@/lib/http-error';
 import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
 import { changeShare, changeVisibility } from '@/lib/meetings/sharing';
+import { widens } from '@/lib/webhooks/rules';
 import { queueMeetingEventQuietly } from '@/lib/webhooks/store';
 import type { Colleague } from '@/lib/meetings/queries';
 
@@ -21,8 +22,8 @@ export async function setVisibility(
       if (!VISIBILITIES.includes(visibility))
         throw new HttpError(400, 'invalid_request', 'Not a visibility.');
       const changed = await changeVisibility(db, installId, meeting, visibility);
-      // Sent only when the meeting may be sent now; a private one is not (lib/webhooks/rules.ts).
-      if (changed === 'changed') {
+      // Only when access widens, and only when the meeting may be sent now (lib/webhooks/rules.ts).
+      if (changed === 'changed' && widens(meeting.visibility, visibility)) {
         await queueMeetingEventQuietly(
           { db, installId, queue },
           { event: 'meeting.shared', meetingId: meeting.id },
@@ -43,7 +44,8 @@ export async function setShare(
       if (shared && meeting.visibility !== 'shared')
         throw new HttpError(400, 'invalid_request', 'Set the meeting to Shared first.');
       const changed = await changeShare(db, installId, meeting, userId, shared);
-      if (changed === 'changed') {
+      // A reader added widens access; a reader removed does not.
+      if (changed === 'changed' && shared) {
         await queueMeetingEventQuietly(
           { db, installId, queue },
           { event: 'meeting.shared', meetingId: meeting.id },

@@ -70,3 +70,8 @@ export function connectedLabel(endpoints: { label: string | null; enabled: boole
 /** Whether an endpoint takes an event. */
 export const takes = (endpoint: { events: readonly string[] }, event: WebhookEvent) =>
   endpoint.events.includes(event);
+
+const REACH: Record<Visibility, number> = { private: 0, shared: 1, company: 2 };
+
+/** Whether a visibility change lets more people read the meeting: only then is it `meeting.shared`. */
+export const widens = (before: Visibility, after: Visibility) => REACH[after] > REACH[before];
