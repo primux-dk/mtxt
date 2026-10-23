@@ -1,5 +1,6 @@
 import 'server-only';
 import { and, eq, inArray, or } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import {
   detachAuditRows,
   dropFromSearchStatement,
@@ -30,10 +31,16 @@ export async function assertOwnRowsOnly(db: Db, installId: string, meetingId: st
 /**
  * Deletes the meeting and everything under it, each table by name and by
  * install, in one batch (one transaction on D1), children first so no
- * cascade is left to run. Its audit rows stay, detached. Call
- * assertOwnRowsOnly first.
+ * cascade is left to run. Its audit rows stay, detached. `also` joins the
+ * same transaction: the `deleted` audit row, so the delete and its row land
+ * together or not at all. Call assertOwnRowsOnly first.
  */
-export async function deleteMeetingRows(db: Db, installId: string, meetingId: string) {
+export async function deleteMeetingRows(
+  db: Db,
+  installId: string,
+  meetingId: string,
+  also: BatchItem<'sqlite'>[] = [],
+) {
   const t = schema;
   const recs = db
     .select({ id: t.recordings.id })
@@ -91,5 +98,6 @@ export async function deleteMeetingRows(db: Db, installId: string, meetingId: st
     db
       .delete(t.meetings)
       .where(and(eq(t.meetings.id, meetingId), eq(t.meetings.installId, installId))),
+    ...also,
   ]);
 }

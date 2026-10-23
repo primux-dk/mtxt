@@ -189,6 +189,25 @@ test('visibility and sharing roll back when the server does not get them (rule 2
   await page.reload();
   await expect(visibility).toHaveValue('private');
 
+  // The audit insert fails: the change does not land either, and the screen says so.
+  d1(
+    `create trigger e2e_no_audit before insert on audit_events begin select raise(abort, 'audit down'); end`,
+  );
+  try {
+    await visibility.selectOption('company');
+    await expect(page.getByText('Visibility was not saved. It is back to Private.')).toBeVisible();
+    await expect(visibility).toHaveValue('private');
+    expect(d1(`select visibility from meetings where id = '${meetingId}'`)).toEqual([
+      { visibility: 'private' },
+    ]);
+    expect(
+      (await request.get(`/meetings/${meetingId}`, { headers: SESSION_HEADERS.newcomer })).status(),
+    ).toBe(404);
+  } finally {
+    d1(`drop trigger e2e_no_audit`);
+  }
+  await page.reload();
+
   // Shared is saved; then an add that does not arrive comes off the list again.
   await visibility.selectOption('shared');
   const dialog = page.getByRole('dialog');

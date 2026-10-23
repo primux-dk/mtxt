@@ -1,7 +1,7 @@
 'use server';
 
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import { audit, foldTitle, schema, syncSearch } from '@mtxt/adapters';
+import { auditStatement, foldTitle, schema, syncSearch } from '@mtxt/adapters';
 import { HttpError } from '@/lib/http-error';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { resetForRetry } from '@/lib/transcription/store';
@@ -57,7 +57,8 @@ export async function setArchived(meetingId: string, archived: boolean): Promise
  * uploads are aborted, every recording's audio is deleted from storage, then
  * the rows, table by table and by install, in one transaction. Storage goes
  * first, so a failure leaves the meeting in place to delete again, never
- * orphaned audio. The audit log keeps a `deleted` row with the title. The
+ * orphaned audio. The `deleted` audit row, with the title, is in the same
+ * transaction as the rows, so neither lands without the other. The
  * owner also removes a meeting retention has already emptied this way.
  */
 export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
@@ -101,13 +102,14 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
           ...(recap?.docxPath ? [recap.docxPath] : []),
         ];
         if (keys.length) await storage.delete(keys);
-        await deleteMeetingRows(db, installId, meetingId);
-        await audit(db, installId, {
-          userId: user.id,
-          meetingId: null,
-          meetingTitle: meeting.title,
-          action: 'deleted',
-        });
+        await deleteMeetingRows(db, installId, meetingId, [
+          auditStatement(db, installId, {
+            userId: user.id,
+            meetingId: null,
+            meetingTitle: meeting.title,
+            action: 'deleted',
+          }),
+        ]);
       },
       { deleted: true },
     ),

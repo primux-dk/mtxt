@@ -1,6 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { Db } from './index';
-import { auditEvents, type AuditAction, type Visibility } from './schema';
+import { auditEvents, meetings, type AuditAction, type Visibility } from './schema';
 
 /** `opened` is written at most once per user, meeting and window, so a reload does not flood the log. */
 export const OPENED_WINDOW_MS = 60 * 60 * 1000;
@@ -49,6 +49,46 @@ export async function audit(db: Db, installId: string, event: AuditEventInput): 
     )
     returning id`);
   return rows.length > 0;
+}
+
+/**
+ * The audit row of a mutation, as a statement for the mutation's own D1
+ * batch, so the change and its row land together or not at all (D1 runs a
+ * batch as one transaction). With `onlyIf`, a condition on `meetings`, the
+ * row is written only when that condition holds inside the batch: for an
+ * insert that may itself do nothing, such as a share on a meeting that is
+ * no longer Shared. `opened` goes through audit(), which deduplicates.
+ */
+export function auditStatement(db: Db, installId: string, event: AuditEventInput, onlyIf?: SQL) {
+  const row = {
+    id: crypto.randomUUID(),
+    installId,
+    userId: event.userId,
+    meetingId: event.meetingId,
+    meetingTitle: event.meetingTitle,
+    action: event.action,
+    details: (event.details ?? null) as Record<string, unknown> | null,
+    at: event.at ?? new Date(),
+  };
+  if (!onlyIf) return db.insert(auditEvents).values(row);
+  // Columns in the table's order; each value bound, selected once when the condition holds.
+  const value = <T>(v: T, column: string) => sql<T>`${v}`.as(column);
+  return db.insert(auditEvents).select(
+    db
+      .select({
+        id: value(row.id, 'id'),
+        installId: value(row.installId, 'install_id'),
+        userId: value(row.userId, 'user_id'),
+        meetingId: value(row.meetingId, 'meeting_id'),
+        meetingTitle: value(row.meetingTitle, 'meeting_title'),
+        action: value(row.action, 'action'),
+        details: value(row.details ? JSON.stringify(row.details) : null, 'details'),
+        at: value(row.at.getTime(), 'at'),
+      })
+      .from(meetings)
+      .where(onlyIf)
+      .limit(1),
+  );
 }
 
 /**

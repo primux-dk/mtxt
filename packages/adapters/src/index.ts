@@ -73,6 +73,7 @@ export type {
 export { AUDIT_ACTIONS } from './db/schema';
 export {
   audit,
+  auditStatement,
   detachAuditRows,
   OPENED_WINDOW_MS,
   type AuditDetails,
