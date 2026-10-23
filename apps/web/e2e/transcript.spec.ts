@@ -150,9 +150,11 @@ test('upload, confirm, transcribing, webhook, transcribed: segments, speakers an
     webhook_auth_header_name: 'X-Mtxt-Webhook-Secret',
   });
   expect(sent.keyterms_prompt).toEqual(expect.arrayContaining(TERMS));
-  expect(
-    d1(`select count(*) as n from transcripts where recording_id = '${ids.recordingId}'`),
-  ).toEqual([{ n: 1 }]);
+  await expect
+    .poll(() =>
+      d1(`select count(*) as n from transcripts where recording_id = '${ids.recordingId}'`),
+    )
+    .toEqual([{ n: 1 }]);
 });
 
 test('the webhook: a wrong secret is 401, a replay is acknowledged and ignored', async ({
@@ -253,9 +255,11 @@ test('rename a speaker: every line changes at once, and a refused save rolls bac
   await expect(segments(page).nth(2)).toContainText('Søren Bak');
   await expect(page.getByText('Forkert navn')).toHaveCount(0);
   await page.unroute('**/meetings/**');
-  expect(
-    d1(`select label from speakers where meeting_id = '${ids.meetingId}' and speaker_index = 2`),
-  ).toEqual([{ label: 'Søren Bak' }]);
+  await expect
+    .poll(() =>
+      d1(`select label from speakers where meeting_id = '${ids.meetingId}' and speaker_index = 2`),
+    )
+    .toEqual([{ label: 'Søren Bak' }]);
 });
 
 test('link a speaker to a colleague, and unlink', async ({ page, request }) => {
@@ -272,11 +276,13 @@ test('link a speaker to a colleague, and unlink', async ({ page, request }) => {
   await expect(dialog.getByText('Linked to Anne Holm')).toBeVisible();
   await dialog.getByRole('button', { name: 'Save' }).click();
   await expect(segments(page).first()).toContainText('AHAnne Holm');
-  expect(
-    d1(
-      `select label, user_id from speakers where meeting_id = '${ids.meetingId}' and speaker_index = 0`,
-    ),
-  ).toEqual([{ label: 'Anne Holm', user_id: 'dev-newcomer' }]);
+  await expect
+    .poll(() =>
+      d1(
+        `select label, user_id from speakers where meeting_id = '${ids.meetingId}' and speaker_index = 0`,
+      ),
+    )
+    .toEqual([{ label: 'Anne Holm', user_id: 'dev-newcomer' }]);
 
   await page
     .getByRole('button', { name: 'Anne Holm, rename or link to a colleague' })
@@ -310,9 +316,9 @@ test('a failed transcription says why, with Try again for the owner and Switch p
   await expect(alert).toContainText('Reason: The provider could not read the audio.');
   // The provider's own words never reach the page or the row.
   await expect(alert).not.toContainText('Fake AssemblyAI');
-  expect(d1(`select failure_reason from recordings where id = '${ids.recordingId}'`)).toEqual([
-    { failure_reason: 'bad_audio' },
-  ]);
+  await expect
+    .poll(() => d1(`select failure_reason from recordings where id = '${ids.recordingId}'`))
+    .toEqual([{ failure_reason: 'bad_audio' }]);
   await expect(alert).toContainText('To switch provider, ask an admin.');
   await expect(alert.getByRole('link', { name: 'Switch provider' })).toHaveCount(0);
   await settle(page);
@@ -345,9 +351,9 @@ test('a malformed provider answer that echoes the key: no key in the Worker outp
   await control(request, 'malformed');
   const ids = await upload(request, 'Ødelagt svar');
   await expect.poll(() => statusOf(request, ids.recordingId), { timeout: 30_000 }).toBe('failed');
-  expect(d1(`select failure_reason from recordings where id = '${ids.recordingId}'`)).toEqual([
-    { failure_reason: 'provider_error:200' },
-  ]);
+  await expect
+    .poll(() => d1(`select failure_reason from recordings where id = '${ids.recordingId}'`))
+    .toEqual([{ failure_reason: 'provider_error:200' }]);
   const log = readFileSync('.wrangler/e2e-worker.log', 'utf8');
   expect(log).toContain('The transcribe job failed; retrying');
   expect(log).not.toContain('e2e-assemblyai-key');
@@ -370,9 +376,11 @@ test('Workers AI Whisper: one speaker, synchronous', async ({ page, request }) =
     await expect(page.getByText('Danish · 1 speaker · Click a speaker to rename')).toBeVisible();
     await expect(segments(page).first()).toContainText('Speaker 1');
     await expect(page.locator('mark').first()).toHaveText('linje 2');
-    expect(
-      d1(`select provider, model from transcripts where recording_id = '${ids.recordingId}'`),
-    ).toEqual([{ provider: 'workers-ai-whisper', model: '@cf/openai/whisper-large-v3-turbo' }]);
+    await expect
+      .poll(() =>
+        d1(`select provider, model from transcripts where recording_id = '${ids.recordingId}'`),
+      )
+      .toEqual([{ provider: 'workers-ai-whisper', model: '@cf/openai/whisper-large-v3-turbo' }]);
   } finally {
     await useProvider('assemblyai');
   }

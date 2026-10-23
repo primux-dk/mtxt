@@ -97,11 +97,13 @@ test('the owner shares with a colleague, who then sees it; the admin does not, b
   await expect(rowsFor.filter({ hasText: 'Private → Shared' })).toContainText('Jonas Skov');
   await expect(rowsFor.filter({ hasText: 'Shared → Private' })).toContainText('1 share removed');
   // Opened once, however often Anne loaded the page and the audio.
-  expect(
-    d1(
-      `select count(*) as n from audit_events where meeting_id = '${meetingId}' and action = 'opened'`,
-    ),
-  ).toEqual([{ n: 1 }]);
+  await expect
+    .poll(() =>
+      d1(
+        `select count(*) as n from audit_events where meeting_id = '${meetingId}' and action = 'opened'`,
+      ),
+    )
+    .toEqual([{ n: 1 }]);
   // And the admin's own search does not find it.
   await page.goto('/meetings?view=company&q=hemmeligt');
   await expect(page.getByRole('heading', { name: 'No meetings match' })).toBeVisible();
@@ -197,9 +199,9 @@ test('visibility and sharing roll back when the server does not get them (rule 2
     await visibility.selectOption('company');
     await expect(page.getByText('Visibility was not saved. It is back to Private.')).toBeVisible();
     await expect(visibility).toHaveValue('private');
-    expect(d1(`select visibility from meetings where id = '${meetingId}'`)).toEqual([
-      { visibility: 'private' },
-    ]);
+    await expect
+      .poll(() => d1(`select visibility from meetings where id = '${meetingId}'`))
+      .toEqual([{ visibility: 'private' }]);
     expect(
       (await request.get(`/meetings/${meetingId}`, { headers: SESSION_HEADERS.newcomer })).status(),
     ).toBe(404);
@@ -219,9 +221,9 @@ test('visibility and sharing roll back when the server does not get them (rule 2
   await expect(dialog.getByText('Anne Holm was not added. Try again.')).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'Nobody else has access' })).toBeVisible();
   await page.unroute('**/*');
-  expect(d1(`select count(*) as n from meeting_shares where meeting_id = '${meetingId}'`)).toEqual([
-    { n: 0 },
-  ]);
+  await expect
+    .poll(() => d1(`select count(*) as n from meeting_shares where meeting_id = '${meetingId}'`))
+    .toEqual([{ n: 0 }]);
   // A retry adds her once.
   await dialog.getByRole('button', { name: 'Add Anne Holm' }).click();
   await expect(dialog.getByRole('heading', { name: '1 person has access' })).toBeVisible();
@@ -308,21 +310,25 @@ test('a delete whose audit row fails changes nothing: the audio still plays; sto
     await deleteIt();
     await expect(page.getByText('The meeting was not deleted. Try again.')).toBeVisible();
     // Nothing changed: the rows, the object, and the owner still hears it.
-    expect(d1(`select count(*) as n from meetings where id = '${meetingId}'`)).toEqual([{ n: 1 }]);
-    expect(d1(`select count(*) as n from storage_cleanup`)).toEqual([{ n: 0 }]);
-    expect(r2Has(key)).toBe(true);
+    await expect
+      .poll(() => d1(`select count(*) as n from meetings where id = '${meetingId}'`))
+      .toEqual([{ n: 1 }]);
+    await expect.poll(() => d1(`select count(*) as n from storage_cleanup`)).toEqual([{ n: 0 }]);
+    await expect.poll(() => r2Has(key)).toBe(true);
     expect((await request.get(audio, { headers: colleague })).status()).toBe(200);
   } finally {
     d1(`drop trigger e2e_no_audit`);
   }
   await page.getByRole('dialog').getByRole('button', { name: 'Delete permanently' }).click();
   await expect(page).toHaveURL(/\/meetings$/);
-  expect(r2Has(key)).toBe(false);
-  expect(d1(`select count(*) as n from storage_cleanup`)).toEqual([{ n: 0 }]);
+  await expect.poll(() => r2Has(key)).toBe(false);
+  await expect.poll(() => d1(`select count(*) as n from storage_cleanup`)).toEqual([{ n: 0 }]);
   expect((await request.get(audio, { headers: colleague })).status()).toBe(404);
-  expect(
-    d1(
-      `select count(*) as n from audit_events where action = 'deleted' and meeting_title = 'Slet mig ikke'`,
-    ),
-  ).toEqual([{ n: 1 }]);
+  await expect
+    .poll(() =>
+      d1(
+        `select count(*) as n from audit_events where action = 'deleted' and meeting_title = 'Slet mig ikke'`,
+      ),
+    )
+    .toEqual([{ n: 1 }]);
 });
