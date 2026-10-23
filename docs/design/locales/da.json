@@ -36,7 +36,7 @@
   "library.search.label": "Søg i de møder, du har adgang til",
   "library.uploadAudio": "Overfør lyd",
   "library.newMeeting": "Nyt møde",
-  "library.mine.subheading": "Møder, du har optaget eller overført.",
+  "library.archived.link": "Arkiveret",
   "library.filters.label": "Filtre",
   "library.filter.all": "Alle",
   "library.filter.thisWeek": "Denne uge",

@@ -128,7 +128,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
       </div>
       {search('mb-4 w-full shell:hidden')}
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 max-shell:flex-col max-shell:items-stretch max-shell:gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 max-shell:flex-col max-shell:flex-nowrap max-shell:items-stretch max-shell:gap-4">
         <div className="flex min-w-0 items-center gap-6 max-shell:-mx-5 max-shell:-my-1 max-shell:overflow-x-auto max-shell:px-5 max-shell:py-1 max-shell:[scrollbar-width:none]">
           <FilterPills
             label={t('filters.label')}
@@ -150,6 +150,8 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
             ) : (
               <>
                 {t('archived.link')}
+                {/* A space, so the accessible name reads "Archived 3", not "Archived3". */}
+                {archivedCount > 0 && ' '}
                 {archivedCount > 0 && (
                   <span className="tabular-nums">{format.number(archivedCount)}</span>
                 )}
