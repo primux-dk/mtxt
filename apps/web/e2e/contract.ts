@@ -19,7 +19,23 @@ const spec = parse(
   readFileSync(new URL('../../../packages/contract/openapi.yaml', import.meta.url), 'utf8'),
 ) as Spec;
 const ajv = new Ajv2020({ strict: false, allErrors: true });
+/** `format: date`: a real calendar day written YYYY-MM-DD, so 2026-02-31 is refused (packet 15 review). */
+ajv.addFormat('date', {
+  type: 'string',
+  validate: (value: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    const [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    const date = new Date(Date.UTC(y, m - 1, d));
+    return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+  },
+});
 ajv.addSchema(spec as object, 'openapi');
+
+/** Whether `value` matches the contract's `components.schemas[name]`, for the harness's own checks. */
+export function matchesSchema(name: string, value: unknown): boolean {
+  return ajv.validate({ $ref: `openapi#/components/schemas/${name}` }, value) as boolean;
+}
 
 /** `#/x` refs in a schema taken out of the document, pointed back at it. */
 const rebase = (node: unknown): unknown =>
