@@ -19,7 +19,7 @@ fn main() {
         let feed = Arc::new(LiveFeed::default());
         let seen: Arc<Mutex<Vec<LiveUpdate>>> = Arc::default();
         let s2 = seen.clone();
-        let session = LiveSession::start(dir.clone(), model.clone(), feed.clone(), move |u| s2.lock().unwrap().push(u));
+        let session = LiveSession::start(dir.clone(), model.clone(), feed.clone(), 0.0, move |u| s2.lock().unwrap().push(u));
         std::thread::sleep(Duration::from_secs(6));
         for block in samples.chunks(1600) {
             if let Some(sink) = feed.sink.lock().unwrap().as_mut() {
@@ -32,8 +32,9 @@ fn main() {
         std::thread::sleep(Duration::from_secs(3));
         let updates = seen.lock().unwrap().clone();
         let states: Vec<&str> = updates.iter().map(|u| u.state).collect();
-        let text = updates.iter().rev().find(|u| !u.lines.is_empty() || !u.partial.is_empty());
-        println!("round {round}: states {:?}; text {:?}", states.iter().collect::<std::collections::BTreeSet<_>>(), text.map(|u| (u.lines.clone(), u.partial.clone())));
+        let text: Vec<String> = updates.iter().flat_map(|u| u.append.iter().chain(u.partial.iter())).map(|l| format!("{:.1}s {}", l.at_s, l.text)).collect();
+        let reasons: Vec<String> = updates.iter().filter_map(|u| u.reason.clone()).collect();
+        println!("round {round}: states {:?}; reasons {reasons:?}; text {:?}", states.iter().collect::<std::collections::BTreeSet<_>>(), text.last());
         session.stop();
     }
 }
