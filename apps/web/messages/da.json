@@ -805,7 +805,11 @@
       "removed": "Fjernede {names}",
       "readers": "{count, plural, =0 {ingen andre har adgang} one {# person har adgang} other {# personer har adgang}}",
       "andMore": "{names} og {count} til",
-      "unknownUser": "en fjernet bruger"
+      "unknownUser": "en fjernet bruger",
+      "format": {
+        "md": "Markdown",
+        "docx": "Word"
+      }
     },
     "empty": {
       "first": {

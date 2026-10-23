@@ -53,6 +53,9 @@ export async function AuditTable({
         .filter(Boolean)
         .join(' · ');
     }
+    if (row.action === 'exported' && (d.format === 'md' || d.format === 'docx')) {
+      return t(`details.format.${d.format}`);
+    }
     return null;
   };
 

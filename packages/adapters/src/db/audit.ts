@@ -8,7 +8,9 @@ export const OPENED_WINDOW_MS = 60 * 60 * 1000;
 /** What `details` holds, per action. User ids, so a renamed colleague shows under the new name. */
 export type AuditDetails =
   | { before: Visibility; after: Visibility; sharesRemoved?: number }
-  | { before: string[]; after: string[] };
+  | { before: string[]; after: string[] }
+  /** `exported`: which file the reader took. */
+  | { format: 'md' | 'docx' };
 
 export interface AuditEventInput {
   userId: string;

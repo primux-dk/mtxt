@@ -805,7 +805,11 @@
       "removed": "Removed {names}",
       "readers": "{count, plural, =0 {nobody else has access} one {# person has access} other {# people have access}}",
       "andMore": "{names} and {count} more",
-      "unknownUser": "a removed user"
+      "unknownUser": "a removed user",
+      "format": {
+        "md": "Markdown",
+        "docx": "Word"
+      }
     },
     "empty": {
       "first": {
