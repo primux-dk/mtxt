@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, MEMBER, signIn } from './helpers';
+import { ADMIN, MEMBER, openUserMenu, signIn } from './helpers';
 
 const shot = (name: string) => `e2e/__screenshots__/${name}.png`;
 const DESKTOP = { width: 1280, height: 800 };
@@ -426,7 +426,8 @@ test('sign out ends the session', async ({ page }) => {
   await signIn(page, ADMIN);
   await page.setViewportSize(DESKTOP);
   await page.goto('/meetings');
-  await page.getByRole('button', { name: 'Sign out' }).click();
+  const menu = await openUserMenu(page);
+  await menu.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto('/meetings');
   await expect(page).toHaveURL(/\/login\?callbackUrl=%2Fmeetings$/);

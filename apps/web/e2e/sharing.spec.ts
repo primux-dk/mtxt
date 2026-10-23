@@ -10,6 +10,7 @@ import {
   SESSION_HEADERS,
   settle,
   shot,
+  signIn,
   signInHeaders,
   tabTo,
 } from './helpers';
@@ -290,16 +291,16 @@ for (const viewport of [DESKTOP, PHONE]) {
 test('with no one else in the directory, the share search says so, not that everyone has access', async ({
   page,
   context,
-  request,
 }) => {
-  // A single-user install: everyone but the newcomer is parked in another install for the test.
-  const { meetingId } = await meetingWithAudio(request, newcomer, 'Alene');
+  // A single-user install: a user of their own, and everyone else parked in another install.
+  const solo = { email: 'solo@example.com', name: 'Sofie Solo', admin: false };
+  await signIn(context.request, solo);
+  const { meetingId } = await meetingWithAudio(context.request, {}, 'Alene');
   const park = `update users set install_id = 'e2e-parked' where install_id = 'dev'
-    and email != 'anne.holm@example.com'`;
+    and email != '${solo.email}'`;
   const unpark = `update users set install_id = 'dev' where install_id = 'e2e-parked'`;
   d1(park);
   try {
-    await asUser(context, 'newcomer');
     await page.setViewportSize(DESKTOP);
     await page.goto(`/meetings/${meetingId}`);
     await page

@@ -37,19 +37,41 @@ test.describe('keyboard and focus (rule 11)', () => {
       await expectFocusRing(nav.getByRole('link', { name }));
       await page.keyboard.press('Tab');
     }
-    // Then the user slot's "Recorders" and "Sign out", and past the sidebar the page: the search field first.
-    await expectFocusRing(page.getByRole('button', { name: 'Recorders', exact: true }));
-    await page.keyboard.press('Tab');
-    await expectFocusRing(page.getByRole('button', { name: 'Sign out' }));
-    await page.keyboard.press('Tab');
-    await expect(page.getByRole('searchbox')).toBeFocused();
-    await page.keyboard.press('Tab');
-    await expectFocusRing(page.getByRole('button', { name: 'Upload audio' }));
-    await page.keyboard.press('Tab');
-    await expectFocusRing(page.getByRole('button', { name: 'New meeting' }));
+    // Then the user row: Enter opens its menu, arrows move, Escape closes it back onto the row.
+    const userRow = page.getByRole('complementary').getByRole('button', { name: /^Mette Lund/ });
+    await expectFocusRing(userRow);
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(userRow).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(userRow).toBeFocused();
+
+    // Past the sidebar the library header, left to right, then down (packet 12):
+    // search, Upload audio, New meeting; the pills, Archived; the sort.
+    const header = [
+      page.getByRole('searchbox'),
+      page.getByRole('button', { name: 'Upload audio' }),
+      page.getByRole('button', { name: 'New meeting' }),
+      page.getByRole('button', { name: /^All/ }),
+      page.getByRole('button', { name: /^Ready/ }),
+      page.getByRole('button', { name: /^In progress/ }),
+      page.getByRole('button', { name: /^Failed/ }),
+      page.getByRole('link', { name: /^Archived/ }),
+      page.getByRole('combobox', { name: 'Sort' }),
+    ];
+    for (const control of header) {
+      await page.keyboard.press('Tab');
+      await expectFocusRing(control);
+    }
 
     // Enter on a nav item navigates, and the current item is marked.
-    for (let i = 0; i < 7; i++) await page.keyboard.press('Shift+Tab');
+    for (let i = 0; i < header.length + 3; i++) await page.keyboard.press('Shift+Tab');
     await expect(nav.getByRole('link', { name: 'Shared with me' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/view=shared/);
@@ -82,6 +104,18 @@ test.describe('keyboard and focus (rule 11)', () => {
       await page.keyboard.press('Tab');
       expect(await sheet.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     }
+
+    // The user row opens the same menu inside the Sheet; Escape closes the menu, then the Sheet.
+    const userRow = sheet.getByRole('button', { name: /^Mette Lund/ });
+    await userRow.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(userRow).toBeFocused();
+    await expect(sheet).toBeVisible();
 
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
