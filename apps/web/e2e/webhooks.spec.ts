@@ -154,6 +154,10 @@ test('an admin turns on Send automatically and adds an endpoint; the secret show
   await dialog.getByRole('button', { name: 'Add endpoint' }).click();
   await expect(dialog.getByText('Use an https URL.')).toBeVisible();
   await expect(dialog.getByLabel('URL')).toHaveValue('http://alex.example.com/hooks');
+  await dialog.getByLabel('URL').fill('https://alex.example.com:8443/hooks');
+  await dialog.getByRole('button', { name: 'Add endpoint' }).click();
+  await expect(dialog.getByText('Use the standard https port, 443.')).toBeVisible();
+  await expect(dialog.getByText('https on port 443 only')).toBeVisible();
   await dialog.getByLabel('URL').fill('https://10.0.0.8/hooks');
   await dialog.getByRole('button', { name: 'Add endpoint' }).click();
   await expect(dialog.getByText(/Refused: this is a local or private address/)).toBeVisible();

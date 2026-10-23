@@ -71,9 +71,9 @@ An install can send its meetings to the company's other systems, such as a CRM o
     "owner": { "name": "Mette Lund", "email": "mette.lund@example.com" }
   },
   "links": {
-    "transcript": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.transcript.1793178900.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>",
-    "recap_markdown": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.md.1793178900.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>",
-    "recap_docx": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.docx.1793178900.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>"
+    "transcript": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.transcript.1792754100.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>",
+    "recap_markdown": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.md.1792754100.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>",
+    "recap_docx": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.docx.1792754100.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>"
   },
   "expires_at": "2026-10-23T11:15:00.000Z"
 }
