@@ -508,7 +508,11 @@ test('the sixth failed attempt parks the delivery', async ({ page, request }) =>
   await receiver(request, 500);
   await page.setViewportSize(DESKTOP);
   await page.goto(`/settings/webhooks/${endpointId}`);
-  await page.getByRole('button', { name: 'Send test event' }).first().click();
+  // Send test event is the page's one primary action (rule 10).
+  const send = page.getByRole('button', { name: 'Send test event' });
+  await expect(send).toHaveCount(1);
+  await expect(send).toHaveAttribute('data-variant', 'primary');
+  await send.click();
   await expect.poll(() => testDeliveries()[0]?.attempts, { timeout: 20_000 }).toBe(1);
   const id = testDeliveries()[0]!.id;
   await page.reload();

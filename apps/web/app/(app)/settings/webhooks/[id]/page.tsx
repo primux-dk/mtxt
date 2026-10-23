@@ -102,8 +102,9 @@ export default async function DeliveryLogPage({ params, searchParams }: Params) 
         </EmptyState>
       )}
       {rows?.length === 0 && (
+        // The page's one primary, Send test event, sits in the header; the empty state points to it.
         <EmptyState Icon={Inbox} title={tl('empty.title')} body={tl('empty.body')}>
-          <SendTest endpointId={endpoint!.id} />
+          {null}
         </EmptyState>
       )}
       {rows && rows.length > 0 && (

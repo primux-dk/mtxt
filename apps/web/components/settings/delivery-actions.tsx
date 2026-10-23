@@ -55,7 +55,7 @@ export function RetryDelivery({ deliveryId, label }: { deliveryId: string; label
   );
 }
 
-/** "Send test event" on the log page; the new row shows after a moment. */
+/** "Send test event", the log page's one primary action (rule 10); the new row shows after a moment. */
 export function SendTest({ endpointId }: { endpointId: string }) {
   const t = useTranslations('settings.webhooks');
   const router = useRouter();
@@ -64,6 +64,7 @@ export function SendTest({ endpointId }: { endpointId: string }) {
   return (
     <span className="inline-grid justify-items-start gap-1">
       <Button
+        variant="primary"
         aria-busy={pending || undefined}
         onClick={() =>
           startTransition(async () => {
