@@ -43,7 +43,12 @@ test.describe('keyboard and focus (rule 11)', () => {
     const userRow = page.getByRole('complementary').getByRole('button', { name: /^Mette Lund/ });
     await expectFocusRing(userRow);
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('menuitem')).toHaveText(['Settings', 'Recorders', 'Sign out']);
+    await expect(page.getByRole('menuitem')).toHaveText([
+      'Settings',
+      'Recorders',
+      'API tokens',
+      'Sign out',
+    ]);
     await expect(page.getByRole('menuitem', { name: 'Settings' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
@@ -145,6 +150,14 @@ test.describe('keyboard and focus (rule 11)', () => {
       'aria-selected',
       'true',
     );
+
+    // Settings again, from the page it opens: the Sheet still closes (fix 4).
+    await menu.click();
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('button', { name: /^Mette Lund/ }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page).toHaveURL(/\/settings\/general$/);
   });
 
   test('Settings is in the user menu for an admin only, and marks the row while open', async ({
@@ -170,11 +183,11 @@ test.describe('keyboard and focus (rule 11)', () => {
     await settle(page);
     await page.screenshot({ path: shot('settings-user-menu-1280') });
 
-    // A non-admin's menu has Recorders and Sign out, nothing else.
+    // A non-admin's menu has no Settings.
     await signIn(page, MEMBER);
     await page.goto('/meetings');
     await sidebar.getByRole('button', { name: /^Anne Holm/ }).click();
-    await expect(page.getByRole('menuitem')).toHaveText(['Recorders', 'Sign out']);
+    await expect(page.getByRole('menuitem')).toHaveText(['Recorders', 'API tokens', 'Sign out']);
   });
 });
 

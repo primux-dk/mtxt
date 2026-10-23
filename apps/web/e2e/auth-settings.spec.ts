@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, expectFocusRing, MEMBER, openUserMenu, SAGE, settle, signIn } from './helpers';
+import { ADMIN, d1, expectFocusRing, MEMBER, openUserMenu, SAGE, settle, signIn } from './helpers';
 
 const shot = (name: string) => `e2e/__screenshots__/${name}.png`;
 const DESKTOP = { width: 1280, height: 800 };
@@ -265,6 +265,129 @@ test('a tab with unsaved changes is marked, and leaving it asks first', async ({
   await expect(dialog).toHaveCount(0);
 });
 
+test('an edit made while a save is on its way stays unsaved (fix 1)', async ({ page }) => {
+  await signIn(page, ADMIN);
+  await page.goto('/settings/general');
+  // Hold the save's request until the second edit is typed.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/settings/general', async (route) => {
+    if (route.request().method() === 'POST') await held;
+    await route.continue();
+  });
+  await page.locator('#companyName').fill(`${COMPANY} 1`);
+  await save(page).click();
+  await page.locator('#companyName').fill(`${COMPANY} 2`);
+  release();
+  await expect(page.getByText('Settings saved.')).toHaveCount(0);
+  await expect(page.getByTestId('settings-status')).toHaveText('You have unsaved changes.');
+  await expect(page.getByTestId('unsaved-dot')).toBeVisible();
+  await expect
+    .poll(() => d1<{ v: string }>(`select company_name as v from settings`)[0]!.v)
+    .toBe(`${COMPANY} 1`);
+  await page.unroute('**/settings/general');
+
+  // Typed back to what was sent, it is the saved state.
+  await page.locator('#companyName').fill(`${COMPANY} 1`);
+  await expect(page.getByTestId('unsaved-dot')).toHaveCount(0);
+  await page.locator('#companyName').fill(COMPANY);
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await expect(page.getByTestId('unsaved-dot')).toHaveCount(0);
+});
+
+test('a secret typed while a save is on its way is kept; a saved one is cleared', async ({
+  page,
+}) => {
+  await signIn(page, ADMIN);
+  await page.goto('/settings/login');
+  const secret = page.locator('#oidcClientSecret');
+  await secret.fill('e2e-client-secret-not-a-credential');
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await expect(secret).toHaveValue('');
+  await expect(page.getByTestId('unsaved-dot')).toHaveCount(0);
+});
+
+test('every way out of unsaved changes asks: Back, the sidebar, the user menu, reload (fix 2)', async ({
+  page,
+}) => {
+  await signIn(page, ADMIN);
+  await page.setViewportSize(DESKTOP);
+  await page.goto('/meetings');
+  const sidebar = page.locator('aside').first();
+  await sidebar.getByRole('button', { name: /^Mette Lund/ }).click();
+  await page.getByRole('menuitem', { name: 'Settings' }).click();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+  const dialog = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
+
+  // Back: the dialog, and Keep editing stays with the text.
+  await page.locator('#companyName').fill(`${COMPANY} (draft)`);
+  await page.evaluate(() => history.back());
+  await expect(dialog).toContainText(
+    'The changes on General are not saved. Leaving this page discards them.',
+  );
+  await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+  await expect(page.locator('#companyName')).toHaveValue(`${COMPANY} (draft)`);
+  // Asked again on the next Back, which then goes where Back pointed.
+  await page.evaluate(() => history.back());
+  await dialog.getByRole('button', { name: 'Discard changes' }).click();
+  await expect(page).toHaveURL(/\/meetings$/);
+
+  // After a save Back is one step again: the held entry is let go.
+  await page.goto('/meetings');
+  await page.goto('/settings/general');
+  await page.locator('#companyName').fill(`${COMPANY} `);
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/\/meetings$/);
+  await expect(dialog).toHaveCount(0);
+
+  // The sidebar: asks, Keep editing returns focus to the link.
+  await page.goto('/settings/general');
+  await page.locator('#companyName').fill(`${COMPANY} (draft)`);
+  const mine = sidebar.getByRole('link', { name: 'My meetings' });
+  await mine.click();
+  await expect(dialog).toContainText('Leaving this page discards them.');
+  await page.keyboard.press('Escape');
+  await expect(mine).toBeFocused();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+
+  // The user menu's Settings and Sign out ask too.
+  const row = sidebar.getByRole('button', { name: /^Mette Lund/ });
+  await row.click();
+  await page.getByRole('menuitem', { name: 'Settings' }).click();
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(row).toBeFocused();
+  await row.click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+
+  // A new tab from the strip keeps the changes here (a real link: Ctrl or Cmd click).
+  const [other] = await Promise.all([
+    page.context().waitForEvent('page'),
+    tab(page, 'Login').click({ modifiers: ['ControlOrMeta'] }),
+  ]);
+  await expect(other).toHaveURL(/\/settings\/login$/);
+  await other.close();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('#companyName')).toHaveValue(`${COMPANY} (draft)`);
+  await expect(tab(page, 'Login')).toHaveAttribute('href', '/settings/login');
+
+  // Reload or closing the window: the browser's own prompt.
+  const prompt = page.waitForEvent('dialog');
+  void page.close({ runBeforeUnload: true });
+  const asked = await prompt;
+  expect(asked.type()).toBe('beforeunload');
+  await asked.dismiss();
+});
+
 test('an admin cookie from before an email change carries no admin rights', async ({
   page,
   browser,
@@ -411,6 +534,36 @@ test('a template add the server never gets is rolled back (rule 2)', async ({ pa
   await expect(list.getByRole('button', { name: 'Interview' })).toHaveCount(1);
 });
 
+test('a template draft marks the Recap tab and asks before it is lost (fix 3)', async ({
+  page,
+}) => {
+  await signIn(page, ADMIN);
+  await page.goto('/settings/recap');
+  const list = page.getByRole('group', { name: 'Templates' });
+  await list.getByRole('button', { name: 'New template' }).click();
+  await page.getByLabel('Template name').fill('Ugeplan');
+  await expect(tab(page, 'Recap').getByTestId('unsaved-dot')).toBeVisible();
+  // The model form itself has no change.
+  await expect(page.getByTestId('settings-status')).toHaveText(
+    'Changes apply to this installation.',
+  );
+  await tab(page, 'General').click();
+  const dialog = page.getByRole('dialog', { name: 'Discard unsaved changes?' });
+  await expect(dialog).toContainText('The changes on Recap are not saved. Opening General');
+  await dialog.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(page.getByLabel('Template name')).toHaveValue('Ugeplan');
+  // Clearing the draft is no change.
+  await page.getByLabel('Template name').fill('');
+  await expect(page.getByTestId('unsaved-dot')).toHaveCount(0);
+  // Editing a saved template's body is one.
+  await list.getByRole('button', { name: /Produktionsmøde/ }).click();
+  await page.getByLabel('Content in Markdown').fill('# Changed');
+  await expect(page.getByTestId('unsaved-dot')).toBeVisible();
+  await page.getByRole('button', { name: 'Save template' }).click();
+  await expect(page.getByText('Saved Produktionsmøde.')).toBeVisible();
+  await expect(page.getByTestId('unsaved-dot')).toHaveCount(0);
+});
+
 test('the tab strip follows the keyboard tab pattern (rule 11)', async ({ page }) => {
   await signIn(page, ADMIN);
   await page.setViewportSize(DESKTOP);
@@ -459,7 +612,6 @@ test('the tab strip follows the keyboard tab pattern (rule 11)', async ({ page }
   await expect(page).toHaveURL(/\/settings\/general$/);
 
   // Enter opens a tab: its route, selected, focus stays on it.
-  // Radix moves focus a tick after each key, so each press waits for it.
   await page.keyboard.press('ArrowRight');
   await expect(tab(page, 'Login')).toBeFocused();
   await page.keyboard.press('ArrowRight');
