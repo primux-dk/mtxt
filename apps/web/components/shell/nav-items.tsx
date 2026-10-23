@@ -1,31 +1,31 @@
 'use client';
 
-import { Building2, CalendarDays, Settings, Users } from 'lucide-react';
+import { Building2, CalendarDays, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
 
 const ITEMS = [
-  { key: 'myMeetings', href: '/meetings', path: '/meetings', view: null, Icon: CalendarDays },
+  { key: 'myMeetings', href: '/meetings', view: null, Icon: CalendarDays },
   {
     key: 'sharedWithMe',
     href: '/meetings?view=shared',
-    path: '/meetings',
     view: 'shared',
     Icon: Users,
   },
   {
     key: 'wholeCompany',
     href: '/meetings?view=company',
-    path: '/meetings',
     view: 'company',
     Icon: Building2,
   },
-  { key: 'settings', href: '/settings', path: '/settings', view: null, Icon: Settings },
 ] as const;
 
-/** The four navigation items, shared by the sidebar and the mobile Sheet. */
+/**
+ * The three navigation items, shared by the sidebar and the mobile Sheet.
+ * Settings is in the user menu, for admins (packet 14).
+ */
 export function NavItems({ label, onNavigate }: { label: string; onNavigate?: () => void }) {
   const t = useTranslations('nav');
   const pathname = usePathname();
@@ -33,12 +33,9 @@ export function NavItems({ label, onNavigate }: { label: string; onNavigate?: ()
 
   return (
     <nav aria-label={label} className="grid gap-1">
-      {ITEMS.map(({ key, href, path, view: itemView, Icon }) => {
-        // Settings covers its sub-pages (/settings/audit); the library items differ by view.
-        const current =
-          path === '/settings'
-            ? pathname === path || pathname.startsWith(`${path}/`)
-            : pathname === path && view === itemView;
+      {ITEMS.map(({ key, href, view: itemView, Icon }) => {
+        // The library items differ by view.
+        const current = pathname === '/meetings' && view === itemView;
         return (
           <Link
             key={key}

@@ -1,7 +1,8 @@
 'use client';
 
 import { Menu } from 'lucide-react';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +27,9 @@ export function MobileNav({
 }) {
   const t = useTranslations('nav');
   const [open, setOpen] = useState(false);
+  // A link from the user menu (Settings) navigates without the Sheet's own items.
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

@@ -7,6 +7,7 @@ export { Avatar };
 export interface ShellUser {
   name: string;
   email: string;
+  isAdmin: boolean;
 }
 
 async function signOutAction() {
@@ -14,7 +15,16 @@ async function signOutAction() {
   await signOut({ redirectTo: '/login' });
 }
 
-/** The signed-in user: one row with the name and the company line, opening Recorders and Sign out. */
+/**
+ * The signed-in user: one row with the name and the company line, opening
+ * Settings for an admin, Recorders and Sign out.
+ */
 export function UserSlot({ user, companyName }: { user: ShellUser; companyName?: string | null }) {
-  return <UserMenu user={{ name: user.name }} companyName={companyName} signOut={signOutAction} />;
+  return (
+    <UserMenu
+      user={{ name: user.name, isAdmin: user.isAdmin }}
+      companyName={companyName}
+      signOut={signOutAction}
+    />
+  );
 }
