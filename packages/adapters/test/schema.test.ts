@@ -64,6 +64,7 @@ describe('schema', () => {
       'segments',
       'settings',
       'speakers',
+      'storage_cleanup',
       'templates',
       'transcripts',
       'users',

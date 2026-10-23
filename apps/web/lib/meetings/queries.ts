@@ -154,8 +154,10 @@ export async function listMeetings(
     state: MeetingState | 'deleted';
     archived_at: number | null;
     deleted_at: number | null;
+    best_kind: number | null;
   }>(
     sql`${withHits}select m.id, m.title, m.started_at, m.visibility, m.archived_at, m.deleted_at,
+      ${hits ? sql`h.kind_rank` : sql`null`} as best_kind,
       r.duration_s, ${STATE_SQL} as state
       ${from} ${statusWhere} order by ${order} limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}`,
   );
@@ -173,7 +175,8 @@ export async function listMeetings(
           db,
           installId,
           query,
-          rows.filter((r) => r.deleted_at === null).map((r) => r.id),
+          // A meeting found by its title shows no snippet: the row already shows the title.
+          rows.filter((r) => r.deleted_at === null && Number(r.best_kind) !== 0).map((r) => r.id),
         )
       : new Map<string, SearchHit>();
 

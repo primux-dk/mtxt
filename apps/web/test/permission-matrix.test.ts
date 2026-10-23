@@ -229,4 +229,41 @@ describe('the permission matrix', () => {
     }
     expect(await visible()).toEqual(before);
   });
+
+  it('ranks a meeting by its best document alone; the snippet comes from that document', async () => {
+    const { db, sqlite } = setup();
+    const f = fixtures(sqlite);
+    // A: one word in its recap, twenty in one transcript segment. B: two in its recap.
+    f.meeting('A', { owner: 'owner', title: 'A', startedAt: Date.UTC(2026, 9, 3) });
+    f.meeting('B', { owner: 'owner', title: 'B', startedAt: Date.UTC(2026, 9, 1) });
+    await syncSearch(db, INSTALL, {
+      meetingId: 'A',
+      recap: { id: 'ca', bodyMd: 'Referat: omega nævnes her.' },
+      segments: [{ id: 'sa', text: Array.from({ length: 20 }, () => 'omega').join(' ') }],
+    });
+    await syncSearch(db, INSTALL, {
+      meetingId: 'B',
+      recap: { id: 'cb', bodyMd: 'Referat: omega og omega igen.' },
+    });
+    const page = await listMeetings(db, INSTALL, user('owner'), parseLibraryParams({ q: 'omega' }));
+    expect(page.rows.map((r) => r.id)).toEqual(['B', 'A']);
+    const a = page.rows.find((r) => r.id === 'A')!;
+    expect(a.snippet?.kind).toBe('recap');
+    expect(a.snippet?.snippet.split('\u0002')).toHaveLength(2);
+    // A title hit outranks both, and shows no snippet.
+    f.meeting('C', { owner: 'owner', title: 'Omega-møde', startedAt: Date.UTC(2026, 8, 1) });
+    await syncSearch(db, INSTALL, {
+      meetingId: 'C',
+      title: 'Omega-møde',
+      segments: [{ id: 'sc', text: 'omega' }],
+    });
+    const again = await listMeetings(
+      db,
+      INSTALL,
+      user('owner'),
+      parseLibraryParams({ q: 'omega' }),
+    );
+    expect(again.rows.map((r) => r.id)).toEqual(['C', 'B', 'A']);
+    expect(again.rows[0]!.snippet).toBeUndefined();
+  });
 });

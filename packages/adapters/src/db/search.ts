@@ -149,27 +149,34 @@ const MATCHED_WORDS = (column: SQL) =>
 
 /**
  * A `select meeting_id, kind_rank, hits` over every meeting in the install
- * that the search hits: the best kind of hit (title 0, recap 1, segment 2)
- * and the most matched words in one of its documents. A substring of
+ * that the search hits, describing the meeting's single best document: the
+ * best kind (title 0, recap 1, segment 2), then the most matched words in
+ * that document, then its ref. Both numbers come from that one document, so
+ * a meeting is ranked by what its snippet shows. A substring of
  * `title_folded` is a title hit too, as before the index. Not yet held to
  * what the user may see: the caller joins it to its permission scope, then
  * orders by kind_rank, hits descending and the meeting's start, then pages.
+ * searchSnippets() picks the same document.
  */
 export function searchHitsSql(installId: string, query: string | null, titleLike: string): SQL {
   // highlight() only runs inside the full-text query itself, so that query is
-  // materialised (limit -1) before it is grouped; SQLite would otherwise flatten it.
+  // materialised (limit -1) before anything groups it; SQLite would otherwise flatten it.
   const fts = query
-    ? sql`select meeting_id, ${KIND_RANK} as kind_rank, ${MATCHED_WORDS(sql`h`)} as hits
-        from (select meeting_id, kind,
+    ? sql`select meeting_id, ${KIND_RANK} as kind_rank, ${MATCHED_WORDS(sql`h`)} as hits, ref
+        from (select meeting_id, kind, ref,
             highlight(meeting_search, 5, ${SNIPPET_OPEN}, ${SNIPPET_CLOSE}) as h
           from meeting_search where meeting_search match ${query} and install_id = ${installId}
           limit -1)
       union all `
     : sql``;
-  return sql`select meeting_id, min(kind_rank) as kind_rank, max(hits) as hits from (
-      ${fts}select id as meeting_id, 0 as kind_rank, 1 as hits from meetings
-        where install_id = ${installId} and title_folded like ${titleLike} escape '\\'
-    ) group by meeting_id`;
+  return sql`select meeting_id, kind_rank, hits from (
+      select meeting_id, kind_rank, hits, row_number() over (
+        partition by meeting_id order by kind_rank, hits desc, ref) as n
+      from (
+        ${fts}select id as meeting_id, 0 as kind_rank, 1 as hits, '' as ref from meetings
+          where install_id = ${installId} and title_folded like ${titleLike} escape '\\'
+      )
+    ) where n = 1`;
 }
 
 /** Marks the snippet function puts around a hit; the page turns them into <mark>. */
@@ -188,9 +195,10 @@ export interface SearchHit {
 /**
  * The best snippet per meeting, for the meetings of one page. Call it only
  * with meetings the user may read: the page's rows have been through the
- * permission scope already. Chosen within the meeting's own documents: a
- * recap hit before a transcript hit, then the most matched words. A title
- * hit has no snippet, since the row already shows its title.
+ * permission scope already, and only for meetings whose best document is
+ * not the title, since the row shows the title. The document is the one
+ * searchHitsSql() ranks the meeting by: the best kind, then the most matched
+ * words, then its ref.
  */
 export async function searchSnippets(
   db: Db,
