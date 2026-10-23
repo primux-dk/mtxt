@@ -180,6 +180,23 @@ export const reasonForError = (text: string | null | undefined) =>
     ? ('bad_audio' as const)
     : ('provider_error' as const);
 
+/** A response body as JSON; a malformed one is a provider error, never its text in a message. */
+async function readJson<T>(response: Response, what: string): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch (error) {
+    const timeout =
+      (error as Error)?.name === 'TimeoutError' || (error as Error)?.name === 'AbortError';
+    throw new SttError(
+      'stt_failed',
+      timeout ? 'timeout' : 'provider_error',
+      true,
+      response.status,
+      what,
+    );
+  }
+}
+
 /** One call under a deadline. A network error or the deadline is worth another try. */
 async function call(fetchFn: FetchFn, url: string, init: RequestInit, what: string, ms: number) {
   try {
@@ -230,7 +247,10 @@ export function assemblyAi(options: {
         timeouts.uploadMs,
       );
       if (!upload.ok) throw failure(upload.status, 'AssemblyAI upload');
-      const { upload_url: audioUrl } = (await upload.json()) as { upload_url?: string };
+      const { upload_url: audioUrl } = await readJson<{ upload_url?: string }>(
+        upload,
+        'AssemblyAI upload',
+      );
       if (!audioUrl) {
         throw new SttError('stt_failed', 'provider_error', true, undefined, 'AssemblyAI upload');
       }
@@ -247,7 +267,7 @@ export function assemblyAi(options: {
         timeouts.requestMs,
       );
       if (!created.ok) throw failure(created.status, 'AssemblyAI transcript');
-      const body = (await created.json()) as AaiTranscript;
+      const body = await readJson<AaiTranscript>(created, 'AssemblyAI transcript');
       if (!body.id) {
         throw new SttError(
           'stt_failed',
@@ -269,7 +289,7 @@ export function assemblyAi(options: {
         timeouts.requestMs,
       );
       if (!response.ok) throw failure(response.status, 'AssemblyAI transcript');
-      const body = (await response.json()) as AaiTranscript;
+      const body = await readJson<AaiTranscript>(response, 'AssemblyAI transcript');
       if (body.status === 'completed') {
         return { kind: 'done', result: mapAssemblyAi(body, languages.get(handle) ?? 'auto') };
       }

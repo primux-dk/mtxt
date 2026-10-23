@@ -40,6 +40,7 @@ export {
   updateTemplate,
 } from './db/templates';
 export { open, seal, type SecretContext } from './secrets';
+export { describeError, redact, rememberSecret } from './redact';
 export {
   CAPTURE_SOURCES,
   IDENTITY_PROVIDERS,

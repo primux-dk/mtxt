@@ -1,4 +1,5 @@
 import type { JobHandler, JobMessage } from './queue';
+import { describeError } from './redact';
 
 /**
  * The background jobs. Messages are plain JSON so a database-backed queue in
@@ -89,7 +90,8 @@ export function routeJobs<Env>(
       try {
         await handler(job, message, env);
       } catch (error) {
-        log.error(`The ${job.type} job failed; retrying`, message.id, error);
+        // The one place a job's error is logged: reduced, never the raw message or stack.
+        log.error(`The ${job.type} job failed; retrying`, message.id, describeError(error));
         message.retry();
       }
     }
