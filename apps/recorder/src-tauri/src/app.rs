@@ -8,13 +8,14 @@ use crate::audio::recorder::{self, LiveFeed, Recording, Wanted};
 use crate::connect::{self, Pkce};
 use crate::live::{models, LiveSession, LiveUpdate};
 use crate::permissions::{self, Permission, Permissions};
-use crate::profile::{Connection, Profile};
+use crate::profile::Profile;
 use crate::queue::recovery::{inspect_file, FileCheck};
 use crate::queue::select::{self as select, Connection as Conn};
 use crate::queue::state::Owner;
 use crate::queue::store::{Damaged, ExportError, Store};
-use crate::queue::{uploader, Event, PendingReason, RecordingState, Status};
-use crate::{keychain, locale};
+use crate::queue::{uploader, Event, OnFail, PendingReason, Queue, RecordingState, Status};
+use crate::credentials::{self, Credential, Keychain, SecretStore};
+use crate::locale;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -37,8 +38,9 @@ pub struct App {
 
 pub struct Inner {
     pub profile: Profile,
-    pub token: Option<String>,
-    pub queue: Vec<RecordingState>,
+    /// The token, only while it matches the profile's binding (`credentials.rs`).
+    pub credential: Option<Credential>,
+    pub queue: Queue,
     pub active: Option<Active>,
     pub connect: Option<ConnectAttempt>,
     pub connect_error: Option<Notice>,
@@ -174,6 +176,10 @@ pub struct QueueItem {
     pub local_error: Option<String>,
     pub can_save: bool,
     pub recovered: bool,
+    /// Finished by recovery; uploads after the user says so.
+    pub needs_review: bool,
+    /// The latest change is not on the disk yet: the error.
+    pub unsaved: Option<String>,
     pub gaps: usize,
 }
 
@@ -204,7 +210,7 @@ impl App {
         let store = Store::new(&data_dir)?;
         let models_dir = data_dir.join("models");
         let profile = Profile::load(&data_dir);
-        let token = profile.host.as_deref().and_then(keychain::load);
+        let credential = credentials::restore(&profile, &Keychain);
         let loaded = store.load_all();
         let app = Arc::new(App {
             handle,
@@ -213,8 +219,8 @@ impl App {
             store,
             inner: Mutex::new(Inner {
                 profile,
-                token,
-                queue: loaded.recordings,
+                credential,
+                queue: Queue::new(loaded.recordings),
                 active: None,
                 connect: None,
                 connect_error: None,
@@ -246,7 +252,7 @@ impl App {
     /// reading it keeps both files and marks the entry Unreadable.
     fn recover_interrupted(&self) {
         let ids: Vec<String> =
-            self.lock().queue.iter().filter(|r| r.status == Status::Recording).map(|r| r.id.clone()).collect();
+            self.lock().queue.items.iter().filter(|r| r.status == Status::Recording).map(|r| r.id.clone()).collect();
         for id in ids {
             self.recover(&id);
         }
@@ -259,12 +265,13 @@ impl App {
             FileCheck::Empty => {
                 log::info!("{id}: the file holds no audio; forgotten");
                 if self.store.forget(id).is_ok() {
-                    self.lock().queue.retain(|r| r.id != id);
+                    self.lock().queue.items.retain(|r| r.id != id);
                 }
             }
             FileCheck::Readable { at, duration_s, sha256, size_bytes } => {
-                log::info!("{id}: recovered, {duration_s} s");
-                let _ = self.apply(id, Event::Stopped { at, duration_s, sha256, size_bytes });
+                log::info!("{id}: recovered, {duration_s} s; held for the user");
+                // How the recording ended is unknown: it uploads after the user says so.
+                let _ = self.apply(id, Event::Recovered { at, duration_s, sha256, size_bytes });
             }
             FileCheck::Error(error) => {
                 log::warn!("{id}: unreadable: {error}");
@@ -297,11 +304,11 @@ impl App {
                 FileCheck::Error(error) => rec.apply(Event::Unreadable { error }, Utc::now()),
             }
             match self.store.save(&rec) {
-                Ok(()) => self.lock().queue.push(rec),
+                Ok(()) => self.lock().queue.items.push(rec),
                 Err(e) => log::error!("could not list the recovered file {}: {e}", o.id),
             }
         }
-        self.lock().queue.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        self.lock().queue.items.sort_by(|a, b| b.started_at.cmp(&a.started_at));
     }
 
     pub fn language(inner: &Inner) -> &'static str {
@@ -329,8 +336,8 @@ impl App {
             "ready"
         };
         let host_label = p.host.as_deref().map(|h| h.split("://").nth(1).unwrap_or(h).to_string());
-        let queue: Vec<QueueItem> = inner.queue.iter().take(QUEUE_SHOWN).map(|r| self.item(inner, r)).collect();
-        let ask = inner.ask.as_ref().and_then(|id| inner.queue.iter().find(|r| &r.id == id)).map(|r| self.item(inner, r));
+        let queue: Vec<QueueItem> = inner.queue.items.iter().take(QUEUE_SHOWN).map(|r| self.item(inner, r)).collect();
+        let ask = inner.ask.as_ref().and_then(|id| inner.queue.items.iter().find(|r| &r.id == id)).map(|r| self.item(inner, r));
         Snapshot {
             phase,
             host: p.host.clone(),
@@ -344,7 +351,7 @@ impl App {
                 user_name: c.user_name.clone(),
                 device_name: c.device_name.clone(),
             }),
-            signed_out: p.connection.is_some() && inner.token.is_none(),
+            signed_out: p.connection.is_some() && inner.credential.is_none(),
             language: Self::language(inner),
             permissions: permissions::current(),
             permissions_asked: p.permissions_asked,
@@ -420,6 +427,8 @@ impl App {
             local_error: r.local_error.clone(),
             can_save: r.can_save_elsewhere() && self.store.audio_path(&r.id).exists(),
             recovered: r.recovered,
+            needs_review: r.needs_review,
+            unsaved: inner.queue.unsaved_error(&r.id).map(str::to_string),
             gaps: r.gaps.len(),
         }
     }
@@ -438,52 +447,27 @@ impl App {
 
     // ---------- the queue ----------
 
-    /// Write a recording's new state from the uploader, unless the user ended
-    /// it meanwhile. A state file that cannot be written undoes the change in
-    /// memory and says so; the uploader starts from the file next time.
-    pub fn put(&self, rec: &RecordingState) {
-        let failed = {
-            let mut inner = self.lock();
-            let Some(slot) = inner.queue.iter_mut().find(|r| r.id == rec.id) else { return };
-            if matches!(slot.status, Status::SavedElsewhere | Status::Deleted) && slot.status != rec.status {
-                return;
-            }
-            let before = slot.clone();
-            let snooze = slot.ask_snoozed_until.max(rec.ask_snoozed_until);
-            let days_at_snooze = slot.days_at_snooze.max(rec.days_at_snooze);
-            *slot = rec.clone();
-            slot.ask_snoozed_until = snooze;
-            slot.days_at_snooze = days_at_snooze;
-            match self.store.save(slot) {
-                Ok(()) => None,
-                Err(e) => {
-                    *slot = before;
-                    Some(e.to_string())
-                }
-            }
-        };
-        if let Some(e) = failed {
-            self.state_save_failed(&rec.id, &e);
+    /// Write a recording's new state from the uploader. A failed write keeps
+    /// the change in memory as unsaved, stops the attempt (the error goes back
+    /// to the uploader) and shows the error with Try again.
+    pub fn put(&self, rec: &RecordingState) -> Result<(), String> {
+        let result = self.lock().queue.put(&self.store, rec);
+        if let Err(e) = &result {
+            self.state_save_failed(&rec.id, e);
         }
+        result
     }
 
-    /// Apply an event and write the state file. If the write fails, the change
-    /// is undone in memory, the window says so, and the caller gets the error:
-    /// nothing that depends on the new state (a deletion) may follow.
+    /// Apply an event and write the entry. On a failed write the change is
+    /// kept as unsaved (a stop, a local failure: never lost, never uploaded
+    /// until written), and the caller gets the error, so nothing that depends
+    /// on it (a deletion) follows.
     pub fn apply(&self, id: &str, event: Event) -> Result<RecordingState, String> {
-        let result = {
-            let mut inner = self.lock();
-            let rec = inner.queue.iter_mut().find(|r| r.id == id).ok_or("no such recording")?;
-            let before = rec.clone();
-            rec.apply(event, Utc::now());
-            match self.store.save(rec) {
-                Ok(()) => Ok(rec.clone()),
-                Err(e) => {
-                    *rec = before;
-                    Err(e.to_string())
-                }
-            }
-        };
+        self.apply_with(id, event, OnFail::Keep)
+    }
+
+    pub fn apply_with(&self, id: &str, event: Event, on_fail: OnFail) -> Result<RecordingState, String> {
+        let result = self.lock().queue.apply(&self.store, id, event, Utc::now(), on_fail);
         if let Err(e) = &result {
             self.state_save_failed(id, e);
         }
@@ -495,32 +479,46 @@ impl App {
         self.lock().notice = Some(Notice::new("recorder.error.stateSave").arg("error", error));
     }
 
-    /// "Try again" on a failed state write: write every entry again.
+    /// "Try again" on a failed state write, and every tick: write the
+    /// unsaved entries again.
     pub fn retry_save(&self) {
-        let failed = {
-            let inner = self.lock();
-            inner.queue.iter().find_map(|r| self.store.save(r).err().map(|e| e.to_string()))
-        };
-        self.lock().notice = failed.map(|e| Notice::new("recorder.error.stateSave").arg("error", e));
+        let result = self.lock().queue.retry(&self.store);
+        {
+            let mut inner = self.lock();
+            match result {
+                Ok(()) => {
+                    if inner.notice.as_ref().is_some_and(|n| n.key == "recorder.error.stateSave") {
+                        inner.notice = None;
+                    }
+                }
+                Err(e) => inner.notice = Some(Notice::new("recorder.error.stateSave").arg("error", e)),
+            }
+        }
+        self.wake.notify_one();
         self.changed();
     }
 
     pub fn signed_out(&self) {
         let host = {
             let mut inner = self.lock();
-            inner.token = None;
+            inner.credential = None;
             inner.profile.host.clone()
         };
         if let Some(h) = host {
-            let _ = keychain::delete(&h);
+            let _ = Keychain.delete(&h);
         }
         self.changed();
     }
 }
 
 /// The token, the host and the user it was issued for, when connected.
+/// Only while the credential's token id is the profile's binding.
 fn credentials(inner: &Inner) -> Option<(String, String, Owner)> {
-    Some((inner.token.clone()?, inner.profile.host.clone()?, inner.profile.owner()?))
+    let c = inner.credential.as_ref()?;
+    if inner.profile.connection.as_ref()?.token_id != c.token_id {
+        return None;
+    }
+    Some((c.token.clone(), inner.profile.host.clone()?, inner.profile.owner()?))
 }
 
 // ---------- background loops ----------
@@ -540,7 +538,7 @@ pub async fn uploader_loop(app: Arc<App>) {
             let now = Utc::now();
             credentials(&inner).and_then(|(token, host, me)| {
                 let c = Conn { host: &host, user: &me };
-                select::next_upload(&inner.queue, &c, now).cloned().map(|r| (token.clone(), host.clone(), r))
+                inner.queue.next_upload(&c, now).cloned().map(|r| (token.clone(), host.clone(), r))
             })
         };
         if let Some((token, host, mut rec)) = job {
@@ -551,8 +549,9 @@ pub async fn uploader_loop(app: Arc<App>) {
                     let path = app.store.audio_path(&rec.id);
                     let app2 = app.clone();
                     let mut changed = move |r: &RecordingState| {
-                        app2.put(r);
+                        let saved = app2.put(r);
                         app2.changed();
+                        saved
                     };
                     uploader::attempt(&mut rec, &api, &token, &path, &mut changed).await
                 }
@@ -579,6 +578,7 @@ pub async fn uploader_loop(app: Arc<App>) {
             let now = Utc::now();
             inner
                 .queue
+                .items
                 .iter()
                 .filter(|r| r.is_unconfirmed())
                 .filter_map(|r| r.next_attempt_at)
@@ -599,6 +599,10 @@ pub async fn uploader_loop(app: Arc<App>) {
 /// first, and the audio removed after. A Deleted entry whose audio is still
 /// there (a removal that failed) is removed again.
 fn tick(app: &Arc<App>) {
+    // Changes that could not be written are written again first.
+    if app.lock().queue.first_unsaved_error().is_some() {
+        app.retry_save();
+    }
     let now = Utc::now();
     let mut delete = Vec::new();
     let mut ask = None;
@@ -606,7 +610,13 @@ fn tick(app: &Arc<App>) {
     let mut save_error = None;
     {
         let mut inner = app.lock();
-        for rec in inner.queue.iter_mut() {
+        let unsaved: Vec<String> =
+            inner.queue.items.iter().filter(|r| !inner.queue.is_saved(&r.id)).map(|r| r.id.clone()).collect();
+        for rec in inner.queue.items.iter_mut() {
+            // An unsaved entry waits until its state is on the disk.
+            if unsaved.contains(&rec.id) {
+                continue;
+            }
             let before = rec.clone();
             let out = rec.tick(now);
             if *rec != before {
@@ -627,11 +637,11 @@ fn tick(app: &Arc<App>) {
         if inner.ask.is_none() {
             // A question still open from before a restart comes back.
             inner.ask = ask.clone().or_else(|| {
-                inner.queue.iter().find(|r| r.status == Status::AskUser).map(|r| r.id.clone())
+                inner.queue.items.iter().find(|r| r.status == Status::AskUser).map(|r| r.id.clone())
             });
             any |= inner.ask.is_some() && ask.is_some();
         }
-        for r in inner.queue.iter().filter(|r| r.status == Status::Deleted) {
+        for r in inner.queue.items.iter().filter(|r| r.status == Status::Deleted && !unsaved.contains(&r.id)) {
             if app.store.audio_path(&r.id).exists() {
                 delete.push(r.id.clone());
             }
@@ -642,8 +652,12 @@ fn tick(app: &Arc<App>) {
         any = true;
     }
     for id in delete {
-        let deleted = app.lock().queue.iter().any(|r| r.id == id && r.status == Status::Deleted);
-        if !deleted && app.apply(&id, Event::FileDeleted).is_err() {
+        let deleted = {
+            let inner = app.lock();
+            inner.queue.items.iter().any(|r| r.id == id && r.status == Status::Deleted) && inner.queue.is_saved(&id)
+        };
+        // Deleted must be on the disk before the audio goes.
+        if !deleted && app.apply_with(&id, Event::FileDeleted, OnFail::Revert).is_err() {
             continue;
         }
         if let Err(e) = app.store.delete_audio(&id) {
@@ -667,7 +681,7 @@ async fn poll_server_status(app: &Arc<App>) {
         let cutoff = Utc::now() - chrono::Duration::hours(24);
         credentials(&inner).map(|(token, host, me)| {
             let c = Conn { host: &host, user: &me };
-            let recent: Vec<RecordingState> = select::status_targets(&inner.queue, &c, cutoff).into_iter().cloned().collect();
+            let recent: Vec<RecordingState> = inner.queue.status_targets(&c, cutoff).into_iter().cloned().collect();
             (token.clone(), host.clone(), recent)
         })
     }) else {
@@ -677,7 +691,7 @@ async fn poll_server_status(app: &Arc<App>) {
     for mut rec in recent {
         match uploader::refresh_server_status(&mut rec, &api, &token).await {
             Ok(true) => {
-                app.put(&rec);
+                let _ = app.put(&rec);
                 app.changed();
             }
             Ok(false) => {}
@@ -741,7 +755,7 @@ impl App {
             let mut inner = self.lock();
             if inner.profile.host.as_deref() != Some(&host) {
                 inner.profile.connection = None;
-                inner.token = None;
+                inner.credential = None;
             }
             inner.profile.host = Some(host.clone());
             inner.connect_error = None;
@@ -837,36 +851,35 @@ impl App {
         self.changed();
     }
 
+    /// The binding is written first, then the Keychain (`credentials::bind`).
+    /// A failed profile write aborts the connect and keeps the old binding.
     fn connected(&self, host: &str, token: crate::contract::RecorderToken, cancel: &AtomicBool) {
         if cancel.load(Ordering::SeqCst) {
             return;
         }
-        if let Err(e) = keychain::store(host, &token.token) {
-            log::error!("keychain: {e}");
+        let bound = {
+            let mut inner = self.lock();
+            let data_dir = self.data_dir.clone();
+            let save = move |p: &Profile| p.save(&data_dir);
+            let result = credentials::bind(&mut inner.profile, &save, &Keychain, host, &token);
+            match &result {
+                Ok(c) => inner.credential = Some(c.clone()),
+                // The new binding is on the disk without its token: disconnected.
+                Err(credentials::BindError::Keychain(_)) => inner.credential = None,
+                Err(credentials::BindError::Profile(_)) => {}
+            }
+            result
+        };
+        if let Err(e) = bound {
+            log::error!("connect: {e:?}");
             return self.connect_failed(cancel, Notice::new("recorder.connect.failed").arg("host", host_label(host)));
         }
         let ids: Vec<String> = {
             let mut inner = self.lock();
             inner.connect = None;
             inner.connect_error = None;
-            inner.token = Some(token.token.clone());
             inner.online = true;
-            inner.profile.host = Some(host.to_string());
-            inner.profile.connection = Some(Connection {
-                token_id: token.token_id,
-                expires_at: token.expires_at,
-                device_name: token.device_name,
-                user_id: token.user.id,
-                user_email: token.user.email,
-                user_name: token.user.name,
-                product_name: token.install.product_name,
-                theme_accent: token.install.theme_accent,
-                theme_primary: token.install.theme_primary,
-                interface_language: token.install.interface_language,
-                live_transcript_default: token.install.live_transcript_default.unwrap_or(false),
-            });
-            let _ = inner.profile.save(&self.data_dir);
-            inner.queue.iter().map(|r| r.id.clone()).collect()
+            inner.queue.items.iter().map(|r| r.id.clone()).collect()
         };
         for id in ids {
             let _ = self.apply(&id, Event::Reconnected);
@@ -884,7 +897,7 @@ impl App {
             let inner = self.lock();
             (
                 inner.profile.host.clone(),
-                inner.token.clone(),
+                inner.credential.as_ref().map(|c| c.token.clone()),
                 inner.profile.connection.as_ref().map(|c| c.token_id.clone()),
             )
         };
@@ -895,14 +908,19 @@ impl App {
                 Err(_) => return Err("recorder.disconnect.failed".into()),
             }
         }
-        if let Some(h) = &host {
-            keychain::delete(h).map_err(|_| "recorder.disconnect.failed".to_string())?;
-        }
         {
+            // The binding goes first: a Keychain entry without a binding is never used.
             let mut inner = self.lock();
-            inner.token = None;
-            inner.profile.connection = None;
-            let _ = inner.profile.save(&self.data_dir);
+            let mut next = inner.profile.clone();
+            next.connection = None;
+            next.save(&self.data_dir).map_err(|_| "recorder.disconnect.failed".to_string())?;
+            inner.profile = next;
+            inner.credential = None;
+        }
+        if let Some(h) = &host {
+            if let Err(e) = Keychain.delete(h) {
+                log::warn!("disconnect: the Keychain entry stays (unused without a binding): {e}");
+            }
         }
         self.changed();
         Ok(())
@@ -964,7 +982,7 @@ impl App {
             // does yet, and the user uploads it as themselves later.
             rec.owner = inner.profile.owner();
             self.store.save(&rec).map_err(|_| "recorder.error.file".to_string())?;
-            inner.queue.insert(0, rec);
+            inner.queue.items.insert(0, rec);
             inner.notice = None;
             inner.active = Some(Active {
                 id: id.clone(),
@@ -1010,7 +1028,7 @@ impl App {
                 {
                     let mut inner = self.lock();
                     inner.active = None;
-                    inner.queue.retain(|r| r.id != id);
+                    inner.queue.items.retain(|r| r.id != id);
                 }
                 let _ = self.store.forget(&id);
                 self.changed();
@@ -1093,7 +1111,7 @@ impl App {
         // An upload that can still make progress keeps the app in the menu bar;
         // one waiting for a person (signed out, refused) does not.
         inner.active.is_some()
-            || inner.queue.iter().any(|r| {
+            || inner.queue.items.iter().any(|r| {
                 r.is_unconfirmed()
                     && !matches!(r.pending_reason, Some(PendingReason::SignedOut) | Some(PendingReason::Rejected { .. }))
             })
@@ -1142,7 +1160,7 @@ impl App {
     /// copy, write the entry as Saved elsewhere, and only then delete the
     /// queue's own copy. Any step that fails leaves the queue as it was.
     pub fn save_elsewhere(&self, id: &str, dest: PathBuf) -> Result<(), String> {
-        let rec = self.lock().queue.iter().find(|r| r.id == id).cloned().ok_or("recorder.ask.saveFailed")?;
+        let rec = self.lock().queue.items.iter().find(|r| r.id == id).cloned().ok_or("recorder.ask.saveFailed")?;
         if !rec.can_save_elsewhere() {
             return Err("recorder.ask.saveFailed".into());
         }
@@ -1151,7 +1169,7 @@ impl App {
             ExportError::InsideQueue => "recorder.ask.insideQueue".to_string(),
             _ => "recorder.ask.saveFailed".to_string(),
         })?;
-        self.apply(id, Event::SavedElsewhere { path: dest.display().to_string() })
+        self.apply_with(id, Event::SavedElsewhere { path: dest.display().to_string() }, OnFail::Revert)
             .map_err(|_| "recorder.error.stateSave".to_string())?;
         if let Err(e) = self.store.delete_audio(id) {
             log::warn!("{id}: saved elsewhere, but the queue copy stays: {e}");
@@ -1188,8 +1206,8 @@ impl App {
             Ok(rec) => {
                 let mut inner = self.lock();
                 inner.damaged.retain(|d| d.id != id);
-                inner.queue.push(rec);
-                inner.queue.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+                inner.queue.items.push(rec);
+                inner.queue.items.sort_by(|a, b| b.started_at.cmp(&a.started_at));
             }
             Err(error) => {
                 if let Some(d) = self.lock().damaged.iter_mut().find(|d| d.id == id) {
@@ -1197,7 +1215,7 @@ impl App {
                 }
             }
         }
-        let recording = self.lock().queue.iter().any(|r| r.id == id && r.status == Status::Recording);
+        let recording = self.lock().queue.items.iter().any(|r| r.id == id && r.status == Status::Recording);
         if recording {
             self.recover(id);
         }
@@ -1220,20 +1238,27 @@ impl App {
         };
         {
             let mut inner = self.lock();
-            let rec = inner.queue.iter_mut().find(|r| r.id == id).ok_or("no such recording")?;
+            let rec = inner.queue.items.iter_mut().find(|r| r.id == id).ok_or("no such recording")?;
             if rec.owner.is_some() {
                 return Err("already owned".into());
             }
-            let before = rec.clone();
-            rec.host = host;
-            rec.apply(Event::Claim(owner), Utc::now());
-            if let Err(e) = self.store.save(rec) {
-                *rec = before;
+            let mut next = rec.clone();
+            next.host = host;
+            next.apply(Event::Claim(owner), Utc::now());
+            if let Err(e) = inner.queue.replace(&self.store, next, OnFail::Revert) {
                 drop(inner);
-                self.state_save_failed(id, &e.to_string());
+                self.state_save_failed(id, &e);
                 return Err("recorder.error.stateSave".into());
             }
         }
+        self.wake.notify_one();
+        self.changed();
+        Ok(())
+    }
+
+    /// "Upload" on a recording recovery finished: the user says it may go.
+    pub fn review(&self, id: &str) -> Result<(), String> {
+        self.apply_with(id, Event::Review, OnFail::Revert).map_err(|_| "recorder.error.stateSave".to_string())?;
         self.wake.notify_one();
         self.changed();
         Ok(())
@@ -1245,7 +1270,7 @@ impl App {
             return Err("not removable".into());
         }
         self.store.forget(id).map_err(|e| e.to_string())?;
-        self.lock().queue.retain(|r| r.id != id);
+        self.lock().queue.items.retain(|r| r.id != id);
         self.changed();
         Ok(())
     }

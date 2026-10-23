@@ -120,6 +120,10 @@ pub struct RecordingState {
     /// Found on disk without a state file.
     #[serde(default)]
     pub recovered: bool,
+    /// Finished by recovery after the app ended during a recording. Whether
+    /// the end was clean is unknown, so it uploads only after the user says so.
+    #[serde(default)]
+    pub needs_review: bool,
     #[serde(default)]
     pub gaps: Vec<Gap>,
     /// The server's recording id once `POST /recordings` answered.
@@ -173,6 +177,10 @@ pub struct RecordingState {
 pub enum Event {
     /// The capture stopped (or recovery read the file); it is finished and hashed.
     Stopped { at: DateTime<Utc>, duration_s: u64, sha256: String, size_bytes: u64 },
+    /// Recovery read a file the app left in Recording: queued, but held for the user.
+    Recovered { at: DateTime<Utc>, duration_s: u64, sha256: String, size_bytes: u64 },
+    /// The user uploads a recovered recording.
+    Review,
     /// A write failed during capture: the partial file stays, nothing is uploaded.
     FailedLocal { at: DateTime<Utc>, error: String, duration_s: u64 },
     /// Recovery could not read the file; both files stay.
@@ -235,6 +243,7 @@ impl RecordingState {
             pending_reason: None,
             local_error: None,
             recovered: false,
+            needs_review: false,
             gaps: Vec::new(),
             server_recording_id: None,
             server_meeting_id: None,
@@ -268,7 +277,7 @@ impl RecordingState {
 
     /// The uploader may start an attempt now. The caller checks the owner and the host.
     pub fn due(&self, now: DateTime<Utc>) -> bool {
-        if !self.is_unconfirmed() || self.stopped_at.is_none() || self.owner.is_none() {
+        if !self.is_unconfirmed() || self.stopped_at.is_none() || self.owner.is_none() || self.needs_review {
             return false;
         }
         match &self.pending_reason {
@@ -318,6 +327,15 @@ impl RecordingState {
                 self.next_attempt_at = None;
                 self.restart_days(at);
             }
+            Event::Recovered { at, duration_s, sha256, size_bytes } => {
+                if !matches!(self.status, Status::Recording | Status::Unreadable) {
+                    return;
+                }
+                self.status = Status::Recording;
+                self.apply(Event::Stopped { at, duration_s, sha256, size_bytes }, now);
+                self.needs_review = true;
+            }
+            Event::Review => self.needs_review = false,
             Event::FailedLocal { at, error, duration_s } => {
                 if self.status != Status::Recording {
                     return;
@@ -338,6 +356,7 @@ impl RecordingState {
             Event::Claim(owner) => {
                 if self.owner.is_none() {
                     self.owner = Some(owner);
+                    self.needs_review = false;
                     self.next_attempt_at = None;
                 }
             }
@@ -758,6 +777,17 @@ mod tests {
         r.apply(Event::Stopped { at: t0(), duration_s: 60, sha256: "aa".into(), size_bytes: 10 }, t0());
         assert_eq!(r.status, Status::Uploading);
         assert_eq!(r.local_error, None);
+    }
+
+    #[test]
+    fn a_recovered_recording_waits_for_the_user() {
+        let mut r = RecordingState::new("r".into(), "h".into(), "t".into(), t0());
+        r.owner = Some(owner());
+        r.apply(Event::Recovered { at: t0(), duration_s: 60, sha256: "aa".into(), size_bytes: 10 }, t0());
+        assert_eq!(r.status, Status::Uploading);
+        assert!(r.needs_review && !r.due(t0()));
+        r.apply(Event::Review, t0());
+        assert!(r.due(t0()));
     }
 
     #[test]

@@ -60,11 +60,18 @@ impl Profile {
             .unwrap_or_else(|| Profile { model: default_model(), ..Default::default() })
     }
 
+    /// Write atomically: a temporary file, synced, renamed, the directory synced.
     pub fn save(&self, data_dir: &Path) -> std::io::Result<()> {
+        use std::io::Write;
         let path = Self::path(data_dir);
         let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?)?;
-        std::fs::rename(tmp, path)
+        {
+            let mut f = std::fs::File::create(&tmp)?;
+            f.write_all(&serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?)?;
+            f.sync_all()?;
+        }
+        std::fs::rename(&tmp, &path)?;
+        crate::queue::store::sync_dir(data_dir)
     }
 
     pub fn live_enabled(&self) -> bool {

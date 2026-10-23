@@ -8,6 +8,7 @@ pub mod audio;
 pub mod commands;
 pub mod connect;
 pub mod contract;
+pub mod credentials;
 pub mod keychain;
 pub mod live;
 pub mod locale;
@@ -50,6 +51,7 @@ pub fn run() {
             commands::save_elsewhere,
             commands::remove_recording,
             commands::claim,
+            commands::review,
             commands::retry_unreadable,
             commands::retry_damaged,
             commands::retry_save,

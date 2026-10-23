@@ -110,6 +110,11 @@ pub fn claim(app: AppState, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn review(app: AppState, id: String) -> Result<(), String> {
+    app.review(&id)
+}
+
+#[tauri::command]
 pub fn retry_unreadable(app: AppState, id: String) {
     app.retry_unreadable(&id)
 }

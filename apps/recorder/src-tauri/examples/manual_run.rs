@@ -99,6 +99,7 @@ async fn main() {
         let outcome = attempt(&mut rec, &api, &token.token, &path, &mut |r: &RecordingState| {
             let (d, t) = r.progress();
             println!("  {:?} {d}/{t}", r.status);
+            Ok(())
         })
         .await;
         println!("attempt: {outcome:?} ({:?})", rec.pending_reason);

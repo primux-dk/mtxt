@@ -19,7 +19,12 @@ pub enum Outcome {
     Failed,
     /// The server dropped the whole file; the state is reset and may go again at once.
     Restarted,
+    /// A state write failed; the attempt stopped before its next request.
+    NotSaved,
 }
+
+/// Writes the recording's state; an error stops the attempt before the next request.
+pub type Persist<'a> = dyn FnMut(&RecordingState) -> Result<(), String> + Send + 'a;
 
 /// Waits on `busy` before a chunk counts as failed.
 const MAX_BUSY_WAITS: u32 = 60;
@@ -31,18 +36,24 @@ pub async fn attempt(
     api: &Api,
     token: &str,
     file: &Path,
-    changed: &mut (dyn FnMut(&RecordingState) + Send),
+    changed: &mut Persist<'_>,
 ) -> Outcome {
     rec.apply(Event::AttemptStarted, Utc::now());
-    changed(rec);
+    // Nothing goes to the server unless the state that leads to it is on the disk.
+    if changed(rec).is_err() {
+        return Outcome::NotSaved;
+    }
     match run(rec, api, token, file, changed).await {
         Ok(outcome) => outcome,
+        Err(Stop::NotSaved) => Outcome::NotSaved,
         Err(step) => {
             let now = Utc::now();
             let (reason, retry) = classify(&step);
             let retry_at = retry.then(|| now + backoff_after(rec.attempts + 1));
             rec.apply(Event::AttemptFailed { reason, retry_at }, now);
-            changed(rec);
+            if changed(rec).is_err() {
+                return Outcome::NotSaved;
+            }
             Outcome::Failed
         }
     }
@@ -58,6 +69,8 @@ enum Stop {
     Api(ApiError),
     /// The local file is gone or no longer matches its hash.
     File(String),
+    /// A state write failed.
+    NotSaved,
 }
 
 impl From<ApiError> for Stop {
@@ -69,6 +82,7 @@ impl From<ApiError> for Stop {
 fn classify(stop: &Stop) -> (PendingReason, bool) {
     match stop {
         Stop::File(code) => (PendingReason::Rejected { code: code.clone() }, false),
+        Stop::NotSaved => (PendingReason::Server, false),
         Stop::Api(ApiError::Network(_)) => (PendingReason::Network, true),
         Stop::Api(ApiError::Unauthorized) => (PendingReason::SignedOut, false),
         Stop::Api(e) if e.is_retryable() => (PendingReason::Server, true),
@@ -83,7 +97,7 @@ async fn run(
     api: &Api,
     token: &str,
     file: &Path,
-    changed: &mut (dyn FnMut(&RecordingState) + Send),
+    changed: &mut Persist<'_>,
 ) -> Result<Outcome, Stop> {
     let (sha256, size) = match (&rec.sha256, rec.size_bytes) {
         (Some(h), Some(s)) => (h.clone(), s),
@@ -106,7 +120,7 @@ async fn run(
             Ok(r) => match r.status.as_str() {
                 contract::status::UPLOADING => {
                     rec.apply(Event::ChunksReceived(r.chunks_received), Utc::now());
-                    changed(rec);
+                    changed(rec).map_err(|_| Stop::NotSaved)?;
                 }
                 contract::status::FAILED => return Ok(restart(rec, changed)),
                 _ => return Ok(confirmed(rec, None, &r.status, changed)),
@@ -139,7 +153,9 @@ async fn run(
             },
             Utc::now(),
         );
-        changed(rec);
+        // The server id must be on the disk before the first chunk, or a
+        // restart would create a second recording on the server.
+        changed(rec).map_err(|_| Stop::NotSaved)?;
     }
 
     let id = rec.server_recording_id.clone().expect("created above");
@@ -164,7 +180,7 @@ async fn run(
                             list.push(n);
                         }
                         rec.apply(Event::ChunksReceived(list), Utc::now());
-                        changed(rec);
+                        changed(rec).map_err(|_| Stop::NotSaved)?;
                         break;
                     }
                     Err(ApiError::Conflict(c)) if c.reason == "busy" && busy < MAX_BUSY_WAITS => {
@@ -188,7 +204,7 @@ async fn run(
                 let missing = c.missing.unwrap_or_default();
                 let held: Vec<u64> = (1..=count).filter(|n| !missing.contains(n)).collect();
                 rec.apply(Event::ChunksReceived(held), Utc::now());
-                changed(rec);
+                changed(rec).map_err(|_| Stop::NotSaved)?;
             }
             Err(ApiError::Conflict(c)) if c.reason == "not_uploading" => {
                 return after_session_gone(rec, api, token, &id, changed).await;
@@ -208,7 +224,7 @@ async fn after_session_gone(
     api: &Api,
     token: &str,
     id: &str,
-    changed: &mut (dyn FnMut(&RecordingState) + Send),
+    changed: &mut Persist<'_>,
 ) -> Result<Outcome, Stop> {
     match api.get(token, id).await {
         Ok(r) if r.confirmed_at.is_some() || matches!(r.status.as_str(), "confirmed" | "transcribing" | "transcribed") => {
@@ -223,19 +239,23 @@ fn confirmed(
     rec: &mut RecordingState,
     at: Option<&str>,
     server_status: &str,
-    changed: &mut (dyn FnMut(&RecordingState) + Send),
+    changed: &mut Persist<'_>,
 ) -> Outcome {
     let now = Utc::now();
     let at = at.and_then(|s| DateTime::parse_from_rfc3339(s).ok()).map(|d| d.with_timezone(&Utc)).unwrap_or(now);
     rec.apply(Event::Confirmed { at }, now);
     rec.apply(Event::ServerStatus(server_status.to_string()), now);
-    changed(rec);
+    if changed(rec).is_err() {
+        return Outcome::NotSaved;
+    }
     Outcome::Confirmed
 }
 
-fn restart(rec: &mut RecordingState, changed: &mut (dyn FnMut(&RecordingState) + Send)) -> Outcome {
+fn restart(rec: &mut RecordingState, changed: &mut Persist<'_>) -> Outcome {
     rec.apply(Event::Restart, Utc::now());
-    changed(rec);
+    if changed(rec).is_err() {
+        return Outcome::NotSaved;
+    }
     if rec.due(Utc::now()) {
         Outcome::Restarted
     } else {

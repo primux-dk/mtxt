@@ -55,12 +55,19 @@ struct Mock {
     deleted_tokens: Vec<String>,
     /// Every request this install received.
     requests: u32,
+    /// Bearer tokens this install accepts besides TOKEN, and every one it saw.
+    extra_tokens: Vec<String>,
+    tokens_seen: Vec<String>,
 }
 
 type S = Arc<Mutex<Mock>>;
 
-fn authed(h: &HeaderMap, m: &Mock) -> bool {
-    !m.revoked && h.get("authorization").and_then(|v| v.to_str().ok()) == Some(&format!("Bearer {TOKEN}"))
+fn authed(h: &HeaderMap, m: &mut Mock) -> bool {
+    let bearer = h.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(str::to_string);
+    if let Some(t) = &bearer {
+        m.tokens_seen.push(t.clone());
+    }
+    !m.revoked && bearer.is_some_and(|t| t == TOKEN || m.extra_tokens.contains(&t))
 }
 
 fn error(status: StatusCode, code: &str) -> Response {
@@ -80,7 +87,7 @@ fn recording_json(id: &str, r: &Rec) -> Value {
 async fn create(State(s): State<S>, h: HeaderMap, Json(body): Json<Value>) -> Response {
     let mut m = s.lock().unwrap();
     m.requests += 1;
-    if !authed(&h, &m) {
+    if !authed(&h, &mut m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
     assert_eq!(body["source"], "desktop");
@@ -105,7 +112,7 @@ async fn create(State(s): State<S>, h: HeaderMap, Json(body): Json<Value>) -> Re
 async fn chunk(State(s): State<S>, h: HeaderMap, Path((id, n)): Path<(String, u64)>, body: Bytes) -> Response {
     let mut m = s.lock().unwrap();
     m.requests += 1;
-    if !authed(&h, &m) {
+    if !authed(&h, &mut m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
     assert_eq!(h.get("content-type").unwrap(), "application/octet-stream");
@@ -132,7 +139,7 @@ async fn chunk(State(s): State<S>, h: HeaderMap, Path((id, n)): Path<(String, u6
 async fn complete(State(s): State<S>, h: HeaderMap, Path(id): Path<String>, Json(body): Json<Value>) -> Response {
     let mut m = s.lock().unwrap();
     m.requests += 1;
-    if !authed(&h, &m) {
+    if !authed(&h, &mut m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
     let forget = std::mem::take(&mut m.forget_on_complete);
@@ -168,7 +175,7 @@ async fn complete(State(s): State<S>, h: HeaderMap, Path(id): Path<String>, Json
 async fn get_rec(State(s): State<S>, h: HeaderMap, Path(id): Path<String>) -> Response {
     let mut m = s.lock().unwrap();
     m.requests += 1;
-    if !authed(&h, &m) {
+    if !authed(&h, &mut m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
     match m.recordings.get(&id) {
@@ -204,7 +211,7 @@ async fn token(State(s): State<S>, Json(body): Json<Value>) -> Response {
 async fn revoke(State(s): State<S>, h: HeaderMap, Path(id): Path<String>) -> Response {
     let mut m = s.lock().unwrap();
     m.requests += 1;
-    if !authed(&h, &m) {
+    if !authed(&h, &mut m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
     if id != "tok1" {
@@ -246,7 +253,11 @@ fn recording(origin: &str) -> (tempfile::TempDir, std::path::PathBuf, RecordingS
 async fn run(rec: &mut RecordingState, origin: &str, path: &std::path::Path) -> (Outcome, Vec<RecordingState>) {
     let api = Api::new(origin).unwrap();
     let mut seen = Vec::new();
-    let out = attempt(rec, &api, TOKEN, path, &mut |r: &RecordingState| seen.push(r.clone())).await;
+    let out = attempt(rec, &api, TOKEN, path, &mut |r: &RecordingState| {
+        seen.push(r.clone());
+        Ok(())
+    })
+    .await;
     (out, seen)
 }
 
@@ -388,7 +399,7 @@ async fn run_queue(queue: &mut [RecordingState], host: &str, user: &Owner, files
         let c = Connection { host, user };
         let Some(id) = next_upload(queue, &c, chrono::Utc::now()).map(|r| r.id.clone()) else { break };
         let rec = queue.iter_mut().find(|r| r.id == id).unwrap();
-        attempt(rec, &api, TOKEN, &files[&id], &mut |_: &RecordingState| {}).await;
+        attempt(rec, &api, TOKEN, &files[&id], &mut |_: &RecordingState| Ok(())).await;
     }
     let since = chrono::Utc::now() - chrono::Duration::hours(24);
     let c = Connection { host, user };
@@ -463,4 +474,94 @@ async fn a_confirmed_recording_whose_transcription_failed_is_not_sent_again() {
     assert_eq!(out, Outcome::Confirmed);
     assert_eq!(rec.server_status.as_deref(), Some("failed"));
     assert_eq!(state.lock().unwrap().creates, 1, "a second meeting was created");
+}
+
+#[tokio::test]
+async fn no_state_write_no_request() {
+    let (origin, state) = serve(Mock::default()).await;
+    let (_dir, path, mut rec) = recording(&origin);
+    let api = Api::new(&origin).unwrap();
+    for _ in 0..2 {
+        let out = attempt(&mut rec, &api, TOKEN, &path, &mut |_: &RecordingState| Err("No space left on device (os error 28)".to_string())).await;
+        assert_eq!(out, Outcome::NotSaved);
+    }
+    let m = state.lock().unwrap();
+    assert_eq!(m.creates, 0, "a recording was created on the server");
+    assert_eq!(m.requests, 0);
+}
+
+#[tokio::test]
+async fn a_server_id_that_cannot_be_written_stops_before_the_first_chunk() {
+    let (origin, state) = serve(Mock::default()).await;
+    let (_dir, path, mut rec) = recording(&origin);
+    let api = Api::new(&origin).unwrap();
+    let out = attempt(&mut rec, &api, TOKEN, &path, &mut |r: &RecordingState| {
+        if r.server_recording_id.is_some() { Err("disk full".into()) } else { Ok(()) }
+    })
+    .await;
+    assert_eq!(out, Outcome::NotSaved);
+    let m = state.lock().unwrap();
+    assert_eq!(m.creates, 1);
+    assert_eq!(m.puts.values().sum::<u32>(), 0, "a chunk went out before the server id was saved");
+}
+
+/// The reviewer's sequence: connected as A; reconnecting as B fails to write
+/// the profile; the app restarts. A's recording must never go out with B's
+/// token, and B's token must not be stored at all.
+#[tokio::test]
+async fn a_failed_reconnect_never_uploads_with_the_new_users_token() {
+    use mtxt_recorder::contract::{RecorderInstall, RecorderToken, RecorderUser};
+    use mtxt_recorder::credentials::{bind, restore, SecretStore};
+    use mtxt_recorder::profile::Profile;
+
+    #[derive(Default)]
+    struct Memory(std::sync::Mutex<HashMap<String, String>>);
+    impl SecretStore for Memory {
+        fn set(&self, h: &str, v: &str) -> Result<(), String> {
+            self.0.lock().unwrap().insert(h.into(), v.into());
+            Ok(())
+        }
+        fn get(&self, h: &str) -> Option<String> {
+            self.0.lock().unwrap().get(h).cloned()
+        }
+        fn delete(&self, h: &str) -> Result<(), String> {
+            self.0.lock().unwrap().remove(h);
+            Ok(())
+        }
+    }
+    let token_b = "mtxt_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    let (origin, state) = serve(Mock { extra_tokens: vec![token_b.into()], ..Default::default() }).await;
+    let issued = |token: &str, id: &str, user: &str| RecorderToken {
+        token: token.into(),
+        token_id: id.into(),
+        expires_at: "2027-04-21T00:00:00Z".into(),
+        device_name: "Mac".into(),
+        user: RecorderUser { id: user.into(), name: user.into(), email: format!("{user}@example.com") },
+        install: RecorderInstall { product_name: "P".into(), theme_accent: "#566b45".into(), theme_primary: "#111111".into(), interface_language: None, live_transcript_default: None },
+    };
+    let data = tempfile::tempdir().unwrap();
+    let keychain = Memory::default();
+    let mut profile = Profile::load(data.path());
+    let ok = |p: &Profile| p.save(data.path());
+    bind(&mut profile, &ok, &keychain, &origin, &issued(TOKEN, "tok-a", "u1")).unwrap();
+    // A's recording waits in the queue.
+    let (_dir, path, mut rec) = recording(&origin);
+    // Reconnect as B: the profile write fails.
+    let fail = |_: &Profile| Err(std::io::Error::from_raw_os_error(28));
+    assert!(bind(&mut profile, &fail, &keychain, &origin, &issued(token_b, "tok-b", "u2")).is_err());
+    // Restart: what is on the disk and in the Keychain.
+    let profile = Profile::load(data.path());
+    let credential = restore(&profile, &keychain).expect("A's binding and A's token");
+    let me = profile.owner().unwrap();
+    assert_eq!(me.user_id, "u1");
+    let c = Connection { host: &origin, user: &me };
+    let queue = [rec.clone()];
+    if next_upload(&queue, &c, chrono::Utc::now()).is_some() {
+        let api = Api::new(&origin).unwrap();
+        attempt(&mut rec, &api, &credential.token, &path, &mut |_: &RecordingState| Ok(())).await;
+    }
+    let m = state.lock().unwrap();
+    assert!(!m.tokens_seen.iter().any(|t| t == token_b), "B's token reached the install");
+    assert!(m.tokens_seen.iter().all(|t| t == TOKEN));
+    assert!(!keychain.0.lock().unwrap().values().any(|v| v.contains(token_b)), "B's token was stored");
 }
