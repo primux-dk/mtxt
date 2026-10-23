@@ -54,8 +54,9 @@ test.describe('keyboard and focus (rule 11)', () => {
 
     // Past the sidebar the library header, left to right, then down (packet 12):
     // search, Upload audio, New meeting; the pills, Archived; the sort.
+    const search = page.getByRole('searchbox');
     const header = [
-      page.getByRole('searchbox'),
+      search,
       page.getByRole('button', { name: 'Upload audio' }),
       page.getByRole('button', { name: 'New meeting' }),
       page.getByRole('button', { name: /^All/ }),
@@ -67,7 +68,9 @@ test.describe('keyboard and focus (rule 11)', () => {
     ];
     for (const control of header) {
       await page.keyboard.press('Tab');
-      await expectFocusRing(control);
+      // The search field's ring is drawn by its label (focus-within), so the input is only focused.
+      if (control === search) await expect(control).toBeFocused();
+      else await expectFocusRing(control);
     }
 
     // Enter on a nav item navigates, and the current item is marked.

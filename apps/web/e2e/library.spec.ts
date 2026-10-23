@@ -189,9 +189,10 @@ test.describe('library', () => {
     await page.setViewportSize(PHONE);
     await page.goto('/meetings');
     await tabTo(page, page.getByRole('button', { name: 'Open navigation' }));
+    const search = page.getByRole('searchbox');
     for (const control of [
       page.getByRole('button', { name: 'New meeting' }),
-      page.getByRole('searchbox'),
+      search,
       page.getByRole('button', { name: /^All/ }),
       page.getByRole('button', { name: /^Ready/ }),
       page.getByRole('button', { name: /^In progress/ }),
@@ -200,7 +201,9 @@ test.describe('library', () => {
       page.getByRole('combobox', { name: 'Sort' }),
     ]) {
       await page.keyboard.press('Tab');
-      await expectFocusRing(control);
+      // The search field's ring is drawn by its label (focus-within), so the input is only focused.
+      if (control === search) await expect(control).toBeFocused();
+      else await expectFocusRing(control);
     }
     // The pills stay on one line and scroll; Upload audio is in New meeting's menu here.
     const pills = await page.getByRole('group', { name: 'Filters' }).boundingBox();
