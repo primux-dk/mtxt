@@ -4,6 +4,10 @@
 //   node deploy/install.mjs --config deploy/installs/<name>.json            plan, then apply
 //   node deploy/install.mjs --config deploy/installs/<name>.json --dry-run  plan only
 //   node deploy/install.mjs --config deploy/installs/<name>.json --status   what is deployed
+//   node deploy/install.mjs --config deploy/installs/<name>.json --config-only
+//                         write apps/web/wrangler.<installId>.jsonc and stop
+//   eval "$(node deploy/install.mjs --config deploy/installs/<name>.json --print-env)"
+//                         export the account, the generated config and the names (runbook)
 //
 // Flags: --force-deploy builds and deploys even when the deployed version matches,
 // --replace-secrets puts every secret in the secrets file again (rotation, a changed
@@ -16,25 +20,26 @@
 // See deploy/README.md.
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { seedSql } from '../packages/adapters/src/db/seed.ts';
 import { seal } from '../packages/adapters/src/secrets.ts';
+import {
+  fail,
+  loadInstall,
+  readGeneratedConfig as readGeneratedConfigFor,
+  parseJsonc,
+  readEnvFile,
+  root,
+  runMain,
+  Stop,
+  web,
+  wranglerBin,
+  writePrivateFile,
+} from './lib.mjs';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const web = join(root, 'apps/web');
-const wranglerBin = join(web, 'node_modules/.bin/wrangler');
 const API = 'https://api.cloudflare.com/client/v4';
 
 const { values: flags } = parseArgs({
@@ -45,69 +50,29 @@ const { values: flags } = parseArgs({
     'force-deploy': { type: 'boolean', default: false },
     'replace-secrets': { type: 'boolean', default: false },
     'skip-build': { type: 'boolean', default: false },
+    'config-only': { type: 'boolean', default: false },
+    'print-env': { type: 'boolean', default: false },
   },
 });
-if (!flags.config) fail('Pass --config <install.json>. Copy deploy/install.example.json to start.');
 
 // ---------------------------------------------------------------- output
 
 const say = (line = '') => console.log(line);
 const step = (title) => say(`\n== ${title}`);
 const row = (what, outcome) => say(`  ${what.padEnd(34)} ${outcome}`);
-function fail(message) {
-  console.error(`\nStopped: ${message}`);
-  process.exit(1);
-}
 
 // ---------------------------------------------------------------- config
 
-const expand = (p) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : resolve(root, p));
-const config = JSON.parse(readFileSync(expand(flags.config), 'utf8'));
-
-const accountId = String(config.accountId ?? '').trim();
-const hostname = String(config.hostname ?? '')
-  .trim()
-  .toLowerCase();
-const installId = String(config.installId ?? '').trim();
-if (!/^[0-9a-f]{32}$/.test(accountId)) fail('accountId must be the 32-character account id.');
-if (!/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(hostname)) {
-  fail(`hostname must be a bare host name, like meetings.example.com: "${hostname}"`);
+// Nothing has run yet, so a bad config stops at once.
+let install;
+try {
+  install = loadInstall(flags.config);
+} catch (error) {
+  if (!(error instanceof Stop)) throw error;
+  console.error(`\nStopped: ${error.message}`);
+  process.exit(1);
 }
-if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(installId)) {
-  fail('installId must be 1-64 lowercase letters, digits, _ or -.');
-}
-if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_ACCOUNT_ID !== accountId) {
-  fail('CLOUDFLARE_ACCOUNT_ID in this shell names another account than the config. Unset it.');
-}
-
-const names = {
-  worker: 'mtxt-web',
-  database: 'mtxt-db',
-  bucket: 'mtxt-audio',
-  queue: 'mtxt-jobs',
-  deadLetterQueue: 'mtxt-jobs-dlq',
-  gateway: 'mtxt-gateway',
-  ...config.names,
-};
-for (const [key, value] of Object.entries(names)) {
-  if (value !== null && !/^[a-z0-9][a-z0-9-]{1,62}$/.test(value)) {
-    fail(`names.${key} must be lowercase letters, digits and -: "${value}"`);
-  }
-}
-
-const settings = config.settings ?? {};
-if (settings.interfaceLanguage && !['en', 'da'].includes(settings.interfaceLanguage)) {
-  fail('settings.interfaceLanguage is en or da.');
-}
-if (settings.identityProvider && !['entra', 'google'].includes(settings.identityProvider)) {
-  fail('settings.identityProvider is entra or google.');
-}
-if (settings.sttProvider && !['assemblyai', 'workers-ai-whisper'].includes(settings.sttProvider)) {
-  fail('settings.sttProvider is assemblyai or workers-ai-whisper in this version.');
-}
-
-const secretsFile = expand(config.secretsFile ?? `~/.config/mtxt/${installId}.env`);
-const generatedConfig = join(web, `wrangler.${installId}.jsonc`);
+const { accountId, hostname, installId, names, settings, secretsFile, generatedConfig } = install;
 const publicUrl = `https://${hostname}`;
 
 // Every child process runs against this account and nothing else.
@@ -135,7 +100,7 @@ const wrangler = (args, options) => run(wranglerBin, args, options);
 /**
  * The Cloudflare CLI (`cf`), when it is installed and logged in. Wrangler's OAuth login
  * has no AI Gateway scope; `cf`'s OAuth login has, so the gateway steps use it when the
- * API refuses wrangler's token. Returns null when `cf` is missing or the call fails.
+ * API refuses wrangler's token. `ok` is false when `cf` is missing or the call fails.
  */
 function cf(args) {
   const result = spawnSync('cf', args, {
@@ -144,8 +109,11 @@ function cf(args) {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  if (result.error || result.status !== 0) return null;
-  return result.stdout;
+  return {
+    ok: !result.error && result.status === 0,
+    out: result.stdout ?? '',
+    err: result.stderr ?? '',
+  };
 }
 
 /** The gateway body: no logs (prompts carry meeting content) and no cache. */
@@ -187,58 +155,49 @@ async function api(path, { method = 'GET', body, headers = {} } = {}) {
     ok: response.ok && json.success !== false,
     status: response.status,
     result: json.result,
+    info: json.result_info ?? {},
     errors: (json.errors ?? []).map((e) => `${e.code} ${e.message}`),
   };
 }
 const account = (path) => `/accounts/${accountId}${path}`;
 
-// ---------------------------------------------------------------- JSONC
-
-/** wrangler.jsonc to JSON: drops comments and trailing commas, leaves strings alone. */
-function parseJsonc(text) {
-  let out = '';
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') {
-      let j = i + 1;
-      while (j < text.length && text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
-      out += text.slice(i, j + 1);
-      i = j;
-    } else if (c === '/' && text[i + 1] === '/') {
-      while (i < text.length && text[i] !== '\n') i++;
-      out += '\n';
-    } else if (c === '/' && text[i + 1] === '*') {
-      i = text.indexOf('*/', i + 2) + 1;
-    } else out += c;
+/**
+ * Every item of a list endpoint, through all its pages: by cursor (R2), by
+ * total_count or by total_pages. Existence is never decided on the first page alone.
+ */
+async function apiAll(path, { headers, items = (result) => result } = {}) {
+  const all = [];
+  let page = 1;
+  let cursor;
+  for (let guard = 0; guard < 1000; guard++) {
+    const sep = path.includes('?') ? '&' : '?';
+    const at = cursor ? `cursor=${encodeURIComponent(cursor)}` : `page=${page}`;
+    const res = await api(`${path}${sep}${at}`, { headers });
+    if (!res.ok) return res;
+    const batch = items(res.result) ?? [];
+    all.push(...batch);
+    const { cursor: next, total_count: total, total_pages: pages } = res.info;
+    if (next && next !== cursor) cursor = next;
+    else if (!cursor && total !== undefined && batch.length && all.length < total) page++;
+    else if (!cursor && total === undefined && pages && page < pages) page++;
+    else return { ok: true, result: all };
   }
-  return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
+  fail(`${path} returned more than 1000 pages.`);
 }
 
 // ---------------------------------------------------------------- secrets file
 
-function readEnvFile(path) {
-  if (!existsSync(path)) return {};
-  const values = {};
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (!m) continue;
-    values[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
-  return values;
-}
-
+/** Adds lines to the secrets file. The new file is 0600 before a secret byte is in it. */
 function appendEnvFile(path, entries) {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const head = existsSync(path) ? readFileSync(path, 'utf8') : '';
   const lines = Object.entries(entries).map(([k, v]) => `${k}=${v}`);
   const note =
     '# Generated by deploy/install.mjs. The Worker holds the same values; losing\n' +
     '# MTXT_SETTINGS_KEY makes the sealed settings unreadable (deploy/README.md).\n';
-  writeFileSync(
+  writePrivateFile(
     path,
     `${head}${head && !head.endsWith('\n') ? '\n' : ''}${note}${lines.join('\n')}\n`,
   );
-  chmodSync(path, 0o600);
 }
 
 // The Worker secrets, by their Worker name, from MTXT_* in the shell or the secrets file.
@@ -269,25 +228,27 @@ async function inventory() {
   if (!me.ok) fail(`this login cannot read account ${accountId}: ${me.errors.join('; ')}`);
   found.accountName = me.result.name;
 
-  const zones = await api(`/zones?account.id=${accountId}&per_page=50&status=active`);
+  const zones = await apiAll(`/zones?account.id=${accountId}&per_page=50&status=active`);
   if (!zones.ok) fail(`cannot list zones: ${zones.errors.join('; ')}`);
   found.zone = zones.result
     .filter((z) => hostname === z.name || hostname.endsWith(`.${z.name}`))
     .sort((a, b) => b.name.length - a.name.length)[0];
 
-  const dbs = await api(account(`/d1/database?name=${names.database}&per_page=100`));
+  const dbs = await apiAll(account(`/d1/database?name=${names.database}&per_page=100`));
   if (!dbs.ok) fail(`cannot list D1 databases: ${dbs.errors.join('; ')}`);
   found.database = dbs.result.find((d) => d.name === names.database);
 
-  const euBuckets = await api(account('/r2/buckets?per_page=1000'), {
+  const buckets = (r) => r.buckets;
+  const euBuckets = await apiAll(account('/r2/buckets?per_page=1000'), {
     headers: { 'cf-r2-jurisdiction': 'eu' },
+    items: buckets,
   });
-  const plainBuckets = await api(account('/r2/buckets?per_page=1000'));
+  const plainBuckets = await apiAll(account('/r2/buckets?per_page=1000'), { items: buckets });
   if (!euBuckets.ok || !plainBuckets.ok) fail('cannot list R2 buckets.');
-  found.bucket = euBuckets.result.buckets.find((b) => b.name === names.bucket);
-  found.bucketOutsideEu = plainBuckets.result.buckets.find((b) => b.name === names.bucket);
+  found.bucket = euBuckets.result.find((b) => b.name === names.bucket);
+  found.bucketOutsideEu = plainBuckets.result.find((b) => b.name === names.bucket);
 
-  const queues = await api(account('/queues?per_page=100'));
+  const queues = await apiAll(account('/queues?per_page=100'));
   if (!queues.ok) fail(`cannot list queues: ${queues.errors.join('; ')}`);
   found.queue = queues.result.find((q) => q.queue_name === names.queue);
   found.deadLetterQueue = queues.result.find((q) => q.queue_name === names.deadLetterQueue);
@@ -301,16 +262,15 @@ async function inventory() {
         ? 'missing'
         : 'unreadable';
     if (found.gateway === 'unreadable') {
-      const out = cf(['ai-gateway', 'gateways', 'list']);
-      const list = out === null ? null : JSON.parse(out.slice(out.indexOf('[')));
-      if (list) {
-        found.gatewayVia = 'cf';
-        found.gateway = list.some((g) => g.id === names.gateway) ? 'exists' : 'missing';
-      }
+      // One gateway by its id: no list, so no page to miss it on.
+      const got = cf(['ai-gateway', 'gateways', 'get', names.gateway]);
+      if (got.ok) found.gateway = 'exists';
+      else if (/\b7002\b|404 Not Found/.test(got.err + got.out)) found.gateway = 'missing';
+      if (found.gateway !== 'unreadable') found.gatewayVia = 'cf';
     }
   }
 
-  const scripts = await api(account('/workers/scripts'));
+  const scripts = await apiAll(account('/workers/scripts'));
   if (!scripts.ok) fail(`cannot list Workers: ${scripts.errors.join('; ')}`);
   found.worker = scripts.result.find((s) => s.id === names.worker);
 
@@ -397,15 +357,31 @@ function pendingMigrations() {
 const git = (args) => run('git', args, { cwd: root, allowFail: true }).out.trim();
 
 /**
- * What the Worker is built from: the git trees of apps/web and packages, the
- * lockfile and the generated config. A commit that touches only docs or deploy/
- * keeps the tag, so a run after it deploys nothing.
+ * Everything the build reads: apps/web (its own configs included), packages, and the
+ * root files the workspace and TypeScript resolve through. Paths that are not in git
+ * (an .npmrc nobody made) are left out.
+ */
+const BUILD_INPUTS = [
+  'apps/web',
+  'packages',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'package.json',
+  'tsconfig.base.json',
+  '.npmrc',
+  '.node-version',
+];
+
+/**
+ * The deploy fingerprint: the git objects of the build inputs plus the generated
+ * config. A commit that touches only docs or deploy/ keeps the tag, so a run after
+ * it deploys nothing; an uncommitted change to any input always deploys.
  */
 function desiredTag(configText) {
   const commit = git(['rev-parse', '--short=12', 'HEAD']) || 'nogit';
-  const inputs = git(['rev-parse', 'HEAD:apps/web', 'HEAD:packages', 'HEAD:pnpm-lock.yaml']);
-  const dirty =
-    git(['status', '--porcelain', '--', 'apps/web', 'packages', 'pnpm-lock.yaml']) !== '';
+  const tracked = BUILD_INPUTS.filter((p) => git(['ls-files', '--', p]) !== '');
+  const inputs = git(['rev-parse', ...tracked.map((p) => `HEAD:${p}`)]);
+  const dirty = git(['status', '--porcelain', '--', ...BUILD_INPUTS]) !== '';
   const code = createHash('sha256').update(inputs).digest('hex').slice(0, 12);
   const cfg = createHash('sha256').update(configText).digest('hex').slice(0, 8);
   return { tag: `${code}-${cfg}`, dirty, commit };
@@ -468,6 +444,7 @@ async function status() {
       if (!existsSync(generatedConfig)) {
         writeFileSync(generatedConfig, installConfig(found, configuredGateway(found)));
       }
+      readGeneratedConfigOrStop();
       const pending = pendingMigrations();
       row('D1 migrations pending', pending.join(', ') || 'none');
     }
@@ -481,8 +458,43 @@ const configuredGateway = (found) =>
 
 // ---------------------------------------------------------------- main
 
+/** The generated config must be this install's; see lib.mjs readGeneratedConfig. */
+function readGeneratedConfigOrStop() {
+  return readGeneratedConfigFor(install);
+}
+
+/** Shell exports for the runbook's commands: no API call, nothing secret. */
+function printEnv() {
+  const q = (v) => `'${String(v).replaceAll("'", `'\\''`)}'`;
+  const vars = {
+    CLOUDFLARE_ACCOUNT_ID: accountId,
+    MTXT_INSTALL_ID: installId,
+    MTXT_CFG: generatedConfig,
+    MTXT_WORKER: names.worker,
+    MTXT_DB: names.database,
+    MTXT_BUCKET: names.bucket,
+    MTXT_QUEUE: names.queue,
+    MTXT_DLQ: names.deadLetterQueue,
+    MTXT_GATEWAY: names.gateway ?? '',
+  };
+  for (const [k, v] of Object.entries(vars)) say(`export ${k}=${q(v)}`);
+}
+
+/** Writes the generated config from what exists, and stops. Creates nothing. */
+async function configOnly() {
+  const found = await inventory();
+  if (!found.database)
+    fail(`D1 ${names.database} does not exist. Run the install without --config-only.`);
+  const text = installConfig(found, configuredGateway(found));
+  writeFileSync(generatedConfig, text);
+  readGeneratedConfigOrStop();
+  row(generatedConfig.slice(root.length + 1), 'written');
+}
+
 async function main() {
+  if (flags['print-env']) return printEnv();
   if (flags.status) return status();
+  if (flags['config-only']) return configOnly();
 
   step(`Plan for install "${installId}" on ${hostname}`);
   const found = await inventory();
@@ -580,7 +592,7 @@ async function main() {
         '--body',
         JSON.stringify(GATEWAY_BODY(names.gateway)),
       ]);
-      if (out === null) problem = 'the cf CLI refused the create';
+      if (!out.ok) problem = 'the cf CLI refused the create';
     } else {
       const created = await api(account('/ai-gateway/gateways'), {
         method: 'POST',
@@ -610,6 +622,7 @@ async function main() {
   const configText = installConfig(now, gatewayId);
   const before = existsSync(generatedConfig) ? readFileSync(generatedConfig, 'utf8') : '';
   if (before !== configText) writeFileSync(generatedConfig, configText);
+  readGeneratedConfigOrStop();
   row(generatedConfig.slice(root.length + 1), before === configText ? 'unchanged' : 'written');
 
   // ---- database
@@ -753,4 +766,4 @@ async function main() {
   }
 }
 
-await main();
+await runMain(main);
