@@ -1,42 +1,35 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Tabs as TabsPrimitive } from 'radix-ui';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { SETTINGS_TABS, tabHref, tabOf, type SettingsTab } from '@/lib/settings/tabs';
+import { useUnsavedGuard } from './unsaved-guard';
 
-/** A tab's form reports here whether it holds changes that are not saved. */
-const UnsavedContext = createContext<(dirty: boolean) => void>(() => {});
-export const useReportUnsaved = () => useContext(UnsavedContext);
+const tabId = (tab: SettingsTab) => `settings-tab-${tab}`;
+const PANEL_ID = 'settings-panel';
 
 /**
  * The settings page's tab strip, one route per tab (docs/spec.md "Settings
- * page"). Radix gives the meeting page's keyboard pattern: arrows move
- * between tabs, Home and End jump, Enter or Space opens one, Tab moves into
- * the panel. Activation is manual because opening a tab is a navigation.
- * A tab with unsaved changes has a dot; leaving it asks first. On a phone
- * the strip scrolls sideways and keeps the selected tab in view.
+ * page"). Each tab is a link with role="tab", so it opens in a new tab or
+ * window like any link. The keyboard pattern is the meeting page's: the
+ * selected tab is the one tab stop, arrows move focus, Home and End jump,
+ * Enter or Space opens the focused tab (manual activation: opening one is a
+ * navigation), Tab moves into the panel. A tab with unsaved changes has a
+ * dot, and leaving it asks first (UnsavedGuard). On a phone the strip
+ * scrolls sideways and keeps the selected tab in view.
  */
 export function SettingsTabs({ children }: { children: React.ReactNode }) {
   const t = useTranslations('settings.tabs');
-  const tc = useTranslations('common');
-  const router = useRouter();
   const current = tabOf(usePathname());
-  const [dirty, setDirty] = useState(false);
-  const [leaving, setLeaving] = useState<SettingsTab | null>(null);
+  const guard = useUnsavedGuard();
   const listRef = useRef<HTMLDivElement>(null);
-  // The tab that opened the dialog: focus goes back to it whichever way the dialog closes.
-  const opener = useRef<SettingsTab | null>(null);
+
+  const { setPlace } = guard;
+  useEffect(() => {
+    setPlace(current && t(current));
+    return () => setPlace(null);
+  }, [current, setPlace, t]);
 
   useEffect(() => {
     const list = listRef.current;
@@ -53,82 +46,85 @@ export function SettingsTabs({ children }: { children: React.ReactNode }) {
   }, [current]);
 
   // Without scroll: false the router would move focus to the new tab's content; it stays on the tab.
-  const open = (tab: string) => {
-    const next = tab as SettingsTab;
-    if (next === current) return;
-    opener.current = next;
-    if (dirty) setLeaving(next);
-    else router.push(tabHref(next), { scroll: false });
+  const open = (tab: SettingsTab, opener: HTMLElement) => {
+    if (tab === current) return;
+    guard.navigate(tabHref(tab), { scroll: false, destination: t(tab), opener });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLAnchorElement>, index: number) => {
+    const last = SETTINGS_TABS.length - 1;
+    const to = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: last }[e.key];
+    if (to !== undefined) {
+      e.preventDefault();
+      const next = SETTINGS_TABS[(to + SETTINGS_TABS.length) % SETTINGS_TABS.length]!;
+      document.getElementById(tabId(next))?.focus();
+    } else if (e.key === ' ') {
+      // Enter is the link's own click; Space opens the tab as on a button.
+      e.preventDefault();
+      open(SETTINGS_TABS[index]!, e.currentTarget);
+    }
+  };
+
+  const onClick = (e: React.MouseEvent<HTMLAnchorElement>, tab: SettingsTab) => {
+    // A new tab or window opens as any link does; the changes here stay.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    open(tab, e.currentTarget);
   };
 
   return (
-    <UnsavedContext.Provider value={setDirty}>
-      <TabsPrimitive.Root value={current ?? ''} onValueChange={open} activationMode="manual">
-        {/* The baseline is a shadow, not a border: the strip scrolls, and a scroller clips a tab's underline laid over its border. */}
-        <TabsPrimitive.List
-          ref={listRef}
-          aria-label={t('label')}
-          className="mb-6 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)] [scrollbar-width:none] max-shell:-mx-5 max-shell:mb-5 max-shell:px-5"
-        >
-          {SETTINGS_TABS.map((tab) => (
-            <TabsPrimitive.Trigger
+    <>
+      {/* The baseline is a shadow, not a border: the strip scrolls, and a scroller clips a tab's underline laid over its border. */}
+      <div
+        ref={listRef}
+        role="tablist"
+        aria-label={t('label')}
+        className="mb-6 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)] [scrollbar-width:none] max-shell:-mx-5 max-shell:mb-5 max-shell:px-5"
+      >
+        {SETTINGS_TABS.map((tab, index) => {
+          const selected = tab === current;
+          return (
+            <a
               key={tab}
-              value={tab}
-              data-tab={tab}
-              className="inline-flex min-h-11 shrink-0 outline-offset-[-2px] items-center gap-2 border-b-2 border-transparent px-3.5 py-2.5 text-sm whitespace-nowrap text-muted-foreground transition-[color,border-color] hover:text-foreground data-[state=active]:border-accent-strong data-[state=active]:text-foreground max-shell:px-3"
+              id={tabId(tab)}
+              href={tabHref(tab)}
+              role="tab"
+              aria-selected={selected}
+              aria-controls={selected ? PANEL_ID : undefined}
+              // The selected tab is the strip's one tab stop; with none selected, the first.
+              tabIndex={selected || (!current && index === 0) ? 0 : -1}
+              onClick={(e) => onClick(e, tab)}
+              onKeyDown={(e) => onKeyDown(e, index)}
+              className="inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 border-transparent px-3.5 py-2.5 text-sm whitespace-nowrap text-muted-foreground outline-offset-[-2px] transition-[color,border-color] hover:text-foreground aria-selected:border-accent-strong aria-selected:text-foreground max-shell:px-3"
             >
               {t(tab)}
-              {dirty && tab === current && (
-                <span
-                  className="size-1.5 rounded-full bg-accent-strong"
-                  data-testid="unsaved-dot"
-                  aria-hidden="true"
-                />
+              {guard.dirty && selected && (
+                <>
+                  <span
+                    className="size-1.5 rounded-full bg-accent-strong"
+                    data-testid="unsaved-dot"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">{t('unsavedLabel')}</span>
+                </>
               )}
-              {dirty && tab === current && <span className="sr-only">{t('unsavedLabel')}</span>}
-            </TabsPrimitive.Trigger>
-          ))}
-        </TabsPrimitive.List>
-        {current ? (
-          <TabsPrimitive.Content value={current} className="min-w-0">
-            {children}
-          </TabsPrimitive.Content>
-        ) : (
-          children
-        )}
-      </TabsPrimitive.Root>
-
-      <Dialog open={leaving !== null} onOpenChange={(o) => !o && setLeaving(null)}>
-        <DialogContent
-          closeLabel={tc('close')}
-          onCloseAutoFocus={(e) => {
-            // A click opens the dialog before the tab takes focus, so Radix has no opener to return to.
-            e.preventDefault();
-            listRef.current?.querySelector<HTMLElement>(`[data-tab="${opener.current}"]`)?.focus();
-          }}
+            </a>
+          );
+        })}
+      </div>
+      {current ? (
+        <div
+          id={PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={tabId(current)}
+          tabIndex={0}
+          className="min-w-0"
         >
-          <DialogTitle>{t('discard.title')}</DialogTitle>
-          <DialogDescription>
-            {current && leaving && t('discard.body', { tab: t(current), next: t(leaving) })}
-          </DialogDescription>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button>{t('discard.keep')}</Button>
-            </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                const next = leaving!;
-                setLeaving(null);
-                setDirty(false);
-                router.push(tabHref(next), { scroll: false });
-              }}
-            >
-              {t('discard.confirm')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </UnsavedContext.Provider>
+          {children}
+        </div>
+      ) : (
+        children
+      )}
+    </>
   );
 }

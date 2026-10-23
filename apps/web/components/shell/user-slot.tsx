@@ -17,7 +17,7 @@ async function signOutAction() {
 
 /**
  * The signed-in user: one row with the name and the company line, opening
- * Settings for an admin, Recorders and Sign out.
+ * Settings for an admin, Recorders, API tokens and Sign out.
  */
 export function UserSlot({ user, companyName }: { user: ShellUser; companyName?: string | null }) {
   return (

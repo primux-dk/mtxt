@@ -8,17 +8,28 @@ import { Button } from '@/components/ui/button';
 import { TAB_FIELDS, type FormTab } from '@/lib/settings/tabs';
 import type { Field as FieldName } from '@/lib/settings/validate';
 import { controlClass, describedBy } from './fields';
-import { useReportUnsaved } from './settings-tabs';
+import { useReportUnsaved } from './unsaved-guard';
 
 export type FieldErrors = Partial<Record<FieldName, string>>;
 
 /** The control each field's summary link moves focus to. */
 const fieldId = (field: FieldName) => (field === 'recordingSources' ? 'source-desktop' : field);
 
-/** What the form's fields hold, to tell a change from the saved state. */
-function snapshot(form: HTMLFormElement) {
+const secretFields = (form: HTMLFormElement) => [
+  ...form.querySelectorAll<HTMLInputElement>('input[type=password][name]'),
+];
+
+/**
+ * What the form's fields hold, to tell a change from the saved state. With
+ * `blankSecrets`, a secret counts as empty: that is how it reads once saved.
+ */
+function snapshot(form: HTMLFormElement, blankSecrets = false) {
+  const secrets = new Set(secretFields(form).map((input) => input.name));
   return JSON.stringify(
-    [...new FormData(form).entries()].map(([k, v]) => [k, typeof v === 'string' ? v : v.name]),
+    [...new FormData(form).entries()].map(([k, v]) => [
+      k,
+      blankSecrets && secrets.has(k) ? '' : typeof v === 'string' ? v : v.name,
+    ]),
   );
 }
 
@@ -33,8 +44,6 @@ export const controlProps = (errors: FieldErrors, field: FieldName, help = false
 
 export interface TabFormState {
   errors: FieldErrors;
-  /** Changes after a save, so the secret fields start empty again. */
-  secretsKey: number;
   /** Call after a change made outside a typing event, such as a CSV import. */
   changed: () => void;
 }
@@ -60,9 +69,8 @@ export function TabForm<T extends FormTab>({
   const tc = useTranslations('common');
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<SaveResult | null>(null);
-  const [secretsKey, setSecretsKey] = useState(0);
   const [dirty, setDirty] = useState(false);
-  const report = useReportUnsaved();
+  useReportUnsaved(`form:${tab}`, dirty);
   const formRef = useRef<HTMLFormElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const saved = useRef<string | null>(null);
@@ -75,20 +83,22 @@ export function TabForm<T extends FormTab>({
   const changed = useCallback(() => {
     const form = formRef.current;
     if (!form) return;
-    // The first look, and the first after a save, is the saved state.
+    // The first look is the saved state; after a save, what was sent is.
     saved.current ??= snapshot(form);
     setDirty(snapshot(form) !== saved.current);
   }, []);
 
   // Controlled fields change on a render, not always on an input event.
   useEffect(changed);
-  useEffect(() => report(dirty), [dirty, report]);
-  useEffect(() => () => report(false), [report]);
 
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (pending) return;
-    const form = new FormData(e.currentTarget);
+    const element = e.currentTarget;
+    const form = new FormData(element);
+    // What is sent becomes the saved state; anything typed while it is on its way stays a change.
+    const sent = snapshot(element, true);
+    const sentSecrets = new Map(secretFields(element).map((input) => [input, input.value]));
     startTransition(async () => {
       const next = await saveSettingsAction(tab, form).catch((): SaveResult => ({
         status: 'error',
@@ -96,8 +106,10 @@ export function TabForm<T extends FormTab>({
       }));
       setResult(next);
       if (next.status === 'saved') {
-        setSecretsKey((k) => k + 1);
-        saved.current = null;
+        // A saved secret is never shown again; one typed since the save stays.
+        for (const [input, value] of sentSecrets) if (input.value === value) input.value = '';
+        saved.current = sent;
+        changed();
       }
       // The summary takes focus so a keyboard or screen reader user hears what to fix.
       if (next.status !== 'saved') requestAnimationFrame(() => summaryRef.current?.focus());
@@ -163,7 +175,7 @@ export function TabForm<T extends FormTab>({
         noValidate
         aria-label={t(`tabs.${tab as FormTab}`)}
       >
-        {children({ errors, secretsKey, changed })}
+        {children({ errors, changed })}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
           <p role="status" className="text-xs text-muted-foreground" data-testid="settings-status">

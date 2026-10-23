@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
+import { useUnsavedGuard } from '@/components/settings/unsaved-guard';
 
 const ITEMS = [
   { key: 'myMeetings', href: '/meetings', view: null, Icon: CalendarDays },
@@ -30,6 +31,7 @@ export function NavItems({ label, onNavigate }: { label: string; onNavigate?: ()
   const t = useTranslations('nav');
   const pathname = usePathname();
   const view = useSearchParams().get('view');
+  const guard = useUnsavedGuard();
 
   return (
     <nav aria-label={label} className="grid gap-1">
@@ -40,7 +42,11 @@ export function NavItems({ label, onNavigate }: { label: string; onNavigate?: ()
           <Link
             key={key}
             href={href}
-            onClick={onNavigate}
+            onClick={(e) => {
+              // Unsaved settings ask first; the Sheet closes only when the link is followed.
+              guard.linkClick(e, { opener: e.currentTarget });
+              if (!e.defaultPrevented) onNavigate?.();
+            }}
             aria-current={current ? 'page' : undefined}
             className={cn(
               'flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-sm text-sidebar-foreground transition-[background-color,color] hover:text-accent-strong',

@@ -107,7 +107,7 @@ export function TranscriptionForm({
         keyterms: t('keyterms.field'),
       }}
     >
-      {({ errors, secretsKey, changed }) => (
+      {({ errors, changed }) => (
         <>
           <Section id="stt" heading={t('stt.heading')} help={t('stt.help')}>
             <div className="grid grid-cols-2 gap-4 max-shell:grid-cols-1">
@@ -144,7 +144,6 @@ export function TranscriptionForm({
                   error={errors.sttApiKey}
                 >
                   <Input
-                    key={secretsKey}
                     id="sttApiKey"
                     name="sttApiKey"
                     type="password"

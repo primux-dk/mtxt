@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { controlClass, describedBy, FieldError } from './fields';
+import { useReportUnsaved } from './unsaved-guard';
 
 type Notice = { tone: 'status' | 'alert'; text: string } | null;
 type Draft = { id: string; name: string; bodyMd: string };
@@ -31,7 +32,7 @@ const blank = (): Draft => ({ id: crypto.randomUUID(), name: '', bodyMd: '' });
 
 /**
  * Recap templates: a list to pick from, the editor for the picked one, and
- * "New template". Saved on their own actions, not by "Save settings".
+ * "New template". Saved on their own actions, not by the Recap tab's Save.
  * Add and delete show at once and roll back when the server refuses
  * (behaviour rule 2); every answer carries the server's list, so the screen
  * ends in the server's state. A new template's id is made here and kept
@@ -52,6 +53,12 @@ export function Templates({ initial }: { initial: TemplateRow[] }) {
 
   const isNew = selected === 'new';
   const current = templates.find((tpl) => tpl.id === selected);
+  // A draft that differs from its template, or a new one with text in it, is unsaved:
+  // the Recap tab is marked and leaving it asks, with the model form's changes.
+  const unsaved = isNew
+    ? draft.name.trim() !== '' || draft.bodyMd !== ''
+    : Boolean(current) && (draft.name.trim() !== current!.name || draft.bodyMd !== current!.bodyMd);
+  useReportUnsaved('templates', unsaved);
 
   const pick = (id: string | 'new') => {
     const tpl = templates.find((x) => x.id === id);

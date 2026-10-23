@@ -445,6 +445,7 @@
       "discard": {
         "title": "Discard unsaved changes?",
         "body": "The changes on {tab} are not saved. Opening {next} discards them.",
+        "bodyLeave": "The changes on {tab} are not saved. Leaving this page discards them.",
         "keep": "Keep editing",
         "confirm": "Discard changes"
       }

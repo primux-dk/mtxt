@@ -445,6 +445,7 @@
       "discard": {
         "title": "Kassér ændringer, der ikke er gemt?",
         "body": "Ændringerne under {tab} er ikke gemt. Åbner du {next}, kasseres de.",
+        "bodyLeave": "Ændringerne under {tab} er ikke gemt. Forlader du siden, kasseres de.",
         "keep": "Fortsæt redigering",
         "confirm": "Kassér ændringer"
       }

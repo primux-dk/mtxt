@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
+import { useUnsavedGuard } from '@/components/settings/unsaved-guard';
 import { Avatar } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -43,12 +44,14 @@ export function UserMenu({
   const inSettings = pathname === '/settings' || pathname.startsWith('/settings/');
   const [recorders, setRecorders] = useState(false);
   const [apiTokens, setApiTokens] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const guard = useUnsavedGuard();
   const [, startTransition] = useTransition();
   const row = useRef<HTMLButtonElement>(null);
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={menu} onOpenChange={setMenu}>
         <DropdownMenuTrigger asChild>
           <button
             ref={row}
@@ -85,7 +88,14 @@ export function UserMenu({
         >
           {user.isAdmin && (
             <DropdownMenuItem asChild>
-              <Link href="/settings/general">
+              <Link
+                href="/settings/general"
+                onClick={(e) => {
+                  // Unsaved settings ask first; the menu closes either way.
+                  guard.linkClick(e, { opener: row.current });
+                  if (e.defaultPrevented) setMenu(false);
+                }}
+              >
                 <Settings aria-hidden="true" />
                 {nav('settings')}
               </Link>
@@ -99,7 +109,11 @@ export function UserMenu({
             <KeyRound aria-hidden="true" />
             {a('open')}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => startTransition(() => signOut())}>
+          <DropdownMenuItem
+            onSelect={() =>
+              guard.leave({ go: () => startTransition(() => signOut()), opener: row.current })
+            }
+          >
             <LogOut aria-hidden="true" />
             {t('signOut')}
           </DropdownMenuItem>

@@ -37,7 +37,7 @@ export function RecapForm({
         recapApiKey: t('recap.apiKey'),
       }}
     >
-      {({ errors, secretsKey }) => (
+      {({ errors }) => (
         <>
           <Section id="recap" heading={t('recap.heading')} help={t('recap.help')}>
             <div className="grid grid-cols-2 gap-4 max-shell:grid-cols-1">
@@ -95,7 +95,7 @@ export function RecapForm({
                   error={errors.recapApiKey}
                 >
                   <Input
-                    key={`${secretsKey}-${recap}`}
+                    key={recap}
                     id="recapApiKey"
                     name="recapApiKey"
                     type="password"

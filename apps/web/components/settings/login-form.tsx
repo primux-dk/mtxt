@@ -40,7 +40,7 @@ export function LoginForm({
         adminEmails: t('admins.field'),
       }}
     >
-      {({ errors, secretsKey }) => (
+      {({ errors }) => (
         <>
           <Section id="login" heading={t('login.heading')} help={t('login.help')}>
             <div className="grid grid-cols-2 gap-4 max-shell:grid-cols-1">
@@ -109,7 +109,6 @@ export function LoginForm({
                 className="col-span-full"
               >
                 <Input
-                  key={secretsKey}
                   id="oidcClientSecret"
                   name="oidcClientSecret"
                   type="password"
