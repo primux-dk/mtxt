@@ -345,6 +345,31 @@ describe('the REST API on a database', () => {
     });
   });
 
+  it('counts a refused write against the minute, with the rate headers on the 403', async () => {
+    as(await token('anne', 'read'));
+    const statuses: number[] = [];
+    for (let i = 0; i < 65; i++) {
+      const response = await meetingRoute.PATCH(
+        new Request('http://localhost/api/v1/meetings/a1', {
+          method: 'PATCH',
+          body: JSON.stringify({ keep: true }),
+        }),
+        { params: Promise.resolve({ id: 'a1' }) },
+      );
+      statuses.push(response.status);
+      expect(response.headers.get('x-ratelimit-limit'), `request ${i + 1}`).toBe('60');
+      expect(response.headers.get('x-ratelimit-remaining'), `request ${i + 1}`).toBe(
+        String(Math.max(0, 59 - i)),
+      );
+      if (response.status === 429) expect(response.headers.get('retry-after')).toMatch(/^\d+$/);
+    }
+    expect(statuses).toEqual([...Array(60).fill(403), ...Array(5).fill(429)]);
+    const [row] = ctx.raw
+      .prepare(`select rate_count from recorder_tokens where kind = 'api'`)
+      .all() as { rate_count: number }[];
+    expect(row!.rate_count).toBe(60);
+  });
+
   it('is 401 without a token, and with a revoked one', async () => {
     expect((await meetingsRoute.GET(get('/api/v1/meetings'))).status).toBe(401);
     const value = await token('anne');

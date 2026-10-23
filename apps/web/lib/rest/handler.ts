@@ -9,7 +9,9 @@ import { authorise, etagFor, etagMatches } from './rules';
 /*
   Every REST API route runs through rest() (docs/spec.md "API"): the
   caller and its token, the scope, the per-token rate limit, the contract's
-  error shape, and on a GET the ETag and its 304. A read is audited only
+  error shape, and on a GET the ETag and its 304. An API token's request is
+  counted before its scope is checked, and every answer, an error too,
+  carries the rate headers. A read is audited only
   when its body is served: the route hands its audit row to `served`, which
   runs after the 304 check and before the answer leaves, so a 304 writes
   nothing and a body is never served without its row.
@@ -59,14 +61,10 @@ export async function rest(
         'Send a working personal API token as Authorization: Bearer <token>.',
       );
     }
-    const verdict = authorise(user.token, {
-      write: need.write ?? false,
-      session: need.session ?? false,
-    });
-    if (!verdict.ok) throw new HttpError(verdict.status, verdict.code, verdict.message);
-
+    // Every request with an API token counts, a refused one included, so a
+    // script that keeps hitting a 403 is still held to its minute.
     const adapters = await getAdapters();
-    if (user.token) {
+    if (user.token?.kind === 'api') {
       const taken = await takeApiRequest(adapters.db, adapters.installId, user.token.id);
       limits = {
         'x-ratelimit-limit': String(API_RATE_LIMIT),
@@ -82,6 +80,11 @@ export async function rest(
         );
       }
     }
+    const verdict = authorise(user.token, {
+      write: need.write ?? false,
+      session: need.session ?? false,
+    });
+    if (!verdict.ok) throw new HttpError(verdict.status, verdict.code, verdict.message);
 
     const writes: (() => Promise<unknown>)[] = [];
     const via: ViaApi | null = user.token ? { via: 'api', token: user.token.name } : null;
