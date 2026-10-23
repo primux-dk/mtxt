@@ -51,6 +51,19 @@ Every page needs a company login. `apps/web/.dev.vars` holds `AUTH_SECRET`, `SET
 
 Layout: `apps/web` is the library (Next.js on Cloudflare Workers), `packages/contract` the recorder-to-server contract, `packages/adapters` storage, queue and database behind interfaces. The web app reaches Cloudflare only through `@mtxt/adapters`.
 
+## Deploy
+
+An install runs in the owning company's own Cloudflare account, on a hostname in one of its zones. One command creates or reuses the D1 database, the R2 bucket, the queues and the AI Gateway, applies the migrations, writes the first settings row, deploys the Worker with its custom domain and sets its secrets:
+
+```sh
+cp deploy/install.example.json deploy/installs/acme.json   # then fill it in
+pnpm deploy:install --config deploy/installs/acme.json --dry-run
+pnpm deploy:install --config deploy/installs/acme.json
+pnpm deploy:smoke meetings.acme.com --product "Acme Meetings"
+```
+
+[deploy/README.md](deploy/README.md) is the runbook: prerequisites, the app registration and its redirect URI, rotating secrets, updating, backing up D1, removing an install, and what stays in the EU.
+
 ## Licence
 
 PolyForm Noncommercial 1.0.0, the same as scene-loop. Free for noncommercial use; a company that runs it in its business needs a commercial licence from Primux. Source-available, not open source in the OSI sense. See [LICENSE.md](LICENSE.md) and [NOTICE.md](NOTICE.md) for third-party code and model attributions.
