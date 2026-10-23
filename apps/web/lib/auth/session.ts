@@ -18,6 +18,8 @@ export interface SessionUser {
   email: string;
   /** The user row's is_admin, kept from the admin list at sign-in and on every save of the list. */
   isAdmin: boolean;
+  /** Set when the caller is a desktop recorder: the id of the bearer token it authenticated with. */
+  recorderTokenId?: string;
 }
 
 /**
@@ -57,7 +59,7 @@ export const getApiUser = cache(async (): Promise<SessionUser | null> => {
   if (!token) return null;
   const { db, installId } = await getAdapters();
   const found = await findRecorderUser(db, installId, await hashRecorderToken(token));
-  return found ? sessionUser(found.user) : null;
+  return found ? { ...sessionUser(found.user), recorderTokenId: found.tokenId } : null;
 });
 
 /** A page that needs a session sends the reader to the login page, and back after. */

@@ -26,13 +26,18 @@ vi.mock('next/headers', () => ({ headers: async () => state.headers }));
 vi.mock('@/lib/auth', () => ({
   auth: async () => (state.sessionUserId ? { user: { id: state.sessionUserId } } : null),
 }));
+const loads = vi.hoisted(() => ({ adapters: 0, settings: 0 }));
 vi.mock('@/lib/install', () => ({
-  getAdapters: async () => ({ db: state.db, installId: INSTALL }),
+  getAdapters: async () => {
+    loads.adapters++;
+    return { db: state.db, installId: INSTALL };
+  },
 }));
 
 const { getApiUser } = await import('../lib/auth/session');
 const { pollForToken } = await import('../lib/recorders/token-poll');
 const { connectParams, connectState } = await import('../lib/recorders/connect');
+const { DELETE } = await import('../app/api/v1/recorder/tokens/[id]/route');
 
 const settings = { installId: INSTALL, ...DEFAULT_SETTINGS, productName: 'Primux Møder' };
 const verifier = 'v'.repeat(43);
@@ -41,7 +46,19 @@ describe('recorder connection', () => {
   let ctx: Awaited<ReturnType<typeof testDb>>;
   let challenge: string;
   const poll = async (body: unknown) => {
-    const response = await pollForToken({ db: ctx.db, installId: INSTALL, settings }, body);
+    const response = await pollForToken(
+      {
+        adapters: async () => {
+          loads.adapters++;
+          return { db: ctx.db, installId: INSTALL };
+        },
+        settings: async () => {
+          loads.settings++;
+          return settings;
+        },
+      },
+      body,
+    );
     return {
       status: response.status,
       headers: response.headers,
@@ -55,6 +72,8 @@ describe('recorder connection', () => {
     state.db = ctx.db;
     state.headers = new Headers();
     state.sessionUserId = null;
+    loads.adapters = 0;
+    loads.settings = 0;
     challenge = await s256(verifier);
     ctx.raw.exec(`INSERT INTO users (id, install_id, oidc_subject, email, name, is_admin) VALUES
       ('mette', '${INSTALL}', 'm', 'mette@example.com', 'Mette Lund', 1),
@@ -68,6 +87,18 @@ describe('recorder connection', () => {
         expect(r.status).toBe(400);
         expect(r.body.error.code).toBe('invalid_request');
       }
+      // Refused before the database is asked.
+      expect(loads.adapters).toBe(0);
+    });
+
+    it('answers a wrong verifier without the database, and loads the settings only to issue a token', async () => {
+      expect((await poll({ challenge, verifier: 'w'.repeat(43) })).status).toBe(410);
+      expect(loads).toEqual({ adapters: 0, settings: 0 });
+      expect((await poll({ challenge, verifier })).status).toBe(202);
+      expect(loads).toEqual({ adapters: 1, settings: 0 });
+      await approveGrant(ctx.db, INSTALL, { challenge, userId: 'mette', deviceName: 'Mac' });
+      expect((await poll({ challenge, verifier })).status).toBe(200);
+      expect(loads.settings).toBe(1);
     });
 
     it('answers 202 with Retry-After until Approve, and writes nothing', async () => {
@@ -110,18 +141,23 @@ describe('recorder connection', () => {
       expect(JSON.stringify(stored)).not.toContain(r.body.token);
       expect(stored[0]).toMatchObject({ token_hash: await hashRecorderToken(r.body.token) });
 
-      // At once again: one poll a second. Later: used, 410.
-      const again = await poll({ challenge, verifier });
-      expect(again.status).toBe(429);
-      expect(again.body).toEqual({
-        error: { code: 'rate_limited', message: expect.any(String) },
-        retry_after: 1,
-      });
-      expect(again.headers.get('retry-after')).toBe('1');
-      ctx.raw.exec('update recorder_grants set last_poll_at = last_poll_at - 1000');
+      // Used: the next poll is 410 at once, and writes nothing.
       const used = await poll({ challenge, verifier });
       expect(used.status).toBe(410);
       expect(used.body.error.code).toBe('expired');
+    });
+
+    it('answers 429 with Retry-After to a second poll inside a second on an approved grant', async () => {
+      await approveGrant(ctx.db, INSTALL, { challenge, userId: 'mette', deviceName: 'Mac' });
+      ctx.raw.exec(`update recorder_grants set last_poll_at = ${Date.now()}`);
+      const fast = await poll({ challenge, verifier });
+      expect(fast.status).toBe(429);
+      expect(fast.body).toEqual({
+        error: { code: 'rate_limited', message: expect.any(String) },
+        retry_after: 1,
+      });
+      expect(fast.headers.get('retry-after')).toBe('1');
+      expect(ctx.raw.prepare('select count(*) as n from recorder_tokens').get()).toEqual({ n: 0 });
     });
 
     it('answers 410 denied after Cancel and 410 expired after 10 minutes', async () => {
@@ -164,6 +200,7 @@ describe('recorder connection', () => {
         name: 'Mette Lund',
         email: 'mette.lund@example.com',
         isAdmin: false,
+        recorderTokenId: expect.any(String),
       });
     });
 
@@ -182,6 +219,41 @@ describe('recorder connection', () => {
       expect(await getApiUser()).toMatchObject({ id: 'mette' });
       await revokeRecorderToken(ctx.db, INSTALL, { userId: 'mette', tokenId: token_id });
       expect(await getApiUser()).toBeNull();
+    });
+  });
+
+  describe('DELETE /api/v1/recorder/tokens/{id}', () => {
+    async function connectTwo() {
+      const ids: { token: string; token_id: string }[] = [];
+      for (const seed of ['p', 'q']) {
+        const v = seed.repeat(43);
+        const c = await s256(v);
+        await approveGrant(ctx.db, INSTALL, { challenge: c, userId: 'mette', deviceName: seed });
+        ids.push((await poll({ challenge: c, verifier: v })).body);
+      }
+      return ids;
+    }
+    const del = async (id: string) =>
+      (await DELETE(new Request('http://x'), { params: Promise.resolve({ id }) })).status;
+
+    it('with a bearer token revokes only that token: a sibling is 404 and stays connected', async () => {
+      const [a, b] = await connectTwo();
+      state.headers = new Headers({ authorization: `Bearer ${a!.token}` });
+      expect(await del(b!.token_id)).toBe(404);
+      expect(
+        ctx.raw.prepare('select revoked_at from recorder_tokens where id = ?').get(b!.token_id),
+      ).toEqual({ revoked_at: null });
+      expect(await del(a!.token_id)).toBe(204);
+    });
+
+    it('with the session cookie revokes any of the user’s own tokens, never another user’s', async () => {
+      const [a, b] = await connectTwo();
+      state.sessionUserId = 'anne';
+      expect(await del(a!.token_id)).toBe(404);
+      state.sessionUserId = 'mette';
+      expect(await del(a!.token_id)).toBe(204);
+      expect(await del(b!.token_id)).toBe(204);
+      expect(await del(b!.token_id)).toBe(204);
     });
   });
 
