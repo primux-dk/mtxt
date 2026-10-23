@@ -80,9 +80,11 @@ describe('the edges', () => {
     expect(due('Sendes 3/4')).toBe('unsure');
   });
 
-  it('never gives a day before the meeting', () => {
-    expect(due('Afleveret 2026-10-01')).toBe('none');
-    expect(due('Planen sendes 21. oktober 2026')).toBe('none');
+  it('calls a deadline before the meeting past, never a due date', () => {
+    expect(due('Afleveret 2026-10-01')).toBe('past');
+    expect(due('Planen sendes 21. oktober 2026')).toBe('past');
+    // A past day next to a future one: the future one is the deadline.
+    expect(due('Udkastet kom 2026-10-01, rettelser inden fredag')).toBe('2026-10-23');
   });
 
   it('moves to the next month that has the day', () => {
@@ -100,7 +102,12 @@ describe('the edges', () => {
       date: '2026-10-24',
     });
     expect(validTimeZone('Europe/Copenhagen')).toBe(true);
+    expect(validTimeZone('UTC')).toBe(true);
     expect(validTimeZone('Mars/Olympus')).toBe(false);
+    // Intl takes these, the list the settings page offers does not (packet 15 review).
+    expect(validTimeZone('+01:00')).toBe(false);
+    expect(validTimeZone('CET')).toBe(false);
+    expect(validTimeZone('')).toBe(false);
   });
 });
 
@@ -108,6 +115,19 @@ describe('which due date a drafted decision keeps', () => {
   it('takes the phrase over the model, and none when the phrase is unsure', () => {
     expect(decideDue('Test på torsdag', DAY, '2026-10-23')).toBe('2026-10-29');
     expect(decideDue('Test næste fredag', DAY, '2026-10-23')).toBeNull();
+  });
+
+  it("gives no date for a past deadline, and does not fall back to the model's (packet 15 review)", () => {
+    expect(decideDue('Send by 21 October 2026', DAY, '2026-11-01')).toBeNull();
+    expect(decideDue('Sendes 21. oktober 2026', DAY, '2026-11-01')).toBeNull();
+  });
+
+  it("keeps the model's date up to the same day a year later, not 366 days", () => {
+    expect(decideDue('Test', DAY, '2027-10-22')).toBe('2027-10-22');
+    expect(decideDue('Test', DAY, '2027-10-23')).toBeNull();
+    // A meeting on 29 February: the anniversary is 28 February.
+    expect(decideDue('Test', '2028-02-29', '2029-02-28')).toBe('2029-02-28');
+    expect(decideDue('Test', '2028-02-29', '2029-03-01')).toBeNull();
   });
 
   it("keeps the model's date only when it is a real day within a year from the meeting", () => {

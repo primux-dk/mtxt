@@ -25,7 +25,9 @@
   "next Friday" mean this week's or next week's depending on who says it, so
   they, "næste måned", "next month", "snart" and "soon" make the item
   unsure. Two phrases that give different days make it unsure too. Unsure
-  means no due date; a date before the meeting's day is never one.
+  means no due date. A phrase that names a day before the meeting is a
+  deadline that cannot be, and gives none either, the model's date
+  included; a date before the meeting's day is never one.
 
   Pure: no clock, no database.
 */
@@ -48,14 +50,15 @@ export function meetingDay(at: Date, timeZone: string): string {
 }
 
 /** Whether `zone` is a time zone this runtime knows. */
+let zones: Set<string> | null = null;
+/**
+ * Whether `zone` is one the settings page offers: UTC or a name in the
+ * runtime's own list. `Intl` also takes offsets (`+01:00`) and legacy names
+ * (`CET`); those are refused (packet 15 review).
+ */
 export function validTimeZone(zone: string): boolean {
-  if (!zone || zone.length > 64) return false;
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
+  zones ??= new Set(['UTC', ...Intl.supportedValuesOf('timeZone')]);
+  return zones.has(zone);
 }
 
 const DAY_MS = 86_400_000;
@@ -310,7 +313,12 @@ const RULES: Rule[] = [
   },
 ];
 
-export type Found = { kind: 'date'; date: string } | { kind: 'none' } | { kind: 'unsure' };
+export type Found =
+  | { kind: 'date'; date: string }
+  | { kind: 'none' }
+  | { kind: 'unsure' }
+  /** Every deadline it names is before the meeting: no date, and no model fallback. */
+  | { kind: 'past' };
 
 /** The due date a decision's text states, relative to the meeting's day (`YYYY-MM-DD`). */
 export function findDue(text: string, day: string): Found {
@@ -318,6 +326,7 @@ export function findDue(text: string, day: string): Found {
   let rest = text.replace(/\s+/g, ' ');
   const dates = new Set<string>();
   let unsure = false;
+  let past = false;
   for (const rule of RULES) {
     rule.pattern.lastIndex = 0;
     rest = rest.replace(rule.pattern, (...args) => {
@@ -328,27 +337,36 @@ export function findDue(text: string, day: string): Found {
       const found = rule.resolve(match, start);
       if (found === 'unsure') unsure = true;
       else if (found && found >= start) dates.add(iso(found));
+      else if (found) past = true;
       // Taken out, so "i overmorgen" is not read again as "i morgen".
       return ' '.repeat(match[0].length);
     });
   }
   if (unsure || dates.size > 1) return { kind: 'unsure' };
   const [date] = dates;
-  return date ? { kind: 'date', date } : { kind: 'none' };
+  return date ? { kind: 'date', date } : past ? { kind: 'past' } : { kind: 'none' };
+}
+
+/** The same day a year later; 29 February gives 28 February. */
+function anniversary(day: Date): Date {
+  const y = day.getUTCFullYear() + 1;
+  const m = day.getUTCMonth();
+  return calendar(y, m, day.getUTCDate()) ?? lastOfMonth(y, m);
 }
 
 /**
  * The due date a drafted decision keeps. A phrase in its text decides; an
- * unsure one gives none. With no phrase, the model's own `~date` stands when
- * it is a real day from the meeting's day to a year after it.
+ * unsure one, or one that names a day before the meeting, gives none. With
+ * no phrase, the model's own `~date` stands when it is a real day from the
+ * meeting's day to the same day a year later.
  */
 export function decideDue(text: string, day: string, fromModel: string | null): string | null {
   const found = findDue(text, day);
   if (found.kind === 'date') return found.date;
-  if (found.kind === 'unsure') return null;
+  if (found.kind !== 'none') return null;
   const model = dueDate(fromModel);
   if (!model) return null;
   const at = toDate(model);
   const start = toDate(day);
-  return at >= start && at <= plus(start, 366) ? model : null;
+  return at >= start && at <= anniversary(start) ? model : null;
 }

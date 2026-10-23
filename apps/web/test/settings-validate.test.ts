@@ -357,9 +357,12 @@ describe('the time zone', () => {
       return result.ok ? result.patch.timeZone : result.errors.timeZone;
     };
     expect(zone('Europe/Copenhagen')).toBe('Europe/Copenhagen');
-    expect(zone('America/Argentina/Buenos_Aires')).toBe('America/Argentina/Buenos_Aires');
+    expect(zone('America/Buenos_Aires')).toBe('America/Buenos_Aires');
     expect(zone(null)).toBe('UTC');
     expect(zone('Europe/Atlantis')).toEqual({ code: 'invalid' });
+    // Intl reads these; the list on the page has neither (packet 15 review).
+    expect(zone('+01:00')).toEqual({ code: 'invalid' });
+    expect(zone('CET')).toEqual({ code: 'invalid' });
     expect(zone('x'.repeat(65))).toEqual({ code: 'invalid' });
   });
 });

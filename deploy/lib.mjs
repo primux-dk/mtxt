@@ -113,15 +113,12 @@ export function loadInstall(path) {
   };
 }
 
-/** Whether `zone` is a time zone name Node knows, the same check the settings page makes. */
+/**
+ * Whether `zone` is UTC or a name in the runtime's own list, the same check
+ * the settings page makes; an offset (`+01:00`) or a legacy name (`CET`) is not.
+ */
 export function knownTimeZone(zone) {
-  if (typeof zone !== 'string' || !zone || zone.length > 64) return false;
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
+  return zone === 'UTC' || Intl.supportedValuesOf('timeZone').includes(zone);
 }
 
 /** wrangler.jsonc to JSON: drops comments and trailing commas, leaves strings alone. */
