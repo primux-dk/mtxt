@@ -4,7 +4,7 @@ Meeting transcription a company hosts itself. A small recorder on each employee'
 
 Meetings only. No dictation.
 
-**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log and search. The MCP server comes next. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the macOS recorder builds; Windows comes later. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
+**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search and outbound webhooks. The MCP server comes next. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the macOS recorder builds; Windows comes later. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -52,6 +52,56 @@ Every page needs a company login. `apps/web/.dev.vars` holds `AUTH_SECRET`, `SET
 - `/design` serves the design guidelines rendered with the install's own theme values.
 
 Layout: `apps/web` is the library (Next.js on Cloudflare Workers), `packages/contract` the recorder-to-server contract, `packages/adapters` storage, queue and database behind interfaces. The web app reaches Cloudflare only through `@mtxt/adapters`.
+
+## Webhooks
+
+An install can send its meetings to the company's other systems, such as a CRM or a case system. An admin adds up to five endpoints under Settings, Webhooks, and chooses whether company meetings, all shared meetings or none go out on their own. A private meeting goes only when its owner chooses "Send to connected systems" (or "Send to Alex", after the endpoint's label) on the meeting page. A payload carries metadata and signed links, never the transcript or the recap: the receiving system fetches those through the links, which work for one hour and only while the meeting may still be sent. The events are `meeting.transcribed`, `recap.drafted`, `recap.saved`, `meeting.shared`, `meeting.deleted` and `webhook.test`. A failed delivery is tried again after 1 minute, 10 minutes, 1 hour, 6 hours and 24 hours, then parked; each endpoint has a delivery log with Retry now. The details are in [docs/spec.md](docs/spec.md#webhooks).
+
+```json
+{
+  "event": "recap.saved",
+  "sent_at": "2026-10-23T10:15:00.000Z",
+  "install": { "product_name": "Acme Meetings" },
+  "meeting": {
+    "id": "6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d",
+    "title": "Production meeting, week 43",
+    "started_at": "2026-10-22T09:00:00.000Z",
+    "duration_s": 2712,
+    "visibility": "company",
+    "owner": { "name": "Mette Lund", "email": "mette.lund@example.com" }
+  },
+  "links": {
+    "transcript": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.transcript.1793178900.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>",
+    "recap_markdown": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.md.1793178900.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>",
+    "recap_docx": "https://meetings.example.com/api/v1/export/v1.6f1c2a34-9d0e-4b7a-8c21-5e3f9a0b1c2d.docx.1793178900.0a1b2c3d-1e2f-4a5b-8c6d-7e8f9a0b1c2d.<signature>"
+  },
+  "expires_at": "2026-10-23T11:15:00.000Z"
+}
+```
+
+A link is `null` when there is nothing to fetch yet; `meeting.deleted` has no links. The transcript link answers JSON (`language`, `speakers`, and `segments` with `start_ms`, `end_ms`, `speaker_id` and `text`), the recap links Markdown and Word. A link answers 404 once the meeting may no longer be sent and 410 once it has expired.
+
+Every request carries `X-Mtxt-Signature: t=<unix seconds>,v1=<hex>`, the HMAC-SHA256 of `<t>.<raw body>` with the endpoint's secret, plus `X-Mtxt-Event` and `X-Mtxt-Delivery`, which stays the same on every attempt of a delivery so the receiver can drop a repeat. Check the signature on the raw body before parsing it:
+
+```ts
+async function verifyMtxt(rawBody: string, header: string | null, secret: string) {
+  const match = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header ?? '');
+  if (!match) return false;
+  const [, t, v1] = match;
+  // Refuse a replay: the timestamp is signed, so it cannot be moved.
+  if (Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  const mac = Uint8Array.from(v1!.match(/../g)!, (byte) => parseInt(byte, 16));
+  // crypto.subtle.verify compares in constant time.
+  return crypto.subtle.verify('HMAC', key, mac, new TextEncoder().encode(`${t}.${rawBody}`));
+}
+```
 
 ## Deploy
 

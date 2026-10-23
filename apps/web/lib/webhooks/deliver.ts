@@ -74,7 +74,6 @@ export function linkOrigin(publicUrl: string | undefined, allowLocal = false): s
 
 export async function runWebhook(deps: WebhookDeps, job: WebhookJob): Promise<void> {
   const { db, installId } = deps;
-  const log = deps.log ?? console;
   const now = deps.now?.() ?? new Date();
   const row = await db
     .select()
@@ -114,6 +113,37 @@ export async function runWebhook(deps: WebhookDeps, job: WebhookJob): Promise<vo
     )
     .returning({ id: d.id });
   if (!claimed.length) return;
+  try {
+    await attempt(deps, job, row, now);
+  } catch (error) {
+    // Unexpected, such as a database error: the claim goes back, so the queue's redelivery of
+    // this message retakes it at once rather than after the lease. If the POST had gone out, the
+    // consumer may see the delivery twice; X-Mtxt-Delivery is the same both times.
+    await db
+      .update(d)
+      .set({ status: 'pending', attempts: job.attempt - 1, nextAttemptAt: now })
+      .where(
+        and(
+          eq(d.installId, installId),
+          eq(d.id, row.id),
+          eq(d.status, 'sending'),
+          eq(d.attempts, job.attempt),
+        ),
+      )
+      .catch(() => {});
+    throw error;
+  }
+}
+
+/** One claimed attempt: build, check, post, record. */
+async function attempt(
+  deps: WebhookDeps,
+  job: WebhookJob,
+  row: typeof d.$inferSelect,
+  now: Date,
+): Promise<void> {
+  const { db, installId } = deps;
+  const log = deps.log ?? console;
 
   /** Writes the attempt's end, only while this attempt still holds the row. */
   const finish = (values: Partial<typeof d.$inferInsert>) =>

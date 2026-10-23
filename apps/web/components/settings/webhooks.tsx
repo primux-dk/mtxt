@@ -346,13 +346,8 @@ export function Webhooks({ initial }: { initial: EndpointRow[] }) {
               </DialogFooter>
             </div>
           ) : (
-            <form
-              onSubmit={submitAdd}
-              noValidate
-              className="grid gap-4"
-              aria-labelledby="webhook-add-title"
-            >
-              <DialogTitle id="webhook-add-title">{t('dialog.title')}</DialogTitle>
+            <form onSubmit={submitAdd} noValidate className="grid gap-4">
+              <DialogTitle>{t('dialog.title')}</DialogTitle>
               <DialogDescription>{t('dialog.body')}</DialogDescription>
               <Field
                 id="webhook-label"
@@ -363,7 +358,10 @@ export function Webhooks({ initial }: { initial: EndpointRow[] }) {
                 <Input
                   id="webhook-label"
                   value={draft.label}
-                  onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                  onChange={(e) => {
+                    setDraft({ ...draft, label: e.target.value });
+                    setErrors((current) => ({ ...current, label: undefined }));
+                  }}
                   autoComplete="off"
                   aria-invalid={errors.label ? true : undefined}
                   aria-describedby={describedBy('webhook-label', true, errors.label)}
@@ -380,7 +378,10 @@ export function Webhooks({ initial }: { initial: EndpointRow[] }) {
                   type="url"
                   inputMode="url"
                   value={draft.url}
-                  onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+                  onChange={(e) => {
+                    setDraft({ ...draft, url: e.target.value });
+                    setErrors((current) => ({ ...current, url: undefined }));
+                  }}
                   autoComplete="off"
                   spellCheck={false}
                   placeholder="https://"

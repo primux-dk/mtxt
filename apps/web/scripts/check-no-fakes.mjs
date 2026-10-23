@@ -19,6 +19,7 @@ const NAMES = [
   'ELEVENLABS_BASE_URL',
   'fakeRecapLlm',
   'RECAP_FAKE_URL',
+  'fakeReceiverRoute',
 ];
 
 const openNext = join(here, '.open-next');
@@ -46,7 +47,8 @@ try {
     if (
       text.includes('/api/test/fake-assemblyai') ||
       text.includes('/api/test/fake-elevenlabs') ||
-      text.includes('/api/test/fake-recap')
+      text.includes('/api/test/fake-recap') ||
+      text.includes('/api/test/webhook-receiver')
     )
       found.push(`${file}: a fake route (an e2e build?)`);
     for (const name of NAMES) if (text.includes(name)) found.push(`${file}: ${name}`);
