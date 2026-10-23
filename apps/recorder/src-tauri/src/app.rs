@@ -176,6 +176,8 @@ pub struct QueueItem {
     pub blocked: Option<Blocked>,
     pub local_error: Option<String>,
     pub can_save: bool,
+    /// The audio is on this Mac.
+    pub has_file: bool,
     pub recovered: bool,
     /// Finished by recovery; uploads after the user says so.
     pub needs_review: bool,
@@ -427,6 +429,7 @@ impl App {
             },
             local_error: r.local_error.clone(),
             can_save: r.can_save_elsewhere() && self.store.audio_path(&r.id).exists(),
+            has_file: self.store.audio_path(&r.id).exists(),
             recovered: r.recovered,
             needs_review: r.needs_review,
             unsaved: inner.queue.unsaved_error(&r.id).map(str::to_string),
@@ -1253,6 +1256,50 @@ impl App {
             }
         }
         self.wake.notify_one();
+        self.changed();
+        Ok(())
+    }
+
+    /// "Save audio to…": a checked copy elsewhere; the entry does not change.
+    pub fn export_audio(&self, id: &str, dest: PathBuf) -> Result<(), String> {
+        let expected = self.lock().queue.get(id).and_then(|r| {
+            (r.status != Status::FailedLocal).then(|| r.sha256.clone()).flatten()
+        });
+        self.store.export(id, &dest, expected.as_deref()).map(|_| ()).map_err(|e| match e {
+            ExportError::InsideQueue => "recorder.ask.insideQueue".to_string(),
+            _ => "recorder.ask.saveFailed".to_string(),
+        })
+    }
+
+    /// "Delete from this Mac": the local copy only. A confirmed recording
+    /// becomes Deleted (the library has it); an unconfirmed one is removed
+    /// entirely, and only with `confirmed` from the window's named question.
+    /// Never while it records or uploads.
+    pub fn delete_local(&self, id: &str, confirmed: bool) -> Result<(), String> {
+        let (status, uploading) = {
+            let inner = self.lock();
+            let r = inner.queue.get(id).ok_or("no such recording")?;
+            (r.status, inner.uploading.as_deref() == Some(id))
+        };
+        if uploading || matches!(status, Status::Recording | Status::Uploading) {
+            return Err("recorder.delete.busy".into());
+        }
+        match status {
+            Status::Confirmed => {
+                self.apply_with(id, Event::FileDeleted, OnFail::Revert).map_err(|_| "recorder.error.stateSave".to_string())?;
+                self.store.delete_audio(id).map_err(|e| e.to_string())?;
+            }
+            Status::Deleted | Status::SavedElsewhere => return Err("recorder.delete.noFile".into()),
+            _ if !confirmed => return Err("recorder.delete.needsConfirm".into()),
+            _ => {
+                self.store.forget(id).map_err(|e| e.to_string())?;
+                let mut inner = self.lock();
+                inner.queue.items.retain(|r| r.id != id);
+                if inner.ask.as_deref() == Some(id) {
+                    inner.ask = None;
+                }
+            }
+        }
         self.changed();
         Ok(())
     }

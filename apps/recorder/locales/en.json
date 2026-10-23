@@ -138,5 +138,15 @@
   "recorder.queue.upload": "Upload",
   "live.errorReason": "The local model could not run: {reason} · Live text is off, the recording continues",
   "live.jump": "Jump to latest",
-  "live.lines": "Live transcript"
+  "live.lines": "Live transcript",
+  "recorder.menu.label": "More actions for “{title}”",
+  "recorder.menu.save": "Save audio to…",
+  "recorder.menu.open": "Open in library",
+  "recorder.menu.delete": "Delete from this Mac",
+  "recorder.delete.title": "Delete “{title}” from this Mac?",
+  "recorder.delete.body": "The library does not have this recording yet. Deleting it here removes the only copy.",
+  "recorder.delete.busy": "The recording is still recording or uploading · Try again when it is done",
+  "recorder.delete.noFile": "The audio is no longer on this Mac",
+  "recorder.delete.needsConfirm": "Confirm the deletion first",
+  "recorder.menu.more": "More actions"
 }

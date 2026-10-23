@@ -19,6 +19,12 @@
           document.getElementById('sys-level').value = p.get('state') === 'figure05' ? 0.42 : 0;
         }, 200);
       }
+      // Open a row menu the way a click would.
+      if (p.get('menu'))
+        setTimeout(
+          () => document.querySelectorAll('.row-more')[Number(p.get('menu'))]?.click(),
+          400,
+        );
       // Open a dialog the way its trigger would.
       if (p.get('dialog') === 'model') {
         setTimeout(() => {

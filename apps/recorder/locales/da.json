@@ -138,5 +138,15 @@
   "recorder.queue.upload": "Overfør",
   "live.errorReason": "Den lokale model kunne ikke køre: {reason} · Live tekst er slået fra, optagelsen fortsætter",
   "live.jump": "Gå til det nyeste",
-  "live.lines": "Live transskription"
+  "live.lines": "Live transskription",
+  "recorder.menu.label": "Flere handlinger for “{title}”",
+  "recorder.menu.save": "Gem lyd som…",
+  "recorder.menu.open": "Åbn i biblioteket",
+  "recorder.menu.delete": "Slet fra denne Mac",
+  "recorder.delete.title": "Slet “{title}” fra denne Mac?",
+  "recorder.delete.body": "Biblioteket har ikke optagelsen endnu. Sletter du den her, er den eneste kopi væk.",
+  "recorder.delete.busy": "Optagelsen optager eller overføres stadig · Prøv igen, når den er færdig",
+  "recorder.delete.noFile": "Lyden ligger ikke længere på denne Mac",
+  "recorder.delete.needsConfirm": "Bekræft sletningen først",
+  "recorder.menu.more": "Flere handlinger"
 }

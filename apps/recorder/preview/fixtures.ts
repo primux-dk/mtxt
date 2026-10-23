@@ -3,7 +3,7 @@
 // 4-hour recording of 200 MB, a 120-character title, æ, ø and å). People and
 // meetings are invented, as in the mockups.
 
-import type { LiveUpdate, QueueItem, Snapshot } from '../src/types';
+import type { LiveTranscript, QueueItem, Snapshot } from '../src/types';
 
 const now = Date.parse('2026-10-23T09:00:00Z');
 const at = (hoursAgo: number) => new Date(now - hoursAgo * 3_600_000).toISOString();
@@ -23,6 +23,7 @@ const item = (
   blocked: null,
   local_error: null,
   can_save: false,
+  has_file: true,
   recovered: false,
   needs_review: false,
   unsaved: null,
@@ -300,14 +301,30 @@ export function snapshot(name: string, lang: string): Snapshot {
   return { ...base, ...(states[name] ?? {}), language: lang === 'da' ? 'da' : 'en' };
 }
 
-export const live: Record<string, LiveUpdate> = {
+const lines = [
+  'Velkommen, vi går i gang med punkt et.',
+  'Produktionen på linje to er oppe igen efter servicen.',
+  'Vi mangler stadig at teste det nye skift.',
+  'Jonas tager testen torsdag, og Søren laver planen.',
+  'Hvis kvaliteten holder, kan vi starte mandag.',
+  'Næste punkt er leverancerne til november.',
+  'Der er to forsinkelser, begge fra samme leverandør.',
+].map((text, i) => ({ at_s: 62 + i * 14, text }));
+
+export const live: Record<string, LiveTranscript> = {
   listening: {
     state: 'listening',
-    lines: ['Vi mangler stadig at teste det nye skift.'],
-    partial: 'Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi starte mandag.',
+    reason: null,
+    lines,
+    partial: { at_s: 162, text: 'Anne ringer til dem i dag og' },
   },
-  loading: { state: 'loading', lines: [], partial: '' },
-  paused: { state: 'paused', lines: [], partial: '' },
-  'needs-model': { state: 'needs_model', lines: [], partial: '' },
-  error: { state: 'error', lines: [], partial: '' },
+  loading: { state: 'loading', reason: null, lines: [], partial: null },
+  paused: { state: 'paused', reason: null, lines: lines.slice(0, 3), partial: null },
+  'needs-model': { state: 'needs_model', reason: null, lines: [], partial: null },
+  error: {
+    state: 'error',
+    reason: 'only one environment is allowed per process',
+    lines: [],
+    partial: null,
+  },
 };

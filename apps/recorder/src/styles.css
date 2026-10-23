@@ -750,3 +750,67 @@ dialog .actions .btn {
   white-space: normal;
   overflow: visible;
 }
+
+/* The three-dot menu on a row: a 44 px target that does not grow the row. */
+.queue-row {
+  position: relative;
+  padding-right: 30px;
+}
+.row-more {
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-control);
+}
+.row-more:hover {
+  color: var(--foreground);
+}
+.row-more .icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+.row-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% - 4px);
+  z-index: 10;
+  min-width: 190px;
+  display: grid;
+  padding: 4px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--floating-shadow);
+}
+.row-menu-item {
+  text-align: left;
+  background: transparent;
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 450;
+  border-radius: var(--radius-control);
+}
+.row-menu-item:hover:not([aria-disabled='true']),
+.row-menu-item:focus-visible {
+  background: var(--secondary);
+}
+.row-menu-item[aria-disabled='true'] {
+  color: var(--text-muted);
+  cursor: default;
+}
+.btn.danger {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--destructive);
+  border-radius: var(--radius-pill);
+}

@@ -39,6 +39,7 @@ export interface QueueItem {
   blocked: Blocked | null;
   local_error: string | null;
   can_save: boolean;
+  has_file: boolean;
   recovered: boolean;
   needs_review: boolean;
   unsaved: string | null;

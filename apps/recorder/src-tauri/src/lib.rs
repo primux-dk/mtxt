@@ -51,6 +51,8 @@ pub fn run() {
             commands::save_elsewhere,
             commands::remove_recording,
             commands::claim,
+            commands::export_audio,
+            commands::delete_local,
             commands::review,
             commands::retry_unreadable,
             commands::retry_damaged,
