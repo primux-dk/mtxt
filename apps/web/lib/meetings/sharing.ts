@@ -38,6 +38,11 @@ export async function changeVisibility(
       .update(m)
       .set({ visibility })
       .where(and(isMeeting(installId, meeting), eq(m.visibility, meeting.visibility))),
+    // Private takes the owner's webhook consent back (docs/spec.md "Webhooks").
+    db
+      .update(m)
+      .set({ webhookConsentAt: null })
+      .where(and(isMeeting(installId, meeting), eq(m.visibility, 'private'))),
     // Shares exist only while Shared; whatever arrived meanwhile goes with the change.
     db
       .delete(s)

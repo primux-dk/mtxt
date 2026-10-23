@@ -44,7 +44,8 @@ export type SecretContext =
   | 'settings.oidc_client_secret'
   | 'settings.stt_api_key'
   | 'settings.webhook_secret'
-  | 'settings.recap_api_key';
+  | 'settings.recap_api_key'
+  | 'webhook_endpoints.secret';
 
 const additionalData = (context: SecretContext) =>
   new TextEncoder().encode(`mtxt:${context}:${VERSION}`);

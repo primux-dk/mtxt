@@ -25,6 +25,7 @@ export async function recapDeps(env: CloudflareEnv): Promise<RecapDeps> {
     db,
     installId,
     takeOnce: (transcriptId) => takeRecapJob(db, installId, transcriptId).catch(() => false),
+    queue: adapters.queue,
     llm: async (settings) =>
       fake ?? recapLlm(settings, { language: adapters.language, settingsKey: env.SETTINGS_KEY }),
   };

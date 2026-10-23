@@ -15,6 +15,8 @@ import {
   writeVersion,
 } from '@/lib/recap/store';
 import { versionView, type VersionView } from '@/lib/recap/view';
+import { SAVED_DELAY_S } from '@/lib/webhooks/rules';
+import { queueMeetingEventQuietly } from '@/lib/webhooks/store';
 
 /*
   The recap's actions besides the save (that is PUT /api/v1/meetings/{id}/recap):
@@ -75,7 +77,7 @@ export async function restoreRecapVersion(meetingId: string, versionId: string) 
   return run<{ version: VersionView; bodyMd: string }>(
     meetingId,
     'owner',
-    async ({ db, installId, meeting, userId }) => {
+    async ({ db, installId, queue, meeting, userId }) => {
       const recap = await loadRecap(db, installId, meeting.id);
       const old = recap ? await versionBody(db, installId, recap.id, String(versionId)) : null;
       if (!recap || !old) return { ok: false, code: 'not_found' };
@@ -91,6 +93,16 @@ export async function restoreRecapVersion(meetingId: string, versionId: string) 
           base: { versionId: now?.current?.id ?? null },
         });
         if (result.ok) {
+          // A restore is a save: `recap.saved` a minute from now, joined by the saves after it.
+          await queueMeetingEventQuietly(
+            { db, installId, queue },
+            {
+              event: 'recap.saved',
+              meetingId: meeting.id,
+              dedupeKey: `saved:${result.version.id}`,
+              delayS: SAVED_DELAY_S,
+            },
+          );
           const body = await versionBody(db, installId, recap.id, result.version.id);
           return {
             ok: true,

@@ -4,6 +4,8 @@ import { readJson, recapMeeting } from '@/lib/recap/access';
 import { RECAP_SAVE_MAX_BYTES } from '@/lib/chunk-guard';
 import { loadRecap, RecapTooLongError, writeVersion } from '@/lib/recap/store';
 import { versionView } from '@/lib/recap/view';
+import { SAVED_DELAY_S } from '@/lib/webhooks/rules';
+import { queueMeetingEventQuietly } from '@/lib/webhooks/store';
 
 /*
   The recap editor's save (behaviour.md rules 1 and 4). Library-only, not
@@ -17,7 +19,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function PUT(request: Request, { params }: Params) {
   return api(async (user) => {
     const { id } = await params;
-    const { db, installId, meeting } = await recapMeeting(user, id, 'owner');
+    const { db, installId, queue, meeting } = await recapMeeting(user, id, 'owner');
     const body = await readJson(request, RECAP_SAVE_MAX_BYTES);
     const base = body.base_version_id;
     const markdown = body.body_md;
@@ -39,8 +41,20 @@ export async function PUT(request: Request, { params }: Params) {
       }
       throw error;
     });
-    // The stored text: the editor takes it when it differs from what it sent.
-    if (result.ok) return json({ version: versionView(result.version), body_md: result.bodyMd });
+    if (result.ok) {
+      // `recap.saved` a minute from now; the saves meanwhile join it (lib/webhooks/store.ts).
+      await queueMeetingEventQuietly(
+        { db, installId, queue },
+        {
+          event: 'recap.saved',
+          meetingId: meeting.id,
+          dedupeKey: `saved:${result.version.id}`,
+          delayS: SAVED_DELAY_S,
+        },
+      );
+      // The stored text: the editor takes it when it differs from what it sent.
+      return json({ version: versionView(result.version), body_md: result.bodyMd });
+    }
     if (result.reason === 'conflict') {
       return json(
         {

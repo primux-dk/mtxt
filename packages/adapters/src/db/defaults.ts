@@ -29,4 +29,5 @@ export const DEFAULT_SETTINGS = {
   recordingSources: ['desktop', 'upload', 'browser'],
   adminEmails: [],
   adminBootstrapClaimedAt: null,
+  webhookAutoSend: 'off',
 } as const;

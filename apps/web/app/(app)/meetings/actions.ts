@@ -14,6 +14,7 @@ import { HttpError } from '@/lib/http-error';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { resetForRetry } from '@/lib/transcription/store';
 import { asOwner, outcome, type ActionResult } from '@/lib/meetings/owner-action';
+import { planDeleted, queueDeleted } from '@/lib/webhooks/store';
 
 /** The owner's changes to a meeting. Each answers with the outcome; the screen rolls back on `ok: false`. */
 export type { ActionResult };
@@ -73,8 +74,13 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
   return outcome(() =>
     asOwner(
       meetingId,
-      async ({ db, storage, uploads, installId, user, meeting }) => {
+      async ({ db, storage, uploads, queue, installId, user, meeting }) => {
         await assertOwnRowsOnly(db, installId, meetingId);
+        // Who must hear of the delete, worked out while the meeting is still there.
+        const deletedEvent = await planDeleted(db, installId, meetingId).catch((error: unknown) => {
+          console.error('Could not plan meeting.deleted', (error as Error).name);
+          return null;
+        });
         const recordings = await db.query.recordings.findMany({
           where: and(eq(r.meetingId, meetingId), eq(r.installId, installId)),
         });
@@ -140,6 +146,7 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
             ),
         );
         await finishCleanup(db, storage, installId, cleanup);
+        if (deletedEvent) await queueDeleted({ db, installId, queue }, deletedEvent);
       },
       { deleted: true },
     ),

@@ -9,8 +9,10 @@ export const OPENED_WINDOW_MS = 60 * 60 * 1000;
 export type AuditDetails =
   | { before: Visibility; after: Visibility; sharesRemoved?: number }
   | { before: string[]; after: string[] }
-  /** `exported`: which file the reader took. */
-  | { format: 'md' | 'docx' };
+  /** `exported`: which file the reader took; `via: 'webhook'` when an endpoint fetched a link. */
+  | { format: 'md' | 'docx' | 'transcript'; via?: 'webhook'; endpoint?: string | null }
+  /** `webhook_sent`: the endpoint's label (null when it has none) and the event it took. */
+  | { endpoint: string | null; event: string };
 
 export interface AuditEventInput {
   userId: string;
