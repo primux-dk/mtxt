@@ -60,6 +60,8 @@ describe('schema', () => {
       'recap_outbox',
       'recap_versions',
       'recaps',
+      'recorder_grants',
+      'recorder_tokens',
       'recordings',
       'segments',
       'settings',
@@ -182,7 +184,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0006 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0007 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -194,10 +196,11 @@ describe('schema', () => {
        INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('t1', 't', 'r1', 'p', 'm', 'da', '{}');
        INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('s1', 't', 'm1', 'Speaker 1');
        INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text) VALUES
-         ('g1', 't', 't1', 's1', 0, 1, 'a'), ('g2', 't', 't1', 's1', 1, 2, 'b'), ('g3', 't', 't1', 's1', 2, 3, 'c');`,
+         ('g1', 't', 't1', 's1', 0, 1, 'a'), ('g2', 't', 't1', 's1', 1, 2, 'b'), ('g3', 't', 't1', 's1', 2, 3, 'c');
+       INSERT INTO audit_events (id, install_id, user_id, meeting_id, action, at) VALUES ('a1', 't', 'u1', 'm1', 'opened', 1000);`,
     );
     const counts = () =>
-      ['meetings', 'recordings', 'transcripts', 'speakers', 'segments'].map(
+      ['meetings', 'recordings', 'transcripts', 'speakers', 'segments', 'audit_events'].map(
         (table) => (old.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
       );
     const before = counts();
@@ -212,10 +215,11 @@ describe('schema', () => {
       '0004_transcription.sql',
       '0005_transcription_claims.sql',
       '0006_access_retention.sql',
+      '0007_recorder_connection.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);
-    expect(before).toEqual([1, 1, 1, 1, 3]);
+    expect(before).toEqual([1, 1, 1, 1, 3, 1]);
     // Packet-1 recordings keep working: a media type from the extension, confirmed at their start.
     expect(
       old.prepare(`SELECT content_type, created_at, confirmed_at FROM recordings`).get(),

@@ -126,5 +126,38 @@ export {
   workersAiSpeech,
   type CloudflareBindings,
 } from './cloudflare';
+export {
+  approveGrant,
+  denyGrant,
+  findGrant,
+  findRecorderUser,
+  listRecorderTokens,
+  pollGrant,
+  revokeRecorderToken,
+  type GrantInput,
+  type PollResult,
+  type RecorderConnection,
+} from './db/recorders';
+export {
+  bearerToken,
+  CHALLENGE_PATTERN,
+  cleanDeviceName,
+  DEVICE_NAME_MAX,
+  GRANT_LIFETIME_MS,
+  hashRecorderToken,
+  LAST_USED_EVERY_MS,
+  MAX_PENDING_GRANTS,
+  newRecorderToken,
+  POLL_ADVICE_S,
+  POLL_INTERVAL_MS,
+  pollAllowed,
+  RECORDER_TOKEN_PATTERN,
+  s256,
+  safeEqual,
+  TOKEN_LIFETIME_MS,
+  verifierMatches,
+  VERIFIER_PATTERN,
+} from './recorder-auth';
+export type { RecorderGrant, RecorderGrantStatus, RecorderToken } from './db/schema';
 export { foldTitle } from './db/fold';
 export { backfillTitleKeys } from './db/title-keys';
