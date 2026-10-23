@@ -345,6 +345,56 @@ test('a pasted image from elsewhere becomes its alt text, with no request to its
   expect(remote).toEqual([]);
 });
 
+test('a recap over 500,000 characters is a 413 the editor explains, with no retry', async ({
+  page,
+  request,
+}) => {
+  const [current] = d1<{ current_version_id: string }>(
+    `select current_version_id from recaps where meeting_id = '${meetingId}'`,
+  );
+  const tooLong = await request.put(`/api/v1/meetings/${meetingId}/recap`, {
+    headers: { ...colleague, 'content-type': 'application/json' },
+    data: JSON.stringify({
+      base_version_id: current!.current_version_id,
+      body_md: 'x'.repeat(500_001),
+    }),
+  });
+  expect(tooLong.status()).toBe(413);
+  expect(await tooLong.json()).toMatchObject({
+    error: { code: 'too_large' },
+    reason: 'recap_too_long',
+  });
+
+  // The editor says so and waits for the next edit instead of retrying.
+  let puts = 0;
+  await page.route('**/api/v1/meetings/*/recap', (route) => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    puts++;
+    return route.fulfill({
+      status: 413,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: { code: 'too_large', message: 'Too long.' },
+        reason: 'recap_too_long',
+      }),
+    });
+  });
+  await page.goto(`/meetings/${meetingId}`);
+  await newLineAfterHeading(page);
+  await page.keyboard.type('For lang.');
+  await expect(status(page)).toContainText(
+    'The recap is too long to save (max 500,000 characters)',
+    {
+      timeout: 10_000,
+    },
+  );
+  await page.waitForTimeout(7000);
+  expect(puts).toBe(1);
+  await page.unroute('**/api/v1/meetings/*/recap');
+  await page.keyboard.press('Backspace');
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+});
+
 test('the Worker entry refuses a recap save over 512 KiB and an image over 8 MiB', async ({
   request,
 }) => {

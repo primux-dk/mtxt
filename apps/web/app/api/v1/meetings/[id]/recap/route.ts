@@ -2,7 +2,7 @@ import { api, json } from '@/lib/api';
 import { HttpError } from '@/lib/http-error';
 import { readJson, recapMeeting } from '@/lib/recap/access';
 import { RECAP_SAVE_MAX_BYTES } from '@/lib/chunk-guard';
-import { loadRecap, writeVersion } from '@/lib/recap/store';
+import { loadRecap, RecapTooLongError, writeVersion } from '@/lib/recap/store';
 import { versionView } from '@/lib/recap/view';
 
 /*
@@ -32,6 +32,12 @@ export async function PUT(request: Request, { params }: Params) {
       bodyMd: markdown,
       authorId: user.id,
       base: { versionId: base },
+    }).catch((error: unknown) => {
+      // A size error is the client's: 413 with its reason, so the editor explains and waits.
+      if (error instanceof RecapTooLongError) {
+        throw new HttpError(413, 'too_large', error.message, { reason: 'recap_too_long' });
+      }
+      throw error;
     });
     // The stored text: the editor takes it when it differs from what it sent.
     if (result.ok) return json({ version: versionView(result.version), body_md: result.bodyMd });

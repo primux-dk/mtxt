@@ -23,6 +23,8 @@ import {
   listDecisions,
   listVersions,
   loadRecap,
+  MAX_BODY_CHARS,
+  RecapTooLongError,
   writeVersion,
 } from '../lib/recap/store';
 import { INSTALL, seedRecording, testDb } from './sqlite-db';
@@ -619,5 +621,24 @@ describe('decision owners stay inside the install (packet 5 review)', () => {
     });
     if (!written.ok) throw new Error('not written');
     expect(written.bodyMd).toBe(`![Egen](${own})\n\nAndet møde\n\nFjern\n`);
+  });
+});
+
+describe('the stored-size cap (second review)', () => {
+  it('stores 500,000 characters and refuses 500,001 with a typed error', async () => {
+    const { db, raw } = await testDb();
+    seedTranscript(raw);
+    const started = (await beginDraft(db, INSTALL, 'meet-1', null))!;
+    const save = (length: number, base: string | null) =>
+      writeVersion(db, INSTALL, {
+        recapId: started.recapId,
+        meetingId: 'meet-1',
+        bodyMd: 'x'.repeat(length),
+        authorId: 'owner',
+        base: { versionId: base },
+      });
+    await expect(save(MAX_BODY_CHARS + 1, null)).rejects.toBeInstanceOf(RecapTooLongError);
+    const ok = await save(MAX_BODY_CHARS, null);
+    expect(ok.ok).toBe(true);
   });
 });

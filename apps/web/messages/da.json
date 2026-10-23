@@ -316,7 +316,7 @@
       "reload": "Genindlæs",
       "problem": {
         "offline": "intet netværk, gemt i denne browser",
-        "too_long": "for langt til at gemme",
+        "too_long": "Referatet er for langt til at blive gemt (højst 500.000 tegn)",
         "refused": "serveren afviste at gemme"
       },
       "tickUndone": "afkrydsningen blev fortrudt"

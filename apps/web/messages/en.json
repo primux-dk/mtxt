@@ -316,7 +316,7 @@
       "reload": "Reload",
       "problem": {
         "offline": "no network, kept in this browser",
-        "too_long": "too long to save",
+        "too_long": "The recap is too long to save (max 500,000 characters)",
         "refused": "the server refused the save"
       },
       "tickUndone": "the tick was undone"

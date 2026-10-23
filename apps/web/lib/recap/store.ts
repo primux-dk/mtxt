@@ -21,8 +21,20 @@ const c = schema.recaps;
 const v = schema.recapVersions;
 const dc = schema.decisions;
 
-/** A recap body: under the save's 512 KiB bound at the Worker entry, JSON and all; about 70,000 words. */
-export const MAX_BODY_BYTES = 500_000;
+/**
+ * A recap body is at most 500,000 characters, about 70,000 words: under the
+ * save's 512 KiB bound at the Worker entry for plain text, and under D1's
+ * value limit for any text.
+ */
+export const MAX_BODY_CHARS = 500_000;
+
+/** A body over MAX_BODY_CHARS: the save answers 413 `recap_too_long`, not a server error. */
+export class RecapTooLongError extends Error {
+  constructor(readonly length: number) {
+    super(`The recap is ${length} characters; at most ${MAX_BODY_CHARS} are stored.`);
+    this.name = 'RecapTooLongError';
+  }
+}
 
 export interface VersionInfo {
   id: string;
@@ -204,9 +216,9 @@ export async function writeVersion(
     speakers: new Set(speakers.keys()),
   });
   const bodyMd = toMarkdown(doc);
-  if (new TextEncoder().encode(bodyMd).byteLength > MAX_BODY_BYTES) {
-    throw new Error('The recap is too long to store.');
-  }
+  // The text counts, not the newline the serializer ends it with.
+  const length = bodyMd.trimEnd().length;
+  if (length > MAX_BODY_CHARS) throw new RecapTooLongError(length);
   const rows: DecisionRow[] = decisionRows(doc, speakers);
   const id = crypto.randomUUID();
   const at = (input.now ?? new Date()).getTime();
