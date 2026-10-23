@@ -1,6 +1,5 @@
 import { and, eq } from 'drizzle-orm';
 import { audit, readSettings, schema } from '@mtxt/adapters';
-import { json } from '@/lib/api';
 import { getAdapters, getEnv } from '@/lib/install';
 import { attachment, exportFileName } from '@/lib/recap/export';
 import { recapFile } from '@/lib/recap/export-file';
@@ -20,6 +19,8 @@ import { transcriptExport } from '@/lib/webhooks/transcript';
 */
 type Params = { params: Promise<{ token: string }> };
 
+const json = (body: unknown, status: number) =>
+  Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const notFound = () =>
   json({ error: { code: 'not_found', message: 'No such export, or no longer available.' } }, 404);
 
