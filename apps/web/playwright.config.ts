@@ -48,7 +48,9 @@ export default defineConfig({
         ` --var PUBLIC_URL:http://localhost:${port}` +
         ` --var ASSEMBLYAI_BASE_URL:http://localhost:${port}/api/test/fake-assemblyai` +
         ` --var WORKERS_AI_FAKE_URL:http://localhost:${port}/api/test/fake-workers-ai` +
-        ` --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e`,
+        ` --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e` +
+        // Everything the Worker logs, for the spec that checks no secret reaches it.
+        ` > .wrangler/e2e-worker.log 2>&1`,
     ]
       .filter(Boolean)
       .join(' && '),

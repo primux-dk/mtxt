@@ -178,6 +178,7 @@ export function TranscriptView({
 
   // "Showing 01:03 of 42:06": the last segment whose top is above the position line.
   const [position, setPosition] = useState(segments[0]?.[0] ?? 0);
+  const remeasure = useRef<() => void>(() => {});
   useEffect(() => {
     let frame = 0;
     const measure = () => {
@@ -207,6 +208,7 @@ export function TranscriptView({
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
+    remeasure.current = schedule;
     schedule();
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
@@ -216,6 +218,9 @@ export function TranscriptView({
       window.removeEventListener('resize', schedule);
     };
   }, [segments, blockCount]);
+
+  // A block that renders after the scroll stopped changes what is in view: measure again.
+  useEffect(() => remeasure.current(), [shown]);
 
   const seek = useCallback((ms: number) => {
     const seconds = Math.floor(ms / 1000);

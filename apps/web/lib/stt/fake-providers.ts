@@ -26,7 +26,7 @@ if (process.env.NODE_ENV === 'production' && process.env.MTXT_E2E_BUILD !== '1')
 const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]']);
 const PREFIX = 'test/fake-assemblyai';
 
-export type FakeMode = 'completed' | 'error' | 'empty';
+export type FakeMode = 'completed' | 'error' | 'empty' | 'malformed';
 interface Control {
   mode: FakeMode;
   delayMs: number;
@@ -65,7 +65,10 @@ export async function controlRoute(request: Request) {
   }
   const body = (await request.json()) as Partial<Control>;
   const next: Control = {
-    mode: body.mode === 'error' || body.mode === 'empty' ? body.mode : 'completed',
+    mode:
+      body.mode === 'error' || body.mode === 'empty' || body.mode === 'malformed'
+        ? body.mode
+        : 'completed',
     delayMs: Number.isInteger(body.delayMs) ? Math.min(body.delayMs!, 30_000) : 1500,
   };
   await writeJson(`${PREFIX}/control.json`, next);
@@ -77,6 +80,12 @@ export async function uploadRoute(request: Request) {
   if (!request.headers.get('authorization'))
     return Response.json({ error: 'no key' }, { status: 401 });
   const bytes = (await request.arrayBuffer()).byteLength;
+  // A broken answer that echoes the key, for the redaction check (e2e/transcript.spec.ts).
+  if ((await control()).mode === 'malformed') {
+    return new Response(`{"upload_url": ${request.headers.get('authorization')} <html>`, {
+      status: 200,
+    });
+  }
   return Response.json({
     upload_url: `https://fake.invalid/upload/${crypto.randomUUID()}?bytes=${bytes}`,
   });

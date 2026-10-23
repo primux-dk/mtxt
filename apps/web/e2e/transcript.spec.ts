@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { open, seal } from '../../../packages/adapters/src/secrets';
 import { test } from './contract';
@@ -31,7 +32,7 @@ const KEY = 'ZTJlLXNldHRpbmdzLWtleS1ub3QtYS1zZWNyZXQtMDE='; // e2e/e2e.vars SETT
 const colleague = SESSION_HEADERS.colleague;
 const TERMS = ['linje 2', 'ugeplanen', 'Ærø'];
 
-const control = (request: APIRequestContext, mode: 'completed' | 'error' | 'empty') =>
+const control = (request: APIRequestContext, mode: 'completed' | 'error' | 'empty' | 'malformed') =>
   request.post('/api/test/fake-assemblyai/control', { data: { mode, delayMs: 1500 } });
 
 async function useProvider(provider: 'assemblyai' | 'workers-ai-whisper') {
@@ -338,6 +339,21 @@ test('a failed transcription says why, with Try again for the owner and Switch p
   await expect(segments(page)).toHaveCount(5, { timeout: 30_000 });
 });
 
+test('a malformed provider answer that echoes the key: no key in the Worker output or the rows', async ({
+  request,
+}) => {
+  await control(request, 'malformed');
+  const ids = await upload(request, 'Ødelagt svar');
+  await expect.poll(() => statusOf(request, ids.recordingId), { timeout: 30_000 }).toBe('failed');
+  expect(d1(`select failure_reason from recordings where id = '${ids.recordingId}'`)).toEqual([
+    { failure_reason: 'provider_error:200' },
+  ]);
+  const log = readFileSync('.wrangler/e2e-worker.log', 'utf8');
+  expect(log).toContain('The transcribe job failed; retrying');
+  expect(log).not.toContain('e2e-assemblyai-key');
+  expect(JSON.stringify(d1('select * from recordings'))).not.toContain('e2e-assemblyai-key');
+});
+
 test('no speech: the transcript is empty and says so', async ({ page, request }) => {
   await control(request, 'empty');
   const ids = await upload(request, 'Ingen tale');
@@ -424,6 +440,7 @@ test.describe('the seeded library, as the dev user', () => {
     await expect(page.getByRole('button', { name: 'Go to 2:00:00' })).toBeInViewport();
     expect(await segments(page).count()).toBeLessThanOrEqual(400);
     await expect(page.getByText(/^Showing 2:00:\d\d of 4:00:00$/)).toBeVisible();
+    // The last block renders after the scroll stops; the position follows without another scroll.
     await page.keyboard.press('End');
     await expect(page.getByText(/^Showing 3:59:\d\d of 4:00:00$/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Go to 3:59:57' })).toBeVisible();
