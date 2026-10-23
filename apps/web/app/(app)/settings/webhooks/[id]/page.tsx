@@ -206,6 +206,9 @@ export default async function DeliveryLogPage({ params, searchParams }: Params) 
                       <td className={cell}>
                         {retryable && (
                           <RetryDelivery
+                            // Keyed on the server's attempt count: once that attempt is made, the
+                            // row starts again from the server's state, never from a local "Queued".
+                            key={`${row.id}:${row.attempts}`}
                             deliveryId={row.id}
                             label={tl('retryLabel', {
                               event: t(`eventNames.${eventKey(row.event)}`),

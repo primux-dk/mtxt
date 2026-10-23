@@ -13,8 +13,10 @@ const RESULT_AFTER_MS = 1500;
 /**
  * Retry now on one delivery. Shows "Queued" at once and goes back to the
  * button with the reason when the server refuses (behaviour rule 2); the
- * row reads the attempt's result from the server a moment later. Queueing
- * the same attempt twice sends it once (lib/webhooks/deliver.ts).
+ * row reads the attempt's result from the server a moment later. The log
+ * keys this on the server's attempt count, so "Queued" lasts only until
+ * that attempt is made. Queueing the same attempt twice sends it once
+ * (lib/webhooks/deliver.ts).
  */
 export function RetryDelivery({ deliveryId, label }: { deliveryId: string; label: string }) {
   const t = useTranslations('settings.webhooks.logPage');

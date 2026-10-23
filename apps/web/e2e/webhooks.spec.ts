@@ -507,11 +507,14 @@ test('the sixth failed attempt parks the delivery', async ({ page, request }) =>
   await page.getByRole('button', { name: 'Send test event' }).first().click();
   await expect.poll(() => testDeliveries()[0]?.attempts, { timeout: 20_000 }).toBe(1);
   const id = testDeliveries()[0]!.id;
+  await page.reload();
   for (let attempt = 2; attempt <= 6; attempt++) {
-    await page.reload();
+    // No reload: once an attempt is made, the row comes back from the server with Retry now.
     const row = page.getByTestId('webhook-log-row').first();
-    await expect(row).toContainText(`${attempt - 1} of 6`);
+    await expect(row).toContainText(`${attempt - 1} of 6`, { timeout: 20_000 });
+    await expect(row.getByRole('status')).toHaveCount(0);
     await row.getByRole('button', { name: /Retry now/ }).click();
+    await expect(row.getByRole('status')).toHaveText(/Queued/);
     await expect
       .poll(
         () => d1<Delivery>(`select attempts, status from webhook_deliveries where id = '${id}'`)[0],
@@ -521,10 +524,10 @@ test('the sixth failed attempt parks the delivery', async ({ page, request }) =>
       )
       .toMatchObject({ attempts: attempt, status: attempt < 6 ? 'pending' : 'parked' });
   }
-  await page.reload();
   const row = page.getByTestId('webhook-log-row').first();
-  await expect(row).toContainText('Parked');
+  await expect(row).toContainText('Parked', { timeout: 20_000 });
   await expect(row).toContainText('6 of 6');
+  await expect(row.getByRole('status')).toHaveCount(0);
   // Parked is not the end: Retry now is still there.
   await expect(row.getByRole('button', { name: /Retry now/ })).toBeVisible();
   expect((await attemptsOf(request, id)).length).toBe(6);
