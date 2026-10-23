@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import { sha256, wav } from './helpers';
+import { sha256, wav, wrangler } from './helpers';
 
 /** A meeting with a 3-second WAV, made through the recorder API as the user whose cookie is in `headers`. */
 export async function meetingWithAudio(
@@ -39,25 +38,28 @@ export async function dropActions(page: Page) {
   );
 }
 
-/** Whether the e2e run's local R2 holds an object (wrangler's own local store, .wrangler/e2e). */
+/**
+ * Whether the e2e run's local R2 holds an object (wrangler's own local store,
+ * .wrangler/e2e). Only "the key does not exist" means no; a busy store is
+ * tried again and any other failure throws, so a broken read never passes
+ * for a deleted object.
+ */
 export function r2Has(key: string): boolean {
   try {
-    execFileSync(
-      'wrangler',
-      [
-        'r2',
-        'object',
-        'get',
-        `mtxt-audio/${key}`,
-        '--local',
-        '--persist-to',
-        '.wrangler/e2e',
-        '--pipe',
-      ],
-      { stdio: ['ignore', 'ignore', 'pipe'] },
-    );
+    wrangler([
+      'r2',
+      'object',
+      'get',
+      `mtxt-audio/${key}`,
+      '--local',
+      '--persist-to',
+      '.wrangler/e2e',
+      '--pipe',
+    ]);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (/The specified key does not exist/.test(String((error as { stderr?: unknown }).stderr)))
+      return false;
+    throw error;
   }
 }

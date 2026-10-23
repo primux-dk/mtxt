@@ -124,15 +124,45 @@ export async function signInHeaders(baseURL: string) {
   }
 }
 
+const BUSY = /SQLITE_BUSY|database is locked/;
+
+/**
+ * Runs wrangler against the e2e run's local state. It opens the same SQLite
+ * files as the running Worker, so while a job writes (the retention batches)
+ * it can meet SQLITE_BUSY: the statement did not run, and it is tried again,
+ * up to 20 times 250 ms apart. Any other failure throws at once, with
+ * wrangler's stderr on the error.
+ */
+export function wrangler(args: string[]): string {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return execFileSync('wrangler', args, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      const stderr = String((error as { stderr?: unknown }).stderr ?? '');
+      if (attempt >= 20 || !BUSY.test(stderr + String(error))) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+    }
+  }
+}
+
 /**
  * A read on the e2e run's local D1 (.wrangler/e2e, playwright.config.ts),
  * for checks the API rightly cannot make, such as rows of another install.
  */
 export function d1<T = Record<string, unknown>>(sql: string): T[] {
-  const out = execFileSync(
-    'wrangler',
-    ['d1', 'execute', 'DB', '--local', '--persist-to', '.wrangler/e2e', '--json', '--command', sql],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  );
+  const out = wrangler([
+    'd1',
+    'execute',
+    'DB',
+    '--local',
+    '--persist-to',
+    '.wrangler/e2e',
+    '--json',
+    '--command',
+    sql,
+  ]);
   return JSON.parse(out)[0].results as T[];
 }
