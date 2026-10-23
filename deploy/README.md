@@ -12,7 +12,7 @@ One install is one Worker and its resources in the owning company's own Cloudfla
 | R2 bucket | `mtxt-audio` | Created with jurisdiction `eu`. Audio and exports. |
 | Queue | `mtxt-jobs` | Created with jurisdiction `eu`. Transcription, recap, drain and retention jobs. One message per batch, five deliveries at most. |
 | Dead-letter queue | `mtxt-jobs-dlq` | Created with jurisdiction `eu`. A message that fails five deliveries lands here. Nothing consumes it; Cloudflare keeps a message for four days by default. |
-| AI Gateway | `mtxt-gateway` | Optional. Logging off, so prompts with meeting content are not kept. See "AI Gateway" below. |
+| AI Gateway | `mtxt-gateway` | Optional. Logs and cache off, so prompts with meeting content are not kept. See "AI Gateway" below. |
 | Worker secrets | | `AUTH_SECRET`, `SETTINGS_KEY`, `OIDC_PROVIDER`, `OIDC_TENANT_ID`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. |
 
 The names can be changed per install under `names` in the install config. The Durable Object migration (`v1`, `UploadSession`) and the queue consumer settings come from `apps/web/wrangler.jsonc`, so every install gets the same ones.
@@ -21,6 +21,7 @@ The names can be changed per install under `names` in the install config. The Du
 
 - Node 22 and pnpm 12 (`corepack enable`), and `pnpm install` at the repository root.
 - A Cloudflare login that can reach the account: `npx wrangler login` (OAuth), or `CLOUDFLARE_API_TOKEN` set to a token for that account. A token needs at least Account: Workers Scripts Edit, D1 Edit, Workers R2 Storage Edit, Queues Edit, AI Gateway Edit and Account Settings Read, plus Zone: Zone Read and Workers Routes Edit on the install's zone. The OAuth login was checked; the token list was not.
+- For the AI Gateway with an OAuth login: the Cloudflare CLI (`npm i -g cf`, then `cf auth login`). Without it the run skips the gateway.
 - The hostname's zone is active in the same account, and the hostname has no DNS record yet.
 - An app registration for the company login, with this redirect URI:
   - Google Workspace: an OAuth client of type "Web application" in the company's Google Cloud project, with the OAuth consent screen set to Internal so only the Workspace's own accounts can sign in. Redirect URI `https://<host>/api/auth/callback/google`. The tenant value is the Workspace domain, for example `example.com`.
@@ -66,7 +67,9 @@ The smoke test checks that `/login` renders (with the product name), that `/` an
 
 ## AI Gateway
 
-Wrangler's OAuth login has no AI Gateway permission, and `wrangler login` cannot ask for one. With that login the run skips the gateway and says so. Create it in the dashboard (AI, AI Gateway, Create gateway, id `mtxt-gateway`, logs off), then enter the id on the install's settings page. With an API token that has AI Gateway Edit, the run creates it and writes its id into a new settings row.
+Wrangler's OAuth login has no AI Gateway permission, and `wrangler login` cannot ask for one. When the API refuses wrangler's login, the run uses the Cloudflare CLI (`cf`, logged in with `cf auth login`) to find and create the gateway, with logs and the cache off. With an API token that has AI Gateway Edit, the run uses the token. With neither, it skips the gateway and says so: create it in the dashboard (AI, AI Gateway, Create gateway, id `mtxt-gateway`, logs off, no cache) and enter its id on the settings page.
+
+A gateway the run creates goes into the settings row's `ai_gateway_id` when the row has none. A later run leaves the column alone, so an admin who clears it on the settings page keeps it cleared.
 
 ## Rotating the Worker secrets
 

@@ -131,6 +131,33 @@ function run(cmd, args, { show = false, cwd = web, allowFail = false } = {}) {
   return { ok: result.status === 0, out: result.stdout ?? '', err: result.stderr ?? '' };
 }
 const wrangler = (args, options) => run(wranglerBin, args, options);
+
+/**
+ * The Cloudflare CLI (`cf`), when it is installed and logged in. Wrangler's OAuth login
+ * has no AI Gateway scope; `cf`'s OAuth login has, so the gateway steps use it when the
+ * API refuses wrangler's token. Returns null when `cf` is missing or the call fails.
+ */
+function cf(args) {
+  const result = spawnSync('cf', args, {
+    cwd: root,
+    env: childEnv,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (result.error || result.status !== 0) return null;
+  return result.stdout;
+}
+
+/** The gateway body: no logs (prompts carry meeting content) and no cache. */
+const GATEWAY_BODY = (id) => ({
+  id,
+  collect_logs: false,
+  cache_ttl: 0,
+  cache_invalidate_on_update: false,
+  rate_limiting_interval: 0,
+  rate_limiting_limit: 0,
+  rate_limiting_technique: 'fixed',
+});
 const withConfig = (args) => [...args, '--config', generatedConfig];
 
 // ---------------------------------------------------------------- Cloudflare API
@@ -267,11 +294,20 @@ async function inventory() {
 
   if (names.gateway) {
     const gw = await api(account(`/ai-gateway/gateways/${names.gateway}`));
+    found.gatewayVia = 'api';
     found.gateway = gw.ok
       ? 'exists'
       : gw.status === 404 || gw.errors.some((e) => e.startsWith('7002'))
         ? 'missing'
         : 'unreadable';
+    if (found.gateway === 'unreadable') {
+      const out = cf(['ai-gateway', 'gateways', 'list']);
+      const list = out === null ? null : JSON.parse(out.slice(out.indexOf('[')));
+      if (list) {
+        found.gatewayVia = 'cf';
+        found.gateway = list.some((g) => g.id === names.gateway) ? 'exists' : 'missing';
+      }
+    }
   }
 
   const scripts = await api(account('/workers/scripts'));
@@ -477,8 +513,8 @@ async function main() {
       `AI Gateway ${names.gateway}`,
       {
         exists: 'reuse',
-        missing: 'create (logs off)',
-        unreadable: 'skip: this login cannot read AI Gateway',
+        missing: `create (logs off, no cache${found.gatewayVia === 'cf' ? ', with the cf CLI' : ''})`,
+        unreadable: 'skip: neither this login nor a logged-in cf CLI can read AI Gateway',
       }[found.gateway],
     );
   }
@@ -533,28 +569,33 @@ async function main() {
       row(`Queue ${name}`, 'created');
     } else row(`Queue ${name}`, 'exists');
   }
+  let gatewayCreated = false;
   if (names.gateway && found.gateway === 'missing') {
-    const created = await api(account('/ai-gateway/gateways'), {
-      method: 'POST',
-      body: {
-        id: names.gateway,
-        cache_invalidate_on_update: true,
-        cache_ttl: 0,
-        // Prompts carry meeting content; the gateway keeps no copy of them.
-        collect_logs: false,
-        rate_limiting_interval: 0,
-        rate_limiting_limit: 0,
-        rate_limiting_technique: 'fixed',
-      },
-    });
-    row(
-      `AI Gateway ${names.gateway}`,
-      created.ok ? 'created' : `not created: ${created.errors.join('; ')}`,
-    );
+    let problem = null;
+    if (found.gatewayVia === 'cf') {
+      const out = cf([
+        'ai-gateway',
+        'gateways',
+        'create',
+        '--body',
+        JSON.stringify(GATEWAY_BODY(names.gateway)),
+      ]);
+      if (out === null) problem = 'the cf CLI refused the create';
+    } else {
+      const created = await api(account('/ai-gateway/gateways'), {
+        method: 'POST',
+        body: GATEWAY_BODY(names.gateway),
+      });
+      if (!created.ok) problem = created.errors.join('; ');
+    }
+    gatewayCreated = !problem;
+    row(`AI Gateway ${names.gateway}`, problem ? `not created: ${problem}` : 'created');
   } else if (names.gateway) {
     row(
       `AI Gateway ${names.gateway}`,
-      found.gateway === 'exists' ? 'exists' : 'skipped: no permission',
+      found.gateway === 'exists'
+        ? 'exists'
+        : 'skipped: no permission; create it in the dashboard (see deploy/README.md)',
     );
   }
 
@@ -594,6 +635,15 @@ async function main() {
     );
     row('Settings row', `written ("${settings.productName ?? 'Meetings'}")`);
   } else row('Settings row', `exists ("${existing[0].product_name}"); left alone`);
+  // A gateway this run created goes into a row that has none. A later run leaves the
+  // column alone, so an admin who clears it on the settings page keeps it cleared.
+  if (existing.length > 0 && gatewayCreated && gatewayId) {
+    d1File(
+      `UPDATE settings SET ai_gateway_id = '${gatewayId}' ` +
+        `WHERE install_id = '${installId}' AND ai_gateway_id IS NULL;\n`,
+    );
+    row('Settings ai_gateway_id', `${gatewayId}, if the row had none`);
+  }
 
   // ---- secrets: what the Worker gets
   const generated = {};
