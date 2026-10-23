@@ -16,8 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import type { Colleague } from '@/lib/meetings/queries';
 import { safely } from '@/lib/safe-action';
-
-type SearchState = { state: 'idle' | 'loading' | 'failed' } | { state: 'done'; found: Colleague[] };
+import { searchLine, type SearchState } from './share-search-state';
 
 /**
  * Who a shared meeting is shared with (README component inventory: named
@@ -64,7 +63,11 @@ export function ShareDialog({
     }
     // Only the latest question's answer is shown.
     if (n !== asked.current) return;
-    setSearch(result.ok ? { state: 'done', found: result.colleagues } : { state: 'failed' });
+    setSearch(
+      result.ok
+        ? { state: 'done', found: result.colleagues, others: result.others }
+        : { state: 'failed' },
+    );
   };
 
   useEffect(() => {
@@ -126,6 +129,7 @@ export function ShareDialog({
 
   const readerIds = new Set(readers.map((r) => r.id));
   const found = search.state === 'done' ? search.found.filter((c) => !readerIds.has(c.id)) : [];
+  const line = searchLine({ ready, search, text, candidates: found.length });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,17 +170,7 @@ export function ShareDialog({
             />
           </div>
           <p id="share-search-state" aria-live="polite" className="text-xs text-muted-foreground">
-            {!ready
-              ? t('search.saving')
-              : search.state === 'loading'
-                ? t('search.loading')
-                : search.state === 'failed'
-                  ? ''
-                  : search.state === 'done' && !found.length
-                    ? text
-                      ? t('search.none', { text })
-                      : t('search.everyone')
-                    : ''}
+            {line === 'none' ? t('search.none', { text }) : line ? t(`search.${line}`) : ''}
           </p>
           {search.state === 'failed' && (
             <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">

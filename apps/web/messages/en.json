@@ -712,6 +712,7 @@
       "placeholder": "Name or email",
       "saving": "Saving the visibility first…",
       "loading": "Searching…",
+      "alone": "No one else has signed in yet. Colleagues appear here after their first sign-in.",
       "none": "No colleague matches “{text}”.",
       "everyone": "Everyone in the directory has access already.",
       "failed": "Could not search the directory.",

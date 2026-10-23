@@ -712,6 +712,7 @@
       "placeholder": "Navn eller e-mail",
       "saving": "Gemmer synligheden først…",
       "loading": "Søger…",
+      "alone": "Ingen andre har logget ind endnu. Kolleger vises her efter deres første login.",
       "none": "Ingen kollega passer til “{text}”.",
       "everyone": "Alle i kataloget har allerede adgang.",
       "failed": "Kunne ikke søge i kataloget.",

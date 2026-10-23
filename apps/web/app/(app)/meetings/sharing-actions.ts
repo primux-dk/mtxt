@@ -39,7 +39,13 @@ export async function setShare(
 }
 
 export type ColleagueResult =
-  { ok: true; colleagues: Colleague[] } | Extract<ActionResult, { ok: false }>;
+  | {
+      ok: true;
+      colleagues: Colleague[];
+      /** The directory holds someone besides the signed-in user (packet 12). */
+      others: boolean;
+    }
+  | Extract<ActionResult, { ok: false }>;
 
 /** The most a directory search answers with. */
 const MAX_COLLEAGUES = 20;
@@ -53,6 +59,7 @@ const DIRECTORY_LIMIT = 5000;
  */
 export async function findColleagues(meetingId: string, text: string): Promise<ColleagueResult> {
   let colleagues: Colleague[] = [];
+  let others = false;
   const result = await outcome(() =>
     asOwner(meetingId, async ({ db, installId, user }) => {
       const needle = foldTitle(text.trim()).slice(0, 100);
@@ -62,6 +69,7 @@ export async function findColleagues(meetingId: string, text: string): Promise<C
         .where(and(eq(u.installId, installId), ne(u.id, user.id)))
         .orderBy(u.name, u.email)
         .limit(DIRECTORY_LIMIT);
+      others = all.length > 0;
       colleagues = (
         needle
           ? all.filter(
@@ -71,5 +79,5 @@ export async function findColleagues(meetingId: string, text: string): Promise<C
       ).slice(0, MAX_COLLEAGUES);
     }),
   );
-  return result.ok ? { ok: true, colleagues } : result;
+  return result.ok ? { ok: true, colleagues, others } : result;
 }

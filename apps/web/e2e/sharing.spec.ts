@@ -287,6 +287,41 @@ for (const viewport of [DESKTOP, PHONE]) {
   });
 }
 
+test('with no one else in the directory, the share search says so, not that everyone has access', async ({
+  page,
+  context,
+  request,
+}) => {
+  // A single-user install: everyone but the newcomer is parked in another install for the test.
+  const { meetingId } = await meetingWithAudio(request, newcomer, 'Alene');
+  const park = `update users set install_id = 'e2e-parked' where install_id = 'dev'
+    and email != 'anne.holm@example.com'`;
+  const unpark = `update users set install_id = 'dev' where install_id = 'e2e-parked'`;
+  d1(park);
+  try {
+    await asUser(context, 'newcomer');
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`/meetings/${meetingId}`);
+    await page
+      .getByRole('combobox', { name: 'Visibility, only the owner can change it' })
+      .selectOption('shared');
+    const dialog = page.getByRole('dialog');
+    const field = dialog.getByLabel('Find a colleague');
+    const alone =
+      'No one else has signed in yet. Colleagues appear here after their first sign-in.';
+    await expect(field).toHaveAccessibleDescription(alone);
+    await expect(dialog.getByText('Everyone in the directory has access already.')).toHaveCount(0);
+    // A search says the same: there is no one to match.
+    await field.fill('jonas');
+    await expect(field).toHaveAccessibleDescription(alone);
+    await settle(page);
+    await page.screenshot({ path: shot('share-dialog-alone-1280') });
+  } finally {
+    d1(unpark);
+  }
+  expect(d1(`select id from users where install_id = 'e2e-parked'`)).toEqual([]);
+});
+
 test('a delete whose audit row fails changes nothing: the audio still plays; storage goes only after the commit', async ({
   page,
   context,
