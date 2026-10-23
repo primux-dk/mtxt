@@ -83,6 +83,7 @@ input[type=checkbox]{accent-color:var(--accent-strong);width:16px;height:16px;fl
 .sidebar-bottom{margin-top:auto;padding-top:24px;border-top:1px solid var(--sidebar-border);font-size:13px}
 .user-row{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:6px 8px;border:0;border-radius:var(--radius-control);background:transparent;text-align:left;font-size:13px;color:inherit}
 .user-row:hover{background:var(--secondary)}
+.user-row[aria-current=page]{background:var(--sidebar-accent);color:var(--sidebar-accent-foreground)}
 .user-row .grow>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-row .name{font-weight:550}
 .user-row .icon{width:16px;height:16px;color:var(--muted-foreground);flex-shrink:0}
@@ -139,6 +140,10 @@ input[type=checkbox]{accent-color:var(--accent-strong);width:16px;height:16px;fl
 .tablist [role=tab]:hover{color:var(--foreground)}
 .tablist [role=tab][aria-selected=true]{color:var(--foreground);border-bottom-color:var(--accent-strong)}
 .tablist [role=tab] .count{margin-left:8px;color:var(--text-muted)}
+.tablist.settings-tabs{overflow-x:auto;scrollbar-width:none}
+.settings-tabs [role=tab]{display:inline-flex;align-items:center;flex-shrink:0;white-space:nowrap;text-decoration:none}
+.settings-tabs [role=tab]:focus-visible{outline-offset:-2px}
+.settings-tabs+form>.settings-section:first-child{border-top:0;padding-top:0}
 [role=tabpanel][hidden]{display:none}
 .editor-panel{min-width:0;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--card);overflow:hidden}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line-subtle);min-height:56px}
@@ -530,7 +535,6 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
 <button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
@@ -619,7 +623,7 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 02. Meeting library, 1280 px. Two header rows: the title with search, Upload audio and "New meeting", the one primary action; then the pills with the quiet Archived link, the count and the sort. The user row at the foot of the sidebar opens a menu with Recorders and Sign out.</figcaption>
+<figcaption class="caption" lang="en">Figure 02. Meeting library, 1280 px. Two header rows: the title with search, Upload audio and "New meeting", the one primary action; then the pills with the quiet Archived link, the count and the sort. The sidebar has three items. The user row at the foot of the sidebar opens a menu with Settings (admins only), Recorders, API tokens and Sign out.</figcaption>
 </figure>
 </section>
 <section id="empty" aria-labelledby="label-empty">
@@ -640,7 +644,6 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
 <button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
@@ -712,7 +715,6 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
 <button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
@@ -1001,7 +1003,7 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <section id="settings" aria-labelledby="label-settings">
 <div class="section-label" lang="en">
 <h2 id="label-settings">07 / Settings</h2>
-<span>1280 px · the whole admin surface</span>
+<span>1280 px · the General tab</span>
 </div>
 <figure>
 <div class="frame-scroll">
@@ -1016,10 +1018,9 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
-<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false" aria-current="page"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -1037,6 +1038,15 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </div>
 <span data-i18n="settings.adminBadge" class="badge">Admin</span>
 </div>
+<div class="tablist settings-tabs" role="tablist" data-i18n-attr="aria-label:settings.tabs.label" aria-label="Settings sections">
+<a role="tab" href="#settings" aria-selected="true"><span data-i18n="settings.tabs.general">General</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.login">Login</span></a>
+<a role="tab" href="#settings-transcription" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.transcription">Transcription</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.recap">Recap</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.sharing">Sharing and retention</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.webhooks">Webhooks</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.audit">Audit log</span></a>
+</div>
 <form>
 <section class="settings-section">
 <div class="settings-label">
@@ -1047,6 +1057,18 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <label class="field">
 <span data-i18n="settings.productName.field">Name</span>
 <input type="text" value="Primux Møder" lang="da">
+</label>
+</div>
+</section>
+<section class="settings-section">
+<div class="settings-label">
+<h2 data-i18n="settings.companyName.heading">Company name</h2>
+<p data-i18n="settings.companyName.help">Under the product name in the sidebar and in the login footer.</p>
+</div>
+<div>
+<label class="field">
+<span data-i18n="settings.companyName.field">Name</span>
+<input type="text" value="PRIMUX DIGITAL, S.L." lang="da">
 </label>
 </div>
 </section>
@@ -1083,34 +1105,81 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </section>
 <section class="settings-section">
 <div class="settings-label">
-<h2 data-i18n="settings.login.heading">Company login</h2>
-<p data-i18n="settings.login.help">No local accounts or passwords.</p>
+<h2 data-i18n="settings.interfaceLanguage.heading">Interface language</h2>
+<p data-i18n="settings.interfaceLanguage.help">The default for this install.</p>
 </div>
 <div>
-<div class="form-grid">
-<label class="field full">
-<span data-i18n="settings.login.provider">Identity provider</span>
+<label class="field">
+<span data-i18n="settings.interfaceLanguage.field">Default interface language</span>
 <select>
-<option>Microsoft Entra ID</option>
-<option>Google Workspace</option>
+<option data-i18n="language.option" data-i18n-args='{"code":"en","name":"@language.en"}'>en · English</option>
+<option data-i18n="language.option" data-i18n-args='{"code":"da","name":"@language.da"}'>da · Danish</option>
 </select>
+<small data-i18n="settings.interfaceLanguage.note">A user's browser or operating system language wins when a translation exists.</small>
 </label>
-<label class="field">
-<span data-i18n="settings.login.tenantId">Tenant ID</span>
-<input type="text" value="00000000-0000-4000-8000-000000000001">
-</label>
-<label class="field">
-<span data-i18n="settings.login.clientId">Client ID</span>
-<input type="text" value="00000000-0000-4000-8000-000000000002">
-</label>
-<label class="field full">
-<span data-i18n="settings.login.clientSecret">Client secret</span>
-<input type="password" value="demo-secret-not-a-credential">
-<small data-i18n="settings.login.secretHelp">Secrets are never shown in clear text.</small>
-</label>
-</div>
 </div>
 </section>
+<div class="row between savebar">
+<span data-i18n="settings.footer" class="small muted">Changes apply to this installation.</span>
+<button type="button" class="btn primary"><span data-i18n="common.save">Save</span></button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="caption" lang="en">Figure 07. Settings, 1280 px, the General tab. The settings page is organised in tabs under its title, one route per tab; together they are the whole admin surface, with only settings from the spec. Each tab with fields is its own form with one Save. Settings opens from the user menu, so the user row is the current place.</figcaption>
+</figure>
+</section>
+<section id="settings-transcription" aria-labelledby="label-settings-transcription">
+<div class="section-label" lang="en">
+<h2 id="label-settings-transcription">07b / Settings, Transcription</h2>
+<span>1280 px · the Transcription tab</span>
+</div>
+<figure>
+<div class="frame-scroll">
+<div class="screen" data-screen="settings-transcription">
+<div class="shell">
+<aside class="sidebar">
+<div>
+<div class="brand" lang="da">Primux Møder</div>
+<div class="org" lang="da">PRIMUX DIGITAL, S.L.</div>
+</div>
+<nav class="nav-items" data-i18n-attr="aria-label:nav.main.label" aria-label="Main navigation">
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
+<a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
+</nav>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false" aria-current="page"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
+</div>
+</aside>
+<div class="grow">
+<div class="mobilebar">
+<button type="button" class="btn icon-only quiet" data-menu aria-haspopup="dialog" aria-expanded="false" data-i18n-attr="aria-label:nav.open" aria-label="Open navigation"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+<span class="brand" lang="da">Primux Møder</span>
+<span class="avatar" aria-hidden="true">ML</span>
+</div>
+<div class="content">
+<div class="row between content-top">
+<div>
+<p class="eyebrow" lang="da">PRIMUX DIGITAL, S.L.</p>
+<h1 data-i18n="settings.title" style="margin-top:8px">Settings</h1>
+<p data-i18n="settings.subheading" class="subheading">The company's setup. Admins only.</p>
+</div>
+<span data-i18n="settings.adminBadge" class="badge">Admin</span>
+</div>
+<div class="tablist settings-tabs" role="tablist" data-i18n-attr="aria-label:settings.tabs.label" aria-label="Settings sections">
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.general">General</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.login">Login</span></a>
+<a role="tab" href="#settings-transcription" aria-selected="true"><span data-i18n="settings.tabs.transcription">Transcription</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.recap">Recap</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.sharing">Sharing and retention</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.webhooks">Webhooks</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.audit">Audit log</span></a>
+</div>
+<form>
 <section class="settings-section">
 <div class="settings-label">
 <h2 data-i18n="settings.stt.heading">Transcription</h2>
@@ -1153,22 +1222,6 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </section>
 <section class="settings-section">
 <div class="settings-label">
-<h2 data-i18n="settings.interfaceLanguage.heading">Interface language</h2>
-<p data-i18n="settings.interfaceLanguage.help">The default for this install.</p>
-</div>
-<div>
-<label class="field">
-<span data-i18n="settings.interfaceLanguage.field">Default interface language</span>
-<select>
-<option data-i18n="language.option" data-i18n-args='{"code":"en","name":"@language.en"}'>en · English</option>
-<option data-i18n="language.option" data-i18n-args='{"code":"da","name":"@language.da"}'>da · Danish</option>
-</select>
-<small data-i18n="settings.interfaceLanguage.note">A user's browser or operating system language wins when a translation exists.</small>
-</label>
-</div>
-</section>
-<section class="settings-section">
-<div class="settings-label">
 <h2 data-i18n="settings.keyterms.heading">Company words</h2>
 <p data-i18n="settings.keyterms.help">Product names, people and jargon.</p>
 </div>
@@ -1187,106 +1240,16 @@ ugeplan</textarea>
 </section>
 <section class="settings-section">
 <div class="settings-label">
-<h2 data-i18n="settings.defaults.heading">Defaults</h2>
+<h2 data-i18n="settings.defaults.liveHeading">Live transcript</h2>
 <p data-i18n="settings.defaults.help">Users can switch the live transcript on for themselves.</p>
 </div>
 <div>
-<div class="stack">
 <div class="setting-toggle">
 <div>
 <p data-i18n="settings.defaults.liveDefault">Live transcript by default</p>
 <small data-i18n="settings.defaults.liveDefaultHelp">Off. The local text is only a preview.</small>
 </div>
 <button class="toggle" type="button" aria-pressed="false" data-i18n-attr="aria-label:settings.defaults.liveDefault" aria-label="Live transcript by default"></button>
-</div>
-<label class="field">
-<span data-i18n="settings.defaults.visibility">Visibility for new meetings</span>
-<select>
-<option data-i18n="visibility.private">Private</option>
-<option data-i18n="settings.defaults.visibilityShared">Shared with chosen colleagues</option>
-<option data-i18n="settings.defaults.visibilityCompany">Whole company</option>
-</select>
-<small data-i18n="settings.defaults.visibilityHelp">Only the meeting owner can change visibility.</small>
-</label>
-</div>
-</div>
-</section>
-<section class="settings-section">
-<div class="settings-label">
-<h2 data-i18n="settings.sources.heading">Recording sources</h2>
-<p data-i18n="settings.sources.help">Teams and Meet cover only meetings the company organised.</p>
-</div>
-<div>
-<div class="stack">
-<label class="choice"><input type="checkbox" checked><span data-i18n="settings.sources.desktop">Desktop recorder</span></label>
-<label class="choice"><input type="checkbox" checked><span data-i18n="settings.sources.upload">Audio file upload</span></label>
-<label class="choice"><input type="checkbox" checked><span data-i18n="settings.sources.browser">Browser recorder</span></label>
-<label class="choice"><input type="checkbox"><span data-i18n="settings.sources.onedrive">OneDrive · Teams recordings</span></label>
-<label class="choice"><input type="checkbox"><span data-i18n="settings.sources.drive">Google Drive · Meet recordings</span></label>
-</div>
-</div>
-</section>
-<section class="settings-section">
-<div class="settings-label">
-<h2 data-i18n="settings.templates.heading">Recap templates</h2>
-<p data-i18n="settings.templates.help">Several templates. The employee picks one per meeting.</p>
-</div>
-<div>
-<div class="template-list">
-<button type="button" class="pill" aria-pressed="true" lang="da">Produktionsmøde</button>
-<button type="button" class="pill" aria-pressed="false" lang="da">Projektstatus</button>
-</div>
-<div class="stack">
-<label class="field">
-<span data-i18n="settings.templates.name">Template name</span>
-<input type="text" value="Produktionsmøde" lang="da">
-</label>
-<label class="field">
-<span data-i18n="settings.templates.body">Content in Markdown</span>
-<textarea rows="6" lang="da"># Overblik
-
-&gt; [!NOTE]
-&gt; Det vigtigste fra mødet
-
-## Beslutninger
-- [ ] Opgave · @ansvarlig · frist
-
-## Næste skridt</textarea>
-</label>
-<div><button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="settings.templates.add">Add template</span></button></div>
-</div>
-</div>
-</section>
-<section class="settings-section">
-<div class="settings-label">
-<h2 data-i18n="settings.retention.heading">Retention</h2>
-<p data-i18n="settings.retention.help">Automatic deletion runs every night. The keep flag exempts the whole meeting.</p>
-</div>
-<div>
-<div class="form-grid">
-<label class="field">
-<span data-i18n="settings.retention.audio">Audio, days</span>
-<input type="number" value="30">
-</label>
-<label class="field">
-<span data-i18n="settings.retention.text">Transcripts and recaps, days</span>
-<input type="number" value="365">
-</label>
-</div>
-</div>
-</section>
-<section class="settings-section">
-<div class="settings-label">
-<h2 data-i18n="settings.mcp.heading">MCP</h2>
-<p data-i18n="settings.mcp.help">AI tools use the employee's own company login.</p>
-</div>
-<div>
-<div class="setting-toggle">
-<div>
-<p data-i18n="settings.mcp.server">MCP server</p>
-<small data-i18n="settings.mcp.serverHelp">Permitted meetings only. Reads and changes are logged.</small>
-</div>
-<button class="toggle" type="button" aria-pressed="true" data-i18n-attr="aria-label:settings.mcp.server" aria-label="MCP server"></button>
 </div>
 </div>
 </section>
@@ -1303,7 +1266,7 @@ ugeplan</textarea>
 </aside>
 <div class="row between savebar">
 <span data-i18n="settings.footer" class="small muted">Changes apply to this installation.</span>
-<button type="button" class="btn primary"><span data-i18n="settings.save">Save settings</span></button>
+<button type="button" class="btn primary"><span data-i18n="common.save">Save</span></button>
 </div>
 </form>
 </div>
@@ -1311,7 +1274,7 @@ ugeplan</textarea>
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 07. Settings, 1280 px, the whole admin surface. Only settings from the spec. The data flow does not promise EU-only processing.</figcaption>
+<figcaption class="caption" lang="en">Figure 07b. Settings, 1280 px, the Transcription tab: the speech-to-text provider, the default language, keyterms, the live transcript default and the data flow. The data flow names the saved recap model and retention, and does not promise EU-only processing.</figcaption>
 </figure>
 </section>
 <section id="marketing" aria-labelledby="label-marketing">
@@ -1376,7 +1339,6 @@ ugeplan</textarea>
 <a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
 <button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
@@ -1484,7 +1446,6 @@ ugeplan</textarea>
 <a class="nav-item" href="#library" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
 <button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
@@ -1641,7 +1602,7 @@ ugeplan</textarea>
 <section id="settings-theme" aria-labelledby="label-settings-theme">
 <div class="section-label" lang="en">
 <h2 id="label-settings-theme">11 / Settings excerpt, theme changed</h2>
-<span>1280 px · excerpt of figure 07 · accent <code>#4a6382</code></span>
+<span>1280 px · the General tab, as in figure 07 · accent <code>#4a6382</code></span>
 </div>
 <figure>
 <div class="frame-scroll">
@@ -1656,10 +1617,9 @@ ugeplan</textarea>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
-<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false" aria-current="page"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -1676,6 +1636,15 @@ ugeplan</textarea>
 <p data-i18n="settings.subheading" class="subheading">The company's setup. Admins only.</p>
 </div>
 <span data-i18n="settings.adminBadge" class="badge">Admin</span>
+</div>
+<div class="tablist settings-tabs" role="tablist" data-i18n-attr="aria-label:settings.tabs.label" aria-label="Settings sections">
+<a role="tab" href="#settings" aria-selected="true"><span data-i18n="settings.tabs.general">General</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.login">Login</span></a>
+<a role="tab" href="#settings-transcription" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.transcription">Transcription</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.recap">Recap</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.sharing">Sharing and retention</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.webhooks">Webhooks</span></a>
+<a role="tab" href="#settings" aria-selected="false" tabindex="-1"><span data-i18n="settings.tabs.audit">Audit log</span></a>
 </div>
 <form>
 <section class="settings-section">
@@ -1723,34 +1692,23 @@ ugeplan</textarea>
 </section>
 <section class="settings-section">
 <div class="settings-label">
-<h2 data-i18n="settings.mcp.heading">MCP</h2>
-<p data-i18n="settings.mcp.help">AI tools use the employee's own company login.</p>
+<h2 data-i18n="settings.interfaceLanguage.heading">Interface language</h2>
+<p data-i18n="settings.interfaceLanguage.help">The default for this install.</p>
 </div>
 <div>
-<div class="setting-toggle">
-<div>
-<p data-i18n="settings.mcp.server">MCP server</p>
-<small data-i18n="settings.mcp.serverHelp">Permitted meetings only. Reads and changes are logged.</small>
-</div>
-<button class="toggle" type="button" aria-pressed="true" data-i18n-attr="aria-label:settings.mcp.server" aria-label="MCP server"></button>
-</div>
-</div>
-</section>
-<section class="settings-section">
-<div class="settings-label">
-<h2 data-i18n="settings.templates.heading">Recap templates</h2>
-<p data-i18n="settings.templates.help">Several templates. The employee picks one per meeting.</p>
-</div>
-<div>
-<div class="template-list">
-<button type="button" class="pill" aria-pressed="true" lang="da">Produktionsmøde</button>
-<button type="button" class="pill" aria-pressed="false" lang="da">Projektstatus</button>
-</div>
+<label class="field">
+<span data-i18n="settings.interfaceLanguage.field">Default interface language</span>
+<select>
+<option data-i18n="language.option" data-i18n-args='{"code":"en","name":"@language.en"}'>en · English</option>
+<option data-i18n="language.option" data-i18n-args='{"code":"da","name":"@language.da"}'>da · Danish</option>
+</select>
+<small data-i18n="settings.interfaceLanguage.note">A user's browser or operating system language wins when a translation exists.</small>
+</label>
 </div>
 </section>
 <div class="row between savebar">
 <span data-i18n="settings.footer" class="small muted">Changes apply to this installation.</span>
-<button type="button" class="btn primary"><span data-i18n="settings.save">Save settings</span></button>
+<button type="button" class="btn primary"><span data-i18n="common.save">Save</span></button>
 </div>
 </form>
 </div>
@@ -1758,10 +1716,10 @@ ugeplan</textarea>
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 11. An excerpt of the settings screen, 1280 px: the Theme section and the controls that change with it, with the accent changed to <code>#4a6382</code>, a muted blue, and the button colour left at <code>#111111</code>. Selected navigation, pills, the toggle, the state dot and the badge follow from the one value. Figure 07 is the full screen.</figcaption>
+<figcaption class="caption" lang="en">Figure 11. The General tab of the settings page, 1280 px: the Theme section and the controls that change with it, with the accent changed to <code>#4a6382</code>, a muted blue, and the button colour left at <code>#111111</code>. The selected tab, the current user row, pills, the toggle, the state dot and the badge follow from the one value. Figure 07 is the same tab with the default theme.</figcaption>
 </figure>
 </section>
-<footer class="footnote" lang="en">A design reference, not a built product. The theme switch, the language switch, the meeting tabs and the mobile navigation work. Login, recording, editing and export are static examples. Mona Sans is bundled locally under the SIL Open Font License 1.1.</footer>
+<footer class="footnote" lang="en">A design reference, not a built product. The theme switch, the language switch, the meeting tabs and the mobile navigation work; the settings tabs link between figures 07 and 07b. Login, recording, editing and export are static examples. Mona Sans is bundled locally under the SIL Open Font License 1.1.</footer>
 </main>
 <dialog class="sheet" id="mobile-nav" aria-labelledby="sheet-title">
 <div class="sheet-top">
@@ -1773,7 +1731,6 @@ ugeplan</textarea>
 <a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-meetings"></use></svg><span data-i18n="nav.myMeetings">My meetings</span></a>
 <a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-shared"></use></svg><span data-i18n="nav.sharedWithMe">Shared with me</span></a>
 <a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
-<a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
 <div class="sidebar-bottom">
 <button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
@@ -1901,7 +1858,7 @@ document.querySelectorAll('[data-menu]').forEach(button => button.addEventListen
 document.querySelector('#close-menu').addEventListener('click', () => sheet.close());
 sheet.querySelectorAll('a').forEach(a => a.addEventListener('click', () => sheet.close()));
 sheet.addEventListener('close', () => { if (opener) { opener.setAttribute('aria-expanded', 'false'); opener.focus(); } });
-document.querySelectorAll('[role=tablist]').forEach(list => {
+document.querySelectorAll('[role=tablist]:not(.settings-tabs)').forEach(list => {
   const tabs = [...list.querySelectorAll('[role=tab]')];
   const select = (tab, focus) => {
     tabs.forEach(t => {

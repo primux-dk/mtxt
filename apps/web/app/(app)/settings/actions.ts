@@ -16,8 +16,8 @@ import {
 import { getSessionUser } from '@/lib/auth/session';
 import { getAdapters, getEnv, getInstallSettings } from '@/lib/install';
 import { fieldMessage } from '@/lib/settings/messages';
+import { isFormTab, TAB_FIELDS, type FormTab } from '@/lib/settings/tabs';
 import {
-  FIELDS,
   validateSettings,
   validateTemplate,
   type Field,
@@ -39,10 +39,15 @@ async function admin() {
   return user?.isAdmin ? user : null;
 }
 
-export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
+/**
+ * Saves one tab of the settings page: its fields are validated and written,
+ * every other column stays as it is, so two tabs never clobber each other.
+ */
+export async function saveSettingsAction(tab: FormTab, form: FormData): Promise<SaveResult> {
   const t = await getTranslations('settings');
   const user = await admin();
   if (!user) return { status: 'error', message: (await getTranslations('auth'))('forbidden.body') };
+  if (!isFormTab(tab)) return { status: 'error', message: t('errors.saveFailed') };
 
   const current = await getInstallSettings();
   const result = validateSettings(
@@ -56,10 +61,11 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
       hasRecapKey: Boolean(current.recapApiKey),
     },
     user.email,
+    [tab],
   );
   if (!result.ok) {
     const errors: Partial<Record<Field, string>> = {};
-    for (const field of FIELDS) {
+    for (const field of TAB_FIELDS[tab]) {
       const error = result.errors[field];
       if (error) errors[field] = fieldMessage(t, error);
     }
@@ -105,7 +111,7 @@ export async function saveSettingsAction(form: FormData): Promise<SaveResult> {
     console.error('Could not save the settings:', error);
     return { status: 'error', message: t('errors.saveFailed') };
   }
-  // Recordings that waited for a provider start now: one drain job queues them, 100 at a
+  // Saving the Transcription tab with a provider: recordings that waited for one start now: one drain job queues them, 100 at a
   // time (docs/decisions.md, packet 4 review). A queue failure is said, not swallowed.
   if (result.patch.sttProvider) {
     const { installId, queue } = await getAdapters();
@@ -152,7 +158,7 @@ async function templateAction(
     const list = await listTemplates(db, installId);
     const early = await run(db, installId, list);
     if (early) return early;
-    revalidatePath('/settings');
+    revalidatePath('/settings/recap');
     return { ok: true, templates: rows(await listTemplates(db, installId)) };
   } catch (error) {
     console.error('Template change failed:', error);

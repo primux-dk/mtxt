@@ -137,14 +137,17 @@ test('an admin turns on Send automatically and adds an endpoint; the secret show
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto('/settings');
-  const section = webhooksSection(page);
-  await expect(section.getByText('No endpoints yet.')).toBeVisible();
-
-  await section.getByLabel('Send automatically').selectOption('company');
-  await page.getByRole('button', { name: 'Save settings' }).click();
+  // Send automatically is on the Sharing and retention tab, the endpoints on Webhooks.
+  await page.goto('/settings/sharing');
+  await webhooksSection(page).getByLabel('Send automatically').selectOption('company');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Settings saved.')).toBeVisible();
   expect(d1<{ v: string }>(`select webhook_auto_send as v from settings`)[0]!.v).toBe('company');
+
+  await page.getByRole('tab', { name: 'Webhooks' }).click();
+  await expect(page).toHaveURL(/\/settings\/webhooks$/);
+  const section = webhooksSection(page);
+  await expect(section.getByText('No endpoints yet.')).toBeVisible();
 
   await section.getByRole('button', { name: 'Add endpoint' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add endpoint' });
@@ -196,7 +199,7 @@ test('an admin turns on Send automatically and adds an endpoint; the secret show
 
 test('a 2 KB URL fits the list, and a disabled endpoint gets nothing', async ({ page }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto('/settings');
+  await page.goto('/settings/webhooks');
   const section = webhooksSection(page);
   await section.getByRole('button', { name: 'Add endpoint' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add endpoint' });
@@ -237,7 +240,7 @@ test('keyboard only: add an endpoint, copy nothing, delete it, and focus lands w
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto('/settings');
+  await page.goto('/settings/webhooks');
   const section = webhooksSection(page);
   const add = section.getByRole('button', { name: 'Add endpoint' });
   await add.focus();
@@ -249,7 +252,7 @@ test('keyboard only: add an endpoint, copy nothing, delete it, and focus lands w
   await page.keyboard.press('Tab');
   await expect(dialog.getByLabel('URL')).toBeFocused();
   await page.keyboard.type(receiverUrl);
-  // Space unticks the focused event; Enter in a field submits the dialog, not the settings form.
+  // Space unticks the focused event; Enter in a field submits the dialog.
   await page.keyboard.press('Tab');
   await page.keyboard.press('Space');
   await expect(dialog.getByRole('checkbox', { name: /Transcript ready/ })).not.toBeChecked();
@@ -264,8 +267,6 @@ test('keyboard only: add an endpoint, copy nothing, delete it, and focus lands w
     await expect(shown).toBeHidden({ timeout: 500 });
   }).toPass({ timeout: 10_000 });
   await expect(add).toBeFocused();
-  // The settings form was not submitted along the way.
-  await expect(page.getByText('Settings saved.')).toHaveCount(0);
 
   const remove = section.getByRole('button', { name: 'Delete Tastatur' });
   await remove.focus();
@@ -281,10 +282,10 @@ test('keyboard only: add an endpoint, copy nothing, delete it, and focus lands w
 
 test('rule 2: a refused Enable and Delete go back to what the server has', async ({ page }) => {
   await page.setViewportSize(DESKTOP);
-  await page.goto('/settings');
+  await page.goto('/settings/webhooks');
   const section = webhooksSection(page);
   // Server actions post to the page's own URL; these never arrive.
-  await page.route('**/settings', (route) =>
+  await page.route('**/settings/webhooks', (route) =>
     route.request().method() === 'POST' ? route.abort() : route.continue(),
   );
   await section.getByRole('button', { name: 'Enable CRM' }).click();
@@ -301,7 +302,7 @@ test('rule 2: a refused Enable and Delete go back to what the server has', async
     page.getByRole('alert').filter({ hasText: 'The endpoint could not be deleted' }),
   ).toBeVisible();
   await expect(section.getByTestId('webhook-endpoint').filter({ hasText: 'CRM' })).toBeVisible();
-  await page.unroute('**/settings');
+  await page.unroute('**/settings/webhooks');
   expect(
     d1<{ enabled: number }>(`select enabled from webhook_endpoints where label = 'CRM'`),
   ).toEqual([{ enabled: 0 }]);
@@ -466,7 +467,7 @@ test('Send test event, a 500 retried by Retry now, and the delivery log', async 
 }) => {
   await receiver(request, 500);
   await page.setViewportSize(DESKTOP);
-  await page.goto('/settings');
+  await page.goto('/settings/webhooks');
   await webhooksSection(page).getByRole('button', { name: 'Send a test event to Alex' }).click();
   await expect(page.getByText('A test event is on its way to Alex.')).toBeVisible();
   await expect
@@ -490,6 +491,11 @@ test('Send test event, a 500 retried by Retry now, and the delivery log', async 
 
   await page.getByRole('link', { name: 'Delivery log of Alex' }).click();
   await expect(page).toHaveURL(`/settings/webhooks/${endpointId}`);
+  // The log sits under the Webhooks tab, one level down.
+  await expect(page.getByRole('tab', { name: 'Webhooks' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   const row = page.getByTestId('webhook-log-row').first();
   await expect(row).toContainText('Test event');
   await expect(row).toContainText('Waiting to retry');
@@ -571,7 +577,7 @@ test('the delivery log with 50 failed deliveries, at 1280 and 390', async ({ pag
       await page.screenshot({ path: shot(`webhook-log-${viewport.width}`) });
     }
     // The add dialog on a phone.
-    await page.goto('/settings');
+    await page.goto('/settings/webhooks');
     await webhooksSection(page).getByRole('button', { name: 'Add endpoint' }).click();
     await settle(page);
     await page.screenshot({ path: shot('webhook-add-390') });

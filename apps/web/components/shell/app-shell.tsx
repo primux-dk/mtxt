@@ -6,7 +6,8 @@ import { Avatar, UserSlot, type ShellUser } from './user-slot';
 
 /**
  * The app shell from the mockups: a 224 px sidebar with the product name, the
- * four navigation items and the user; below 720 px a 56 px top bar and a Sheet.
+ * three navigation items and the user, whose menu holds Settings for an
+ * admin; below 720 px a 56 px top bar and a Sheet.
  */
 export async function AppShell({
   productName,

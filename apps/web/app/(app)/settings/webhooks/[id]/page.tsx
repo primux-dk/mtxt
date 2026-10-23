@@ -62,7 +62,7 @@ export default async function DeliveryLogPage({ params, searchParams }: Params) 
   return (
     <>
       <Link
-        href="/settings#webhooks-heading"
+        href="/settings/webhooks"
         className="mb-6 inline-flex min-h-10 items-center gap-2 text-[13px] text-muted-foreground hover:text-foreground max-shell:mb-5"
       >
         <ArrowLeft aria-hidden="true" className="size-5" strokeWidth={1.5} />
@@ -70,6 +70,7 @@ export default async function DeliveryLogPage({ params, searchParams }: Params) 
       </Link>
       <div className="mb-6 grid gap-3">
         <PageTitle
+          level={2}
           title={tl('title', { name })}
           subheading={tl('subheading')}
           action={endpoint && <SendTest endpointId={endpoint.id} />}

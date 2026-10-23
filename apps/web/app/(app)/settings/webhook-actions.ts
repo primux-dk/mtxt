@@ -78,7 +78,7 @@ export async function addEndpointAction(value: {
       sealedSecret: await seal(secret, 'webhook_endpoints.secret', env.SETTINGS_KEY),
     });
     if (!created.ok) return { ok: false, message: t('webhooks.tooMany') };
-    revalidatePath('/settings');
+    revalidatePath('/settings/webhooks');
     return { ok: true, endpoints: await endpointRows(), secret, id: created.id };
   } catch (error) {
     console.error('Could not add the endpoint:', (error as Error).name);
@@ -95,7 +95,7 @@ async function endpointAction(
   const ctx = await getAdapters();
   try {
     await run(ctx);
-    revalidatePath('/settings');
+    revalidatePath('/settings/webhooks');
     return { ok: true, endpoints: await endpointRows() };
   } catch (error) {
     console.error('Endpoint change failed:', (error as Error).name);

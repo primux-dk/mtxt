@@ -19,7 +19,7 @@ import { isTestMode } from '@/lib/test-mode';
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 /*
-  The audit log, part of the settings page's admin surface (docs/spec.md).
+  The audit log, the settings page's last tab (docs/spec.md).
   Admins only: the middleware answers anyone else with the 403 page, and
   requireAdmin stands behind it. The same list parts as the library (rule
   7): filter pills by action with counts, a select by user, a count, page
@@ -56,7 +56,7 @@ export default async function AuditPageView({ searchParams }: { searchParams: Se
   return (
     <>
       <div className="mb-6">
-        <PageTitle title={t('title')} subheading={t('subheading')} />
+        <PageTitle level={2} title={t('title')} subheading={t('subheading')} />
       </div>
 
       {page && (
