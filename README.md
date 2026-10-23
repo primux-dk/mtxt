@@ -79,7 +79,7 @@ An install can send its meetings to the company's other systems, such as a CRM o
 }
 ```
 
-A link is `null` when there is nothing to fetch yet; `meeting.deleted` has no links. The transcript link answers JSON (`language`, `speakers`, and `segments` with `start_ms`, `end_ms`, `speaker_id` and `text`), the recap links Markdown and Word. A link answers 404 once the meeting may no longer be sent and 410 once it has expired.
+A link is `null` when there is nothing to fetch yet. `meeting.deleted` carries only `meeting: { id, deleted_at }`, with no links, and goes only to an endpoint that took an earlier event of the meeting. The transcript link answers JSON (`language`, `speakers`, and `segments` with `start_ms`, `end_ms`, `speaker_id` and `text`), the recap links Markdown and Word. A link answers 404 once the meeting may no longer be sent and 410 once it has expired.
 
 Every request carries `X-Mtxt-Signature: t=<unix seconds>,v1=<hex>`, the HMAC-SHA256 of `<t>.<raw body>` with the endpoint's secret, plus `X-Mtxt-Event` and `X-Mtxt-Delivery`, which stays the same on every attempt of a delivery so the receiver can drop a repeat. Check the signature on the raw body before parsing it:
 

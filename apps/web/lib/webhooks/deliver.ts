@@ -10,7 +10,6 @@
 */
 import { and, eq, sql } from 'drizzle-orm';
 import {
-  audit,
   describeError,
   open,
   readSettings,
@@ -19,10 +18,11 @@ import {
   type Db,
   type HostResolver,
   type QueueAdapter,
+  type WebhookEvent,
   type WebhookJob,
 } from '@mtxt/adapters';
 import { checkTarget, type TargetProblem } from './address';
-import { available, buildPayload, meetingMeta, signedLinks } from './payload';
+import { available, buildPayload, meetingMeta, signedLinks, type WebhookPayload } from './payload';
 import {
   ATTEMPT_LEASE_MS,
   backoffAfter,
@@ -190,15 +190,22 @@ async function attempt(
   if (!deps.settingsKey || !origin) return fail('config');
 
   // The payload, built now: fresh links and the current title, unless the meeting is gone.
-  let payload;
+  let payload: WebhookPayload;
   let ownerId: string | null = null;
-  if (row.event === 'webhook.test' || row.event === 'meeting.deleted') {
+  let title: string | null = null;
+  if (row.event === 'webhook.test') {
+    payload = buildPayload({ event: 'webhook.test', now, productName: settings.productName });
+  } else if (row.event === 'meeting.deleted') {
+    // The notice carries the id and the time, nothing the meeting said about itself.
+    if (!queued.deleted) return fail('config');
     payload = buildPayload({
-      event: queued.event,
+      event: 'meeting.deleted',
       now,
       productName: settings.productName,
-      meeting: queued.meeting,
+      deleted: queued.deleted,
     });
+    ownerId = queued.owner_id ?? null;
+    title = queued.title ?? null;
   } else {
     const meeting = row.meetingId
       ? await db.query.meetings.findFirst({
@@ -212,6 +219,7 @@ async function attempt(
     if (!meeting || !meta || meeting.deletedAt) return void (await cancel('meeting_gone'));
     if (!mayBeSent(meeting, settings.webhookAutoSend)) return void (await cancel('not_eligible'));
     ownerId = meta.ownerId;
+    title = meta.title;
     const { links, expiresAt } = await signedLinks({
       settingsKey: deps.settingsKey,
       origin,
@@ -221,7 +229,7 @@ async function attempt(
       has: await available(db, installId, meeting.id),
     });
     payload = buildPayload({
-      event: queued.event,
+      event: queued.event as WebhookEvent,
       now,
       productName: settings.productName,
       meeting: meta,
@@ -274,15 +282,40 @@ async function attempt(
   if (status >= 300 && status < 400) return fail('redirect', status);
   if (status < 200 || status >= 300) return fail('http_status', status);
 
-  await finish({ status: 'delivered', lastStatusCode: status, lastError: null });
-  if (ownerId && row.meetingId) {
-    // No service identity: the row names the meeting's owner and, in details, the endpoint.
-    await audit(db, installId, {
-      userId: ownerId,
-      meetingId: row.meetingId,
-      meetingTitle: payload.meeting?.title ?? null,
-      action: 'webhook_sent',
-      details: { endpoint: endpoint.label, event: row.event },
-    }).catch((error) => log.error('Could not write the webhook audit row', describeError(error)));
+  // Delivered and its audit row in one batch: both land or neither, and then the claim goes back.
+  // No service identity: the row names the meeting's owner and, in details, the endpoint.
+  const delivered = finish({ status: 'delivered', lastStatusCode: status, lastError: null });
+  if (!ownerId) {
+    await delivered;
+    return;
   }
+  const value = <T>(v: T, column: string) => sql<T>`${v}`.as(column);
+  const details = JSON.stringify({ endpoint: endpoint.label, event: row.event });
+  await db.batch([
+    delivered,
+    db.insert(schema.auditEvents).select(
+      db
+        .select({
+          id: value(crypto.randomUUID(), 'id'),
+          installId: value(installId, 'install_id'),
+          userId: value(ownerId, 'user_id'),
+          // A deleted meeting's row stays, detached, like the delete's own audit row.
+          meetingId: value(row.event === 'meeting.deleted' ? null : row.meetingId, 'meeting_id'),
+          meetingTitle: value(title, 'meeting_title'),
+          action: value('webhook_sent', 'action'),
+          details: value(details, 'details'),
+          at: value(now.getTime(), 'at'),
+        })
+        .from(d)
+        .where(
+          and(
+            eq(d.installId, installId),
+            eq(d.id, row.id),
+            eq(d.status, 'delivered'),
+            eq(d.attempts, job.attempt),
+          ),
+        )
+        .limit(1),
+    ),
+  ]);
 }

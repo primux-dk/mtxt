@@ -652,21 +652,91 @@ describe('deliveries', () => {
     );
   });
 
-  it('tells an endpoint of a delete, from the snapshot, with no links', async () => {
+  it('tells an endpoint that took the meeting of its delete, with the id and the time only', async () => {
+    // Nobody took an event of it yet: nobody hears of the delete.
+    expect(await planDeleted(db, INSTALL, 'm-company')).toBeNull();
+    await queueMeetingEvent(q(), { event: 'meeting.transcribed', meetingId: 'm-company' });
+    await runLast();
     const plan = await planDeleted(db, INSTALL, 'm-company');
     expect(plan?.endpointIds).toEqual([endpointId]);
     raw.exec(`delete from meetings where id = 'm-company'`);
-    expect(await queueDeleted(q(), plan!)).toBe(1);
+    expect(await queueDeleted(q(), plan!, new Date('2026-10-23T12:00:00Z'))).toBe(1);
     await runLast();
-    const payload = JSON.parse(String(posts[0]!.init.body));
-    expect(payload).toMatchObject({
+    const body = String(posts[1]!.init.body);
+    expect(JSON.parse(body)).toEqual({
       event: 'meeting.deleted',
-      meeting: { id: 'm-company', title: 'Produktionsmøde' },
-      links: { transcript: null, recap_markdown: null, recap_docx: null },
+      sent_at: clock.toISOString(),
+      install: { product_name: 'Primux Møder' },
+      meeting: { id: 'm-company', deleted_at: '2026-10-23T12:00:00.000Z' },
+      links: null,
       expires_at: null,
     });
-    // A private meeting that was never sent is nobody's business.
-    expect(await planDeleted(db, INSTALL, 'm-private')).toBeNull();
+    expect(body).not.toContain('Produktionsmøde');
+    expect(body).not.toContain('Mette Lund');
+    // The audit row names the owner from the snapshot, detached from the meeting that is gone.
+    expect(
+      raw
+        .prepare(
+          `select user_id, meeting_id, details from audit_events where details like '%deleted%'`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        user_id: 'owner',
+        meeting_id: null,
+        details: JSON.stringify({ endpoint: 'Alex', event: 'meeting.deleted' }),
+      },
+    ]);
+  });
+
+  it('send, make private, rename, delete: the endpoint hears nothing of the private title', async () => {
+    const { changeVisibility } = await import('../lib/meetings/sharing');
+    raw.exec(`update meetings set webhook_consent_at = 1 where id = 'm-company'`);
+    await queueMeetingEvent(q(), { event: 'meeting.transcribed', meetingId: 'm-company' });
+    await runLast();
+    expect(deliveries()[0]!.status).toBe('delivered');
+    const meeting = raw.prepare(`select * from meetings where id = 'm-company'`).get() as {
+      owner_id: string;
+    };
+    await changeVisibility(
+      db,
+      INSTALL,
+      {
+        id: 'm-company',
+        ownerId: meeting.owner_id,
+        title: 'Produktionsmøde',
+        visibility: 'company',
+      },
+      'private',
+    );
+    // Private took the consent back.
+    expect(
+      raw.prepare(`select webhook_consent_at as c from meetings where id = 'm-company'`).get(),
+    ).toEqual({ c: null });
+    raw.exec(`update meetings set title = 'Fyringsrunde, fortroligt' where id = 'm-company'`);
+    expect(await planDeleted(db, INSTALL, 'm-company')).toBeNull();
+    expect(posts.map((p) => String(p.init.body)).join('\n')).not.toContain('Fyringsrunde');
+  });
+
+  it('writes delivered and its audit row together: a failed audit insert leaves the delivery to retry', async () => {
+    raw.exec(`CREATE TRIGGER fail_audit BEFORE INSERT ON audit_events
+      BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;`);
+    await queueMeetingEvent(q(), { event: 'meeting.transcribed', meetingId: 'm-company' });
+    const message = sent.at(-1)!.job;
+    await expect(runLast()).rejects.toThrow();
+    // Not delivered, and the claim is back: the queue's redelivery takes it at once.
+    expect(deliveries()[0]).toMatchObject({ status: 'pending', attempts: 0 });
+    expect(raw.prepare(`select count(*) as n from audit_events`).get()).toEqual({ n: 0 });
+    raw.exec(`DROP TRIGGER fail_audit`);
+    if (message.type === 'webhook') await runWebhook(deps(), message);
+    expect(deliveries()[0]).toMatchObject({ status: 'delivered', attempts: 1 });
+    expect(
+      raw.prepare(`select count(*) as n from audit_events where action = 'webhook_sent'`).get(),
+    ).toEqual({ n: 1 });
+    // At least once: the receiver saw the delivery twice, with the same id.
+    expect(posts).toHaveLength(2);
+    const ids = posts.map((p) => (p.init.headers as Record<string, string>)['X-Mtxt-Delivery']);
+    expect(new Set(ids).size).toBe(1);
   });
 
   it('sends a test event to one endpoint with no meeting', async () => {

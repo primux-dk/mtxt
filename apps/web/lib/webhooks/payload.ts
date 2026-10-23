@@ -23,11 +23,17 @@ export interface Links {
   recap_docx: string | null;
 }
 
+/** `meeting.deleted` says which meeting and when, nothing else (docs/spec.md "Webhooks"). */
+export interface DeletedNotice {
+  id: string;
+  deleted_at: string;
+}
+
 export interface WebhookPayload {
   event: WebhookEvent | 'webhook.test';
   sent_at: string;
   install: { product_name: string };
-  meeting: MeetingMeta | null;
+  meeting: MeetingMeta | DeletedNotice | null;
   links: Links | null;
   expires_at: string | null;
 }
@@ -118,10 +124,24 @@ export function buildPayload(input: {
   event: WebhookPayload['event'];
   now: Date;
   productName: string;
-  meeting: MeetingMeta | null;
+  meeting?: MeetingMeta | null;
+  deleted?: DeletedNotice;
   links?: Links | null;
   expiresAt?: Date | null;
 }): WebhookPayload {
+  const base = {
+    event: input.event,
+    sent_at: input.now.toISOString(),
+    install: { product_name: input.productName },
+  };
+  if (input.deleted) {
+    return {
+      ...base,
+      meeting: { id: input.deleted.id, deleted_at: input.deleted.deleted_at },
+      links: null,
+      expires_at: null,
+    };
+  }
   const meeting = input.meeting
     ? {
         id: input.meeting.id,
@@ -133,11 +153,9 @@ export function buildPayload(input: {
       }
     : null;
   return {
-    event: input.event,
-    sent_at: input.now.toISOString(),
-    install: { product_name: input.productName },
+    ...base,
     meeting,
     links: meeting ? (input.links ?? NO_LINKS) : null,
-    expires_at: input.expiresAt ? input.expiresAt.toISOString() : null,
+    expires_at: meeting && input.expiresAt ? input.expiresAt.toISOString() : null,
   };
 }

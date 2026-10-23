@@ -18,7 +18,7 @@ import {
   type WebhookEndpoint,
   type WebhookEvent,
 } from '@mtxt/adapters';
-import { meetingMeta, type MeetingMeta } from './payload';
+import { meetingMeta, type DeletedNotice, type MeetingMeta } from './payload';
 import { LOG_SIZE, MAX_ENDPOINTS, mayBeSent, QUEUE_MAX_DELAY_S, takes } from './rules';
 
 const e = schema.webhookEndpoints;
@@ -31,10 +31,18 @@ export interface QueueDeps {
   log?: Pick<Console, 'log' | 'error'>;
 }
 
-/** What a delivery keeps from when it was queued: the event and the meeting as it was. */
+/**
+ * What a delivery keeps from when it was queued: the event and the meeting
+ * as it was, for the delivery log. For `meeting.deleted`, the notice that
+ * goes out (the id and the time only), and the owner and title for the
+ * audit row and the log, which never go out.
+ */
 export interface QueuedPayload {
   event: WebhookEvent | typeof WEBHOOK_TEST_EVENT;
   meeting: MeetingMeta | null;
+  deleted?: DeletedNotice;
+  owner_id?: string | null;
+  title?: string | null;
 }
 
 /** The meeting's metadata as a payload carries it: the owner by name and address, not by id. */
@@ -285,14 +293,16 @@ export async function queueCurrentState(deps: QueueDeps, meetingId: string) {
 /** What a delete must send, worked out before the meeting's rows go. */
 export interface DeletedPlan {
   meetingId: string;
-  meeting: MeetingMeta;
+  ownerId: string;
+  title: string;
   endpointIds: string[];
 }
 
 /**
- * Before a delete: the endpoints that take `meeting.deleted` and could have
- * received the meeting, because it may be sent now or because they already
- * took an event of it. Null when there is nobody to tell.
+ * Before a delete: the endpoints that take `meeting.deleted`, took an
+ * earlier event of this meeting, and may still receive it now (consent, or
+ * "Send automatically"). A meeting made private, which took the consent
+ * back, tells nobody. Null when there is nobody to tell.
  */
 export async function planDeleted(
   db: Db,
@@ -306,10 +316,10 @@ export async function planDeleted(
   const meeting = await db.query.meetings.findFirst({
     where: and(eq(schema.meetings.id, meetingId), eq(schema.meetings.installId, installId)),
   });
-  const meta = await meetingMeta(db, installId, meetingId);
-  if (!meeting || !meta) return null;
+  if (!meeting) return null;
   const settings = await readSettings(db, installId);
-  const eligible = mayBeSent({ ...meeting, deletedAt: null }, settings.webhookAutoSend);
+  if (!mayBeSent({ ...meeting, deletedAt: null }, settings.webhookAutoSend)) return null;
+  // Deliveries go out only while the meeting may be sent (deliver.ts), so a delivered one was sent then.
   const delivered = new Set(
     (
       await db
@@ -320,21 +330,25 @@ export async function planDeleted(
         )
     ).map((row) => row.endpointId),
   );
-  const endpointIds = endpoints
-    .filter((endpoint) => eligible || delivered.has(endpoint.id))
-    .map((endpoint) => endpoint.id);
+  const endpointIds = endpoints.filter((e) => delivered.has(e.id)).map((e) => e.id);
   if (!endpointIds.length) return null;
-  return { meetingId, meeting: snapshotOf(meta), endpointIds };
+  return { meetingId, ownerId: meeting.ownerId, title: meeting.title, endpointIds };
 }
 
-/** After the delete committed: `meeting.deleted`, once per endpoint, from the snapshot. */
-export async function queueDeleted(deps: QueueDeps, plan: DeletedPlan) {
+/** After the delete committed: `meeting.deleted`, once per endpoint, with the id and the time only. */
+export async function queueDeleted(deps: QueueDeps, plan: DeletedPlan, deletedAt = new Date()) {
   try {
     return await queueFor(
       deps,
       plan.endpointIds.map((id) => ({ id })),
       {
-        payload: { event: 'meeting.deleted', meeting: plan.meeting },
+        payload: {
+          event: 'meeting.deleted',
+          meeting: null,
+          deleted: { id: plan.meetingId, deleted_at: deletedAt.toISOString() },
+          owner_id: plan.ownerId,
+          title: plan.title,
+        },
         meetingId: plan.meetingId,
         dedupeKey: `deleted:${plan.meetingId}`,
       },

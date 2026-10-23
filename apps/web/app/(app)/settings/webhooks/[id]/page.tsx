@@ -146,8 +146,11 @@ export default async function DeliveryLogPage({ params, searchParams }: Params) 
                 {rows.map((row) => {
                   const status = statusKey(row.status, row.attempts);
                   const answer = answerKey(row.lastError, row.lastStatusCode);
-                  const title =
-                    (row.payload as { meeting?: { title?: string } | null }).meeting?.title ?? null;
+                  const queued = row.payload as {
+                    meeting?: { title?: string } | null;
+                    title?: string | null;
+                  };
+                  const title = queued.meeting?.title ?? queued.title ?? null;
                   const retryable =
                     row.status === 'parked' || (row.status === 'pending' && row.attempts > 0);
                   return (
