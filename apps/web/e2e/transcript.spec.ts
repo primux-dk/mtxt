@@ -21,7 +21,8 @@ import {
   Packet 4: a confirmed recording becomes a transcript with speakers. The
   install's provider is the e2e build's fake AssemblyAI (lib/stt/fake-providers.ts),
   which answers a submit and posts the webhook back after a short delay with
-  a three-speaker Danish fixture; or the fake Workers AI. Behaviour rules 2
+  a three-speaker Danish fixture; or the fake Workers AI; or the fake
+  ElevenLabs, chosen on the settings page, with two speakers. Behaviour rules 2
   (rename and link, optimistic with rollback), 5 (timestamps put ?t= in the
   address), 8 and 9 (the transcript states and the failure's next steps),
   11 (keyboard, dialog focus) and 13 (the 4-hour, 14-speaker transcript).
@@ -35,11 +36,11 @@ const TERMS = ['linje 2', 'ugeplanen', 'Ærø'];
 const control = (request: APIRequestContext, mode: 'completed' | 'error' | 'empty' | 'malformed') =>
   request.post('/api/test/fake-assemblyai/control', { data: { mode, delayMs: 1500 } });
 
-async function useProvider(provider: 'assemblyai' | 'workers-ai-whisper') {
+async function useProvider(provider: 'assemblyai' | 'elevenlabs' | 'workers-ai-whisper') {
   const key =
-    provider === 'assemblyai'
-      ? await seal('e2e-assemblyai-key', 'settings.stt_api_key', KEY)
-      : null;
+    provider === 'workers-ai-whisper'
+      ? null
+      : await seal(`e2e-${provider}-key`, 'settings.stt_api_key', KEY);
   d1(
     `update settings set stt_provider = '${provider}', stt_api_key = ${key ? `'${key}'` : 'NULL'}, language = 'auto'`,
   );
@@ -381,6 +382,103 @@ test('Workers AI Whisper: one speaker, synchronous', async ({ page, request }) =
         d1(`select provider, model from transcripts where recording_id = '${ids.recordingId}'`),
       )
       .toEqual([{ provider: 'workers-ai-whisper', model: '@cf/openai/whisper-large-v3-turbo' }]);
+  } finally {
+    await useProvider('assemblyai');
+  }
+});
+
+test('ElevenLabs Scribe, chosen in Settings: two speakers, synchronous, from one multipart request', async ({
+  page,
+  request,
+  browser,
+}) => {
+  const admin = await browser.newContext();
+  try {
+    // An admin chooses it on the settings page; the panel says the route and the residency.
+    await asUser(admin, 'dev');
+    const settings = await admin.newPage();
+    await settings.goto('/settings');
+    const gateway = await settings.locator('#aiGatewayId').inputValue();
+    await settings.locator('#sttProvider').selectOption('elevenlabs');
+    await expect(settings.locator('#sttRegion')).toHaveCount(0);
+    const panel = settings.getByRole('complementary', { name: 'Data flow' });
+    await settings.locator('#aiGatewayId').fill('');
+    await expect(panel).toContainText(
+      'No AI Gateway ID is set, so ElevenLabs Scribe receives audio and keyterms directly. It returns text and speakers.',
+    );
+    await settings.locator('#aiGatewayId').fill('mtxt-gateway');
+    await expect(panel).toContainText(
+      'ElevenLabs Scribe receives audio and keyterms through AI Gateway',
+    );
+    await expect(panel).toContainText(
+      'On a self-serve ElevenLabs plan, ElevenLabs processes the audio in the US',
+    );
+    await settings.locator('#aiGatewayId').fill(gateway);
+    await settings.locator('#sttApiKey').fill('e2e-elevenlabs-key');
+    await settings.getByRole('button', { name: 'Save settings' }).click();
+    await expect(settings.getByText('Settings saved.')).toBeVisible();
+    await expect
+      .poll(() => d1(`select stt_provider, stt_region from settings`))
+      .toEqual([{ stt_provider: 'elevenlabs', stt_region: null }]);
+
+    const ids = await upload(request, 'Scribe-møde');
+    await openTranscript(page, request, ids);
+    await expect(segments(page)).toHaveCount(4);
+    await expect(page.getByText('Danish · 2 speakers · Click a speaker to rename')).toBeVisible();
+    await expect(segments(page).nth(0)).toContainText('Speaker 1');
+    await expect(segments(page).nth(0)).toContainText('Lad os tage linje 2 først.');
+    await expect(segments(page).nth(1)).toContainText('Speaker 2');
+    // Two segments of the second speaker: a 2.1 s pause between them.
+    await expect(segments(page).nth(2)).toContainText('Ugeplanen holder.');
+    await expect(page.locator('mark')).toHaveText(['linje 2', 'Ugeplanen', 'Ærø']);
+    await expect
+      .poll(() =>
+        d1(`select provider, model from transcripts where recording_id = '${ids.recordingId}'`),
+      )
+      .toEqual([{ provider: 'elevenlabs', model: 'scribe_v2' }]);
+
+    // What the fake ElevenLabs was sent: the whole file, with a length, and the fields.
+    const sent = await (await request.get('/api/test/fake-elevenlabs/control')).json();
+    expect(sent).toMatchObject({
+      model_id: 'scribe_v2',
+      diarize: 'true',
+      timestamps_granularity: 'word',
+      tag_audio_events: 'false',
+      file: { bytes: wav(80).length, type: 'audio/wav', name: 'recording.wav' },
+    });
+    expect(sent.language_code).toBeUndefined();
+    expect(sent.keyterms).toEqual(expect.arrayContaining(TERMS));
+    expect(Number(sent.contentLength)).toBeGreaterThan(wav(80).length);
+  } finally {
+    await admin.close();
+    await useProvider('assemblyai');
+  }
+});
+
+test('ElevenLabs failure: a fixed reason with the status, and the key echoed in the body reaches no log or row', async ({
+  page,
+  request,
+}) => {
+  await useProvider('elevenlabs');
+  try {
+    await control(request, 'error');
+    const ids = await upload(request, 'Scribe fejler');
+    await expect.poll(() => statusOf(request, ids.recordingId), { timeout: 30_000 }).toBe('failed');
+    await expect
+      .poll(() =>
+        d1(`select failure, failure_reason from recordings where id = '${ids.recordingId}'`),
+      )
+      .toEqual([{ failure: 'stt_failed', failure_reason: 'bad_audio:422' }]);
+    await page.goto(`/meetings/${ids.meetingId}`);
+    const alert = page.getByRole('alert').filter({ hasText: 'Transcription failed' });
+    await expect(alert).toContainText('ElevenLabs Scribe could not transcribe the recording.');
+    await expect(alert).toContainText('Reason: The provider could not read the audio (HTTP 422).');
+    await expect(alert).not.toContainText('Fake ElevenLabs');
+    const log = readFileSync('.wrangler/e2e-worker.log', 'utf8');
+    expect(log).toContain('Transcription failed');
+    expect(log).not.toContain('e2e-elevenlabs-key');
+    expect(JSON.stringify(d1('select * from recordings'))).not.toContain('e2e-elevenlabs-key');
+    expect(JSON.stringify(d1('select * from transcripts'))).not.toContain('e2e-elevenlabs-key');
   } finally {
     await useProvider('assemblyai');
   }

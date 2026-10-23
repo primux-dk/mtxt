@@ -24,7 +24,7 @@ export function DataFlow({
   providerName: string;
   /** The recap model's provider, by name. */
   recapName: string;
-  /** An AI Gateway id is typed: Workers AI and the recap model go through it. */
+  /** An AI Gateway id is typed: ElevenLabs, Workers AI and the recap model go through it. */
   gateway: boolean;
   audioDays: number;
   textDays: number;
@@ -44,7 +44,9 @@ export function DataFlow({
       ? t('step2Unavailable', { provider: providerName })
       : provider === 'workers-ai-whisper'
         ? t(gateway ? 'step2WorkersAi' : 'step2WorkersAiDirect', { provider: providerName })
-        : t('step2', { provider: providerName });
+        : provider === 'elevenlabs'
+          ? t(gateway ? 'step2ElevenLabs' : 'step2ElevenLabsDirect', { provider: providerName })
+          : t('step2', { provider: providerName });
   return (
     <aside
       aria-labelledby="dataflow-heading"

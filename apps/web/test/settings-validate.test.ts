@@ -188,8 +188,8 @@ describe('validateSettings', () => {
     }
   });
 
-  it('refuses the providers this version does not have, and keeps the two it has', () => {
-    for (const provider of ['azure', 'elevenlabs', 'local-whisper', 'local-parakeet']) {
+  it('refuses the providers this version does not have, and keeps the three it has', () => {
+    for (const provider of ['azure', 'local-whisper', 'local-parakeet']) {
       expect(
         errorsOf(form({ sttProvider: provider, sttApiKey: 'k', sttRegion: 'westeurope' }))
           .sttProvider,
@@ -200,6 +200,29 @@ describe('validateSettings', () => {
     expect(
       validateSettings(form({ sttProvider: 'assemblyai', sttApiKey: 'k' }), configured, SELF).ok,
     ).toBe(true);
+    expect(
+      validateSettings(form({ sttProvider: 'elevenlabs', sttApiKey: 'k' }), configured, SELF).ok,
+    ).toBe(true);
+  });
+
+  it('saves ElevenLabs with its key sealed and no region, whatever the form sends', () => {
+    const result = validateSettings(
+      form({ sttProvider: 'elevenlabs', sttApiKey: 'xi-1', sttRegion: 'eu' }),
+      configured,
+      SELF,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.patch.sttProvider).toBe('elevenlabs');
+    expect(result.ok && result.patch.sttRegion).toBeNull();
+    expect(result.ok && result.secrets).toEqual({ sttApiKey: 'xi-1' });
+    expect(result.ok && result.clearSttKey).toBe(false);
+    // The stored key is AssemblyAI's (configured); it does not carry over.
+    expect(validateSettings(form({ sttProvider: 'elevenlabs' }), configured, SELF)).toMatchObject({
+      ok: false,
+      errors: { sttApiKey: { code: 'secretRequired' } },
+    });
+    const same = { ...configured, sttProvider: 'elevenlabs' as const, hasSttKey: true };
+    expect(validateSettings(form({ sttProvider: 'elevenlabs' }), same, SELF).ok).toBe(true);
   });
 
   it('takes an AI Gateway id, or none', () => {

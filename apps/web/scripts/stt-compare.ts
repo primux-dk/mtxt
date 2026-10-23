@@ -7,6 +7,8 @@
 
     pnpm stt:compare --recording <id> --provider workers-ai
     pnpm stt:compare --recording <id> --provider assemblyai
+    pnpm stt:compare --recording <id> --provider elevenlabs
+      --direct             ElevenLabs at its own API even when the install has a gateway id
       --persist-to <dir>   the local state wrangler dev used (default .wrangler/state);
                            paths are relative to apps/web
       --vars <file>        secrets and vars to read instead of .dev.vars
@@ -15,6 +17,15 @@
   Workers AI always runs remotely, so it needs a wrangler login, also against
   local data. In an e2e state, AUTH_TEST_MODE=1 and WORKERS_AI_FAKE_URL in the
   vars file point it at the fake instead (lib/stt/test-hooks.ts), with no login.
+
+  A provider that takes a key uses the install's stored key when it is the
+  install's own provider. To compare with another one, put its key in
+  MTXT_STT_COMPARE_KEY in the shell (never an argument); it is sealed under
+  SETTINGS_KEY in memory and goes through the same path as a stored key.
+  ElevenLabs through AI Gateway takes the gateway's address from the AI
+  binding, which always runs remotely, so it needs a wrangler login unless
+  --direct is given or ELEVENLABS_BASE_URL in an e2e vars file points it at
+  the fake.
 */
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -27,16 +38,21 @@ import {
   readSettings,
   schema,
   seal,
+  workersAiLanguage,
   workersAiSpeech,
   type Settings,
 } from '@mtxt/adapters';
 import { providerFor, type SttResult } from '../lib/stt';
 import { diffStats, formatDiff, wordDiff, words } from '../lib/stt/compare';
-import { fakeSpeech } from '../lib/stt/test-hooks';
+import { fakeElevenLabsUrl, fakeSpeech } from '../lib/stt/test-hooks';
 import { keytermList } from '../lib/transcription/job';
 import { rawPath } from '../lib/transcription/store';
 
-const PROVIDERS = { 'workers-ai': 'workers-ai-whisper', assemblyai: 'assemblyai' } as const;
+const PROVIDERS = {
+  'workers-ai': 'workers-ai-whisper',
+  assemblyai: 'assemblyai',
+  elevenlabs: 'elevenlabs',
+} as const;
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -47,9 +63,12 @@ async function main() {
   const recordingId = arg('recording');
   const which = arg('provider') as keyof typeof PROVIDERS | undefined;
   if (!recordingId || !which || !(which in PROVIDERS)) {
-    throw new Error('Usage: pnpm stt:compare --recording <id> --provider workers-ai|assemblyai');
+    throw new Error(
+      'Usage: pnpm stt:compare --recording <id> --provider workers-ai|assemblyai|elevenlabs',
+    );
   }
   const remote = process.argv.includes('--remote');
+  const direct = process.argv.includes('--direct');
   const here = resolve(import.meta.dirname, '..');
   let configPath = join(here, 'wrangler.jsonc');
   let temp = false;
@@ -71,10 +90,15 @@ async function main() {
   const envFile = arg('vars');
   // Remote bindings need a login: only for --remote, or for Workers AI unless a test vars file fakes it.
   const vars = envFile ? readFileSync(resolve(envFile), 'utf8') : '';
-  const faked = /^AUTH_TEST_MODE=1$/m.test(vars) && /^WORKERS_AI_FAKE_URL=/m.test(vars);
+  const testMode = /^AUTH_TEST_MODE=1$/m.test(vars);
+  const faked = testMode && /^WORKERS_AI_FAKE_URL=/m.test(vars);
+  const fakedScribe = testMode && /^ELEVENLABS_BASE_URL=/m.test(vars);
   const proxy = await getPlatformProxy<CloudflareEnv>({
     configPath,
-    remoteBindings: remote || (which === 'workers-ai' && !faked),
+    remoteBindings:
+      remote ||
+      (which === 'workers-ai' && !faked) ||
+      (which === 'elevenlabs' && !direct && !fakedScribe),
     ...(persistTo ? { persist: { path: join(resolve(persistTo), 'v3') } } : {}),
     ...(envFile ? { envFiles: [resolve(envFile)] } : {}),
   });
@@ -112,11 +136,25 @@ async function main() {
 
     const settings = await readSettings(db, installId);
     const id = PROVIDERS[which];
+    // Another provider's key comes from the shell, sealed here as a stored key would be.
+    const compareKey = process.env.MTXT_STT_COMPARE_KEY?.trim();
+    let sttApiKey = settings.sttProvider === id ? settings.sttApiKey : null;
+    if (compareKey && env.SETTINGS_KEY) {
+      sttApiKey = await seal(compareKey, 'settings.stt_api_key', env.SETTINGS_KEY);
+    }
+    const language = workersAiLanguage(env.AI);
     const provider = await providerFor(
-      { ...settings, sttProvider: id as Settings['sttProvider'] },
+      {
+        ...settings,
+        sttProvider: id as Settings['sttProvider'],
+        sttApiKey,
+        aiGatewayId: direct ? null : settings.aiGatewayId,
+      },
       {
         settingsKey: env.SETTINGS_KEY,
         speech: fakeSpeech(env) ?? workersAiSpeech(env.AI),
+        gatewayUrl: (gatewayId, name) => language.gatewayUrl(gatewayId, name),
+        elevenLabsBaseUrl: fakeElevenLabsUrl(env),
         publicUrl: env.PUBLIC_URL,
         allowLocalPublicUrl: !remote,
         webhookSecret: () =>

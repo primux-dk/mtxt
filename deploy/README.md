@@ -47,8 +47,9 @@ The names can be changed per install under `names` in the install config. The Du
    MTXT_OIDC_TENANT_ID=example.com
    MTXT_OIDC_CLIENT_ID=...
    MTXT_OIDC_CLIENT_SECRET=...
-   # Optional
+   # Optional: the key for settings.sttProvider, assemblyai or elevenlabs
    MTXT_ASSEMBLYAI_KEY=...
+   MTXT_ELEVENLABS_KEY=...
    ```
 
    A value in quotes is kept as written. Without quotes, a `#` after a space starts a comment.
@@ -62,7 +63,7 @@ The names can be changed per install under `names` in the install config. The Du
    pnpm deploy:install --config deploy/installs/<name>.json
    ```
 
-The run prints what exists and what it will do, then in order: creates the missing D1 database, R2 bucket, queues and AI Gateway; writes `apps/web/wrangler.<installId>.jsonc` with the account id, the resource ids, the hostname as custom domain and the install's vars (not in git); applies the pending D1 migrations remotely; writes the settings row if it does not exist (product name, company name, languages, gateway id); seals the AssemblyAI key into the row if the row has no provider yet; builds with OpenNext, checks that the bundle holds no e2e fake provider and deploys; puts the Worker secrets the Worker lacks; and checks the custom domain. It never prints a secret.
+The run prints what exists and what it will do, then in order: creates the missing D1 database, R2 bucket, queues and AI Gateway; writes `apps/web/wrangler.<installId>.jsonc` with the account id, the resource ids, the hostname as custom domain and the install's vars (not in git); applies the pending D1 migrations remotely; writes the settings row if it does not exist (product name, company name, languages, gateway id); seals the speech-to-text key into the row if the row has no provider yet (`MTXT_ASSEMBLYAI_KEY` for `assemblyai`, `MTXT_ELEVENLABS_KEY` for `elevenlabs`; with no `sttProvider` in the config, an AssemblyAI key alone means AssemblyAI); builds with OpenNext, checks that the bundle holds no e2e fake provider and deploys; puts the Worker secrets the Worker lacks; and checks the custom domain. It never prints a secret.
 
 A second run changes nothing. Resources are found by name; the settings row is left alone once it exists, so the settings page stays the source; a secret is put only when the Worker lacks it; and the Worker is deployed only when a build input changed since the deployed version (its tag says which): `apps/web`, `packages`, the lockfile, the root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.node-version`, an `.npmrc` if there is one, or the generated config. `--force-deploy` deploys anyway.
 

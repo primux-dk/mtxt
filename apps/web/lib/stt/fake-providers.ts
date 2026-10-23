@@ -1,5 +1,5 @@
 /*
-  The fake AssemblyAI and fake Workers AI the e2e run talks to (see
+  The fake AssemblyAI, fake ElevenLabs and fake Workers AI the e2e run talks to (see
   lib/stt/test-hooks.ts). Same three locks as the test sign-in
   (lib/auth/test-sign-in.ts): the routes are `route.e2e.ts` files, a route
   only in an MTXT_E2E_BUILD=1 build; this module throws on import in any
@@ -10,11 +10,14 @@
   `test/fake-assemblyai/`, answers a submit at once, and posts the webhook
   back after a short delay with the fixture: three speakers, Danish. A
   control call sets what the next job does: complete, fail, or find no speech.
+  The fake ElevenLabs answers its one multipart request with a two-speaker
+  Danish fixture, under the same control.
 */
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { getAdapters, getEnv } from '../install';
 import { ASSEMBLYAI_WEBHOOK_HEADER, type AaiTranscript } from './assemblyai';
 import fixture from './fixtures/assemblyai-3-speakers.json';
+import scribeFixture from './fixtures/elevenlabs-2-speakers.json';
 import whisperFixture from './fixtures/whisper.json';
 
 if (process.env.NODE_ENV === 'production' && process.env.MTXT_E2E_BUILD !== '1') {
@@ -25,6 +28,7 @@ if (process.env.NODE_ENV === 'production' && process.env.MTXT_E2E_BUILD !== '1')
 
 const LOCAL = new Set(['localhost', '127.0.0.1', '[::1]']);
 const PREFIX = 'test/fake-assemblyai';
+const SCRIBE_PREFIX = 'test/fake-elevenlabs';
 
 export type FakeMode = 'completed' | 'error' | 'empty' | 'malformed';
 interface Control {
@@ -153,4 +157,54 @@ export async function whisperRoute(request: Request) {
   if (mode === 'error') return Response.json({ error: 'capacity' }, { status: 500 });
   if (mode === 'empty') return Response.json({ text: '', segments: [] });
   return Response.json(whisperFixture);
+}
+
+/** GET: the last Scribe request, for assertions. POST: the shared control. */
+export async function elevenLabsControlRoute(request: Request) {
+  if (!(await allowed(request))) return notFound();
+  if (request.method === 'GET') {
+    return Response.json((await readJson(`${SCRIBE_PREFIX}/last-request.json`)) ?? {});
+  }
+  return controlRoute(request);
+}
+
+/**
+ * ElevenLabs Scribe: one multipart POST, answered at once. A failure echoes
+ * the key in its body, so the e2e run can check it never reaches a log or a row.
+ */
+export async function elevenLabsRoute(request: Request) {
+  if (!(await allowed(request))) return notFound();
+  const key = request.headers.get('xi-api-key');
+  if (!key) return Response.json({ detail: { status: 'invalid_api_key' } }, { status: 401 });
+  const form = await request.formData();
+  const file = form.get('file');
+  const fields: Record<string, string | string[]> = {};
+  for (const [name, value] of form) {
+    if (name === 'file' || typeof value !== 'string') continue;
+    if (name === 'keyterms') fields.keyterms = [...((fields.keyterms as string[]) ?? []), value];
+    else fields[name] = value;
+  }
+  await writeJson(`${SCRIBE_PREFIX}/last-request.json`, {
+    ...fields,
+    file:
+      file && typeof file !== 'string'
+        ? { bytes: file.size, type: file.type, name: file.name }
+        : null,
+    contentLength: request.headers.get('content-length'),
+  });
+  const { mode } = await control();
+  if (mode === 'error') {
+    return Response.json(
+      {
+        detail: {
+          status: 'invalid_audio',
+          message: `Fake ElevenLabs could not decode the audio for ${key}.`,
+        },
+      },
+      { status: 422 },
+    );
+  }
+  if (mode === 'malformed') return new Response(`{"words": ${key} <html>`, { status: 200 });
+  if (mode === 'empty') return Response.json({ ...scribeFixture, text: '', words: [] });
+  return Response.json(scribeFixture);
 }

@@ -91,9 +91,9 @@ export function loadInstall(path) {
   }
   if (
     settings.sttProvider &&
-    !['assemblyai', 'workers-ai-whisper'].includes(settings.sttProvider)
+    !['assemblyai', 'elevenlabs', 'workers-ai-whisper'].includes(settings.sttProvider)
   ) {
-    fail('settings.sttProvider is assemblyai or workers-ai-whisper in this version.');
+    fail('settings.sttProvider is assemblyai, elevenlabs or workers-ai-whisper in this version.');
   }
 
   return {

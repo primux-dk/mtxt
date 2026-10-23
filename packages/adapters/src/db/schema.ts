@@ -512,7 +512,7 @@ export const settings = sqliteTable(
     sttProvider: text('stt_provider', { enum: STT_PROVIDERS }),
     /** Sealed. Workers AI Whisper and the local models have none. */
     sttApiKey: text('stt_api_key'),
-    /** Azure: the region name. ElevenLabs: `eu` or null for the provider default. */
+    /** Azure: the region name. Null for every other provider. */
     sttRegion: text('stt_region'),
     /**
      * Sealed. Authenticates the speech-to-text provider's webhook back to the

@@ -23,7 +23,7 @@ export function redact(text: string): string {
   return out
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
     .replace(
-      /\b(authorization|x-mtxt-webhook-secret)(["']?\s*[:=]\s*["']?)[^\s"',;}]+/gi,
+      /\b(authorization|x-mtxt-webhook-secret|xi-api-key)(["']?\s*[:=]\s*["']?)[^\s"',;}]+/gi,
       '$1$2[redacted]',
     );
 }

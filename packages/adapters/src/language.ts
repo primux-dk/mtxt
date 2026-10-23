@@ -1,7 +1,7 @@
 /**
  * Language models the platform reaches through Cloudflare: Workers AI text
  * generation on the binding, and the AI Gateway's address for the providers
- * that are called over HTTP (Anthropic, OpenAI, Azure OpenAI). apps/web
+ * that are called over HTTP (Anthropic, OpenAI, Azure OpenAI, ElevenLabs). apps/web
  * never touches the `AI` binding; a Docker edition puts a local model or a
  * plain HTTPS base URL behind the same shape.
  */
@@ -27,7 +27,7 @@ export interface GenerateOutput {
 }
 
 /** AI Gateway's provider paths, as `getUrl` names them. */
-export type GatewayProvider = 'anthropic' | 'openai' | 'azure-openai';
+export type GatewayProvider = 'anthropic' | 'openai' | 'azure-openai' | 'elevenlabs';
 
 export interface LanguageModels {
   generate(input: GenerateInput): Promise<GenerateOutput>;

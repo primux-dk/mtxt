@@ -3,8 +3,9 @@
   packet 4). The API key is opened from its sealed column here, at call
   time, and handed to the provider; it is never logged or returned.
 */
-import { open, type Settings, type SpeechModels } from '@mtxt/adapters';
+import { open, type GatewayProvider, type Settings, type SpeechModels } from '@mtxt/adapters';
 import { assemblyAi } from './assemblyai';
+import { elevenLabs } from './elevenlabs';
 import { rememberSecret } from './redact';
 import { SttError, type SttProvider, type SttProviderId } from './types';
 import { workersAiWhisper } from './workers-ai';
@@ -14,6 +15,7 @@ export * from './types';
 /** The providers this build implements. The rest stay in the select and are refused at save. */
 export const AVAILABLE_PROVIDERS = [
   'assemblyai',
+  'elevenlabs',
   'workers-ai-whisper',
 ] as const satisfies readonly SttProviderId[];
 
@@ -29,8 +31,11 @@ export interface ProviderDeps {
   webhookSecret: () => Promise<string>;
   /** http://localhost:<port> is a valid PUBLIC_URL only in the e2e build or local wrangler. */
   allowLocalPublicUrl?: boolean;
+  /** AI Gateway's base URL for a provider, from the binding (packages/adapters, language). */
+  gatewayUrl?: (gatewayId: string, provider: GatewayProvider) => Promise<string>;
   /** Test-only overrides; see lib/stt/test-hooks.ts. */
   assemblyAiBaseUrl?: string;
+  elevenLabsBaseUrl?: string;
   fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
@@ -76,9 +81,33 @@ export async function providerFor(
   if (id === 'workers-ai-whisper') {
     return workersAiWhisper({ speech: deps.speech, gatewayId: settings.aiGatewayId });
   }
-  // assemblyai
   if (!settings.sttApiKey) throw new SttError('stt_auth', 'unauthorised');
   if (!deps.settingsKey) throw new SttError('stt_config', 'config');
+  if (id === 'elevenlabs') {
+    let apiKey: string;
+    try {
+      apiKey = await open(settings.sttApiKey, 'settings.stt_api_key', deps.settingsKey);
+    } catch {
+      throw new SttError('stt_config', 'config');
+    }
+    rememberSecret(apiKey);
+    let gatewayBase: string | null = null;
+    if (settings.aiGatewayId && !deps.elevenLabsBaseUrl) {
+      try {
+        if (!deps.gatewayUrl) throw new Error('No gateway address.');
+        gatewayBase = await deps.gatewayUrl(settings.aiGatewayId, 'elevenlabs');
+      } catch {
+        throw new SttError('stt_config', 'config', false, undefined, 'AI Gateway');
+      }
+    }
+    return elevenLabs({
+      apiKey,
+      gatewayBase,
+      ...(deps.elevenLabsBaseUrl ? { baseUrl: deps.elevenLabsBaseUrl } : {}),
+      ...(deps.fetch ? { fetch: deps.fetch } : {}),
+    });
+  }
+  // assemblyai
   const url = webhookUrl(deps.publicUrl, deps.allowLocalPublicUrl);
   let apiKey: string;
   let secret: string;
