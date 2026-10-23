@@ -62,6 +62,8 @@ export type {
   Visibility,
 } from './db/schema';
 export type {
+  AuditAction,
+  AuditEvent,
   Meeting,
   Recording,
   RecordingStatus,
@@ -92,6 +94,7 @@ export {
   dropFromSearchStatement,
   ftsQuery,
   meetingKey,
+  meetingSegments,
   SEARCH_KINDS,
   searchHitsSql,
   searchSnippets,
