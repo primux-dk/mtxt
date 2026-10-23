@@ -263,14 +263,17 @@ export const transcripts = sqliteTable(
      */
     claimedAt: timestamp('claimed_at'),
     claimToken: text('claim_token'),
+    /** When the claim lapses (15 minutes after it is taken). A held delivery retries until then. */
+    claimExpiresAt: timestamp('claim_expires_at'),
+    /** The current attempt's polling deadline: past it, a job the provider still has is failed as a timeout. */
+    pollDeadlineAt: timestamp('poll_deadline_at'),
     /**
      * Where the provider's raw result lives in storage
-     * (`transcripts/{install}/{recording}/{provider}.json`). `raw_json` is no
-     * longer written beyond `{}`: a full result can pass D1's 2 MB value limit.
+     * (`transcripts/{install}/{recording}/{provider}-{claim_token}.json`), set
+     * by the completion that won. `raw_json` is no longer written beyond `{}`:
+     * a full result can pass D1's 2 MB value limit.
      */
     rawPath: text('raw_path'),
-    /** Set in the completion batch, once; the recap job goes out only when this call set it. */
-    recapEnqueuedAt: timestamp('recap_enqueued_at'),
   },
   (t) => [
     /** One server transcript per recording; the live preview is never stored. Comparisons sit beside it. */
@@ -279,6 +282,28 @@ export const transcripts = sqliteTable(
       .where(sql`"is_comparison" = 0`),
     /** The same provider job never makes two rows in an install (a replayed webhook, a retried job). */
     uniqueIndex('transcripts_install_provider_job').on(t.installId, t.provider, t.providerJobId),
+  ],
+);
+
+/**
+ * The recap job a completed transcript owes, written in the completion
+ * batch. `sent_at` is set once the queue took the message; a later delivery
+ * re-sends a row left unsent for over a minute.
+ */
+export const recapOutbox = sqliteTable(
+  'recap_outbox',
+  {
+    transcriptId: text('transcript_id')
+      .notNull()
+      .references(() => transcripts.id, { onDelete: 'cascade' }),
+    installId: installId(),
+    meetingId: text('meeting_id').notNull(),
+    createdAt: createdAt(),
+    sentAt: timestamp('sent_at'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.transcriptId] }),
+    index('recap_outbox_install_unsent').on(t.installId, t.sentAt),
   ],
 );
 
