@@ -1,7 +1,7 @@
 import { HttpError } from '@/lib/http-error';
 import { rest, restJson } from '@/lib/rest/handler';
 import { queryMeetings } from '@/lib/rest/meetings';
-import { decodeCursor, encodeCursor, parseListParams } from '@/lib/rest/rules';
+import { decodeCursor, encodeCursor, isRankPosition, parseListParams } from '@/lib/rest/rules';
 
 /*
   GET /api/v1/meetings (docs/spec.md "API"): the meetings the token's user
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const params = parseListParams(new URL(request.url).searchParams);
     if ('error' in params) throw new HttpError(400, 'invalid_request', params.error);
     const position = params.cursor ? decodeCursor(params.cursor, params.fingerprint) : undefined;
-    if (position === null || (position && 'offset' in position)) {
+    if (position === null || (position && isRankPosition(position))) {
       throw new HttpError(400, 'invalid_request', 'This cursor belongs to another query.');
     }
     const page = await queryMeetings(db, installId, user, {

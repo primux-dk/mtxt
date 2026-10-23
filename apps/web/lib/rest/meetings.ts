@@ -99,6 +99,7 @@ interface Row {
   has_transcript: number;
   has_recap: number;
   kind_rank: number | null;
+  hits: number | null;
 }
 
 export interface MeetingQuery {
@@ -110,7 +111,8 @@ export interface MeetingQuery {
   limit: number;
   /** Newest first, after this row (`date`), or this many rows in (`relevance`, search). */
   after?: { startedAt: number; id: string };
-  offset?: number;
+  /** Search: after this row of the best-match order. */
+  afterRank?: { rank: number; hits: number; startedAt: number; id: string };
   order: 'date' | 'relevance';
   /** Just this meeting, still under the permission scope. */
   only?: string;
@@ -122,7 +124,11 @@ export async function queryMeetings(
   installId: string,
   user: Pick<SessionUser, 'id'>,
   query: MeetingQuery,
-): Promise<{ rows: MeetingSummary[]; ranks: Map<string, number>; more: boolean }> {
+): Promise<{
+  rows: MeetingSummary[];
+  ranks: Map<string, { rank: number; hits: number }>;
+  more: boolean;
+}> {
   const match = query.q ? ftsQuery(query.q) : null;
   const hits = query.q
     ? searchHitsSql(installId, match, `%${foldTitle(query.q).replace(/[\\%_]/g, (c) => `\\${c}`)}%`)
@@ -133,6 +139,13 @@ export async function queryMeetings(
   else if (query.status) filters.push(sql`${STATE_SQL} = ${query.status}`);
   if (query.since) filters.push(sql`m.started_at >= ${query.since.getTime()}`);
   if (query.only) filters.push(sql`m.id = ${query.only}`);
+  if (query.afterRank && hits) {
+    const a = query.afterRank;
+    filters.push(sql`(h.kind_rank > ${a.rank}
+      or (h.kind_rank = ${a.rank} and h.hits < ${a.hits})
+      or (h.kind_rank = ${a.rank} and h.hits = ${a.hits} and m.started_at < ${a.startedAt})
+      or (h.kind_rank = ${a.rank} and h.hits = ${a.hits} and m.started_at = ${a.startedAt} and m.id > ${a.id}))`);
+  }
   if (query.after) {
     filters.push(sql`(m.started_at < ${query.after.startedAt}
       or (m.started_at = ${query.after.startedAt} and m.id > ${query.after.id}))`);
@@ -144,7 +157,7 @@ export async function queryMeetings(
   const rows = await db.all<Row>(sql`${hits ? sql`with hits as (${hits}) ` : sql``}
     select m.id, m.title, m.started_at, m.visibility, m.owner_id, m.archived_at, m.deleted_at, m.keep,
       u.name as owner_name, u.email as owner_email, r.duration_s, ${STATE_SQL} as state,
-      ${hits ? sql`h.kind_rank` : sql`null`} as kind_rank,
+      ${hits ? sql`h.kind_rank` : sql`null`} as kind_rank, ${hits ? sql`h.hits` : sql`null`} as hits,
       exists (select 1 from transcripts t join recordings r4 on r4.id = t.recording_id and r4.install_id = ${installId}
         where t.install_id = ${installId} and r4.meeting_id = m.id and t.status = 'done' and t.is_comparison = 0)
         as has_transcript,
@@ -158,7 +171,7 @@ export async function queryMeetings(
       order by r2.is_primary desc, r2.created_at desc limit 1)
     where ${sql.join(filters, sql` and `)}
     order by ${order}
-    limit ${query.limit + 1} offset ${query.offset ?? 0}`);
+    limit ${query.limit + 1}`);
   const more = rows.length > query.limit;
   const page = rows.slice(0, query.limit);
   const speakers = await speakersFor(
@@ -166,7 +179,9 @@ export async function queryMeetings(
     installId,
     page.map((r) => r.id),
   );
-  const ranks = new Map(page.map((r) => [r.id, Number(r.kind_rank ?? 0)]));
+  const ranks = new Map(
+    page.map((r) => [r.id, { rank: Number(r.kind_rank ?? 0), hits: Number(r.hits ?? 0) }]),
+  );
   return {
     rows: page.map((r) => ({
       id: r.id,
@@ -218,15 +233,17 @@ export async function searchResults(
   db: Db,
   installId: string,
   q: string,
-  page: { rows: MeetingSummary[]; ranks: Map<string, number> },
+  page: { rows: MeetingSummary[]; ranks: Map<string, { rank: number; hits: number }> },
 ) {
   const match = ftsQuery(q);
   // A title hit shows no snippet: the meeting's title is the hit.
-  const withText = page.rows.filter((r) => (page.ranks.get(r.id) ?? 0) !== 0).map((r) => r.id);
+  const withText = page.rows
+    .filter((r) => (page.ranks.get(r.id)?.rank ?? 0) !== 0)
+    .map((r) => r.id);
   const snippets =
     match && withText.length ? await searchSnippets(db, installId, match, withText) : new Map();
   return page.rows.map((meeting) => {
-    const rank = page.ranks.get(meeting.id) ?? 0;
+    const rank = page.ranks.get(meeting.id)?.rank ?? 0;
     const hit = snippets.get(meeting.id);
     return {
       meeting,

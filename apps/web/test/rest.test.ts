@@ -82,19 +82,20 @@ describe('authorise', () => {
 describe('cursors', () => {
   const f = queryFingerprint({ view: 'all', q: undefined });
 
-  it('round-trip a keyset and an offset, opaque and URL-safe', () => {
+  it('round-trip both keysets, opaque and URL-safe', () => {
     const keyset = encodeCursor({ startedAt: 1_792_000_000_000, id: 'm-ø-1' }, f);
     expect(keyset).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(decodeCursor(keyset, f)).toEqual({ startedAt: 1_792_000_000_000, id: 'm-ø-1' });
-    expect(decodeCursor(encodeCursor({ offset: 50 }, f), f)).toEqual({ offset: 50 });
+    const ranked = { rank: 2, hits: 3, startedAt: 1_792_000_000_000, id: 'm2' };
+    expect(decodeCursor(encodeCursor(ranked, f), f)).toEqual(ranked);
   });
 
   it('are refused by another query, and when tampered with', () => {
-    const cursor = encodeCursor({ offset: 50 }, f);
+    const cursor = encodeCursor({ rank: 1, hits: 1, startedAt: 5, id: 'm1' }, f);
     expect(decodeCursor(cursor, queryFingerprint({ view: 'mine', q: undefined }))).toBeNull();
     expect(decodeCursor(cursor.slice(0, -2), f)).toBeNull();
     expect(decodeCursor('not a cursor!', f)).toBeNull();
-    const forged = btoa(JSON.stringify({ v: 1, f, o: -5 })).replace(/=+$/, '');
+    const forged = btoa(JSON.stringify({ v: 1, f, k: -5, h: 1, s: 5, i: 'm1' })).replace(/=+$/, '');
     expect(decodeCursor(forged, f)).toBeNull();
   });
 
@@ -254,6 +255,31 @@ describe('the REST API on a database', () => {
       params: Promise.resolve({ id: 'a1' }),
     });
     expect(other.status).toBe(404);
+  });
+
+  it('pages a search by its order, so a match added between pages repeats nothing', async () => {
+    as(await token('anne'));
+    const page = async (cursor?: string) =>
+      (await (
+        await searchRoute.GET(
+          get(`/api/v1/search?q=m%C3%B8de&limit=2${cursor ? `&cursor=${cursor}` : ''}`),
+        )
+      ).json()) as { results: { meeting: { id: string } }[]; next_cursor: string | null };
+    const first = await page();
+    expect(first.results.map((r) => r.meeting.id)).toEqual(['js', 'jc']);
+    // A newer matching meeting lands before the cursor's place: page two neither repeats jc nor skips a5.
+    ctx.raw
+      .exec(`INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at, visibility)
+      VALUES ('new', '${INSTALL}', 'anne', 'Møde ny', 'møde ny', ${Date.UTC(2026, 9, 30)}, 'private')`);
+    const seen = first.results.map((r) => r.meeting.id);
+    let cursor = first.next_cursor;
+    while (cursor) {
+      const next = await page(cursor);
+      seen.push(...next.results.map((r) => r.meeting.id));
+      cursor = next.next_cursor;
+    }
+    expect(seen).toEqual(['js', 'jc', 'a5', 'a4', 'a3', 'a2', 'a1', 'a6']);
+    expect(new Set(seen).size).toBe(seen.length);
   });
 
   it('refuses a cursor from another query', async () => {

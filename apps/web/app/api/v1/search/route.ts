@@ -1,7 +1,7 @@
 import { HttpError } from '@/lib/http-error';
 import { rest, restJson } from '@/lib/rest/handler';
 import { queryMeetings, searchResults } from '@/lib/rest/meetings';
-import { decodeCursor, encodeCursor, parseSearchParams } from '@/lib/rest/rules';
+import { decodeCursor, encodeCursor, isRankPosition, parseSearchParams } from '@/lib/rest/rules';
 
 /*
   GET /api/v1/search?q= (docs/spec.md "API"): titles, transcripts and
@@ -13,22 +13,27 @@ export async function GET(request: Request) {
     const params = parseSearchParams(new URL(request.url).searchParams);
     if ('error' in params) throw new HttpError(400, 'invalid_request', params.error);
     const position = params.cursor ? decodeCursor(params.cursor, params.fingerprint) : undefined;
-    if (position === null || (position && !('offset' in position))) {
+    if (position === null || (position && !isRankPosition(position))) {
       throw new HttpError(400, 'invalid_request', 'This cursor belongs to another query.');
     }
-    const offset = position?.offset ?? 0;
     const page = await queryMeetings(db, installId, user, {
       view: 'all',
       q: params.q,
       limit: params.limit,
-      offset,
+      afterRank: position && isRankPosition(position) ? position : undefined,
       order: 'relevance',
     });
+    const last = page.rows.at(-1);
+    const lastRank = last && page.ranks.get(last.id);
     return restJson({
       results: await searchResults(db, installId, params.q, page),
-      next_cursor: page.more
-        ? encodeCursor({ offset: offset + page.rows.length }, params.fingerprint)
-        : null,
+      next_cursor:
+        page.more && last && lastRank
+          ? encodeCursor(
+              { ...lastRank, startedAt: new Date(last.started_at).getTime(), id: last.id },
+              params.fingerprint,
+            )
+          : null,
     });
   });
 }

@@ -52,8 +52,17 @@ export function authorise(
   return { ok: true };
 }
 
-/** Where a page of meetings ends: the last row's start and id (newest first), or an offset for search. */
-export type Position = { startedAt: number; id: string } | { offset: number };
+/**
+ * Where a page ends: the last row's place in the page's whole order. The
+ * list is newest first (start, then id); search is best match first (the
+ * kind of hit, the matched words, then start and id). A keyset, not an
+ * offset, so a meeting added between two pages neither repeats a row nor
+ * hides one.
+ */
+export type DatePosition = { startedAt: number; id: string };
+export type RankPosition = DatePosition & { rank: number; hits: number };
+export type Position = DatePosition | RankPosition;
+export const isRankPosition = (p: Position): p is RankPosition => 'rank' in p;
 
 const bytesToBase64Url = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
@@ -91,10 +100,13 @@ export function queryFingerprint(filters: Record<string, string | number | undef
 
 /** An opaque cursor: the position and the query's fingerprint, base64url JSON. */
 export function encodeCursor(position: Position, fingerprint: string): string {
-  const body =
-    'offset' in position
-      ? { v: 1, f: fingerprint, o: position.offset }
-      : { v: 1, f: fingerprint, s: position.startedAt, i: position.id };
+  const body = {
+    v: 1,
+    f: fingerprint,
+    ...('rank' in position ? { k: position.rank, h: position.hits } : {}),
+    s: position.startedAt,
+    i: position.id,
+  };
   return toBase64Url(JSON.stringify(body));
 }
 
@@ -110,13 +122,12 @@ export function decodeCursor(raw: string, fingerprint: string): Position | null 
   if (!body || typeof body !== 'object') return null;
   const c = body as Record<string, unknown>;
   if (c.v !== 1 || c.f !== fingerprint) return null;
-  if (Number.isSafeInteger(c.o) && (c.o as number) >= 0 && (c.o as number) <= 100_000) {
-    return { offset: c.o as number };
-  }
-  if (Number.isSafeInteger(c.s) && typeof c.i === 'string' && c.i.length > 0 && c.i.length <= 64) {
-    return { startedAt: c.s as number, id: c.i };
-  }
-  return null;
+  if (!Number.isSafeInteger(c.s) || typeof c.i !== 'string' || !c.i || c.i.length > 64) return null;
+  const at = { startedAt: c.s as number, id: c.i };
+  if (c.k === undefined && c.h === undefined) return at;
+  const small = (n: unknown) =>
+    Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) <= 100_000;
+  return small(c.k) && small(c.h) ? { ...at, rank: c.k as number, hits: c.h as number } : null;
 }
 
 /** Page sizes: 1 to 100, 50 by default. */
