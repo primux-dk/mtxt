@@ -110,11 +110,13 @@ test('signed out, connect, sign in, approve; the recorder polls, uploads, and Di
     token: string;
     token_id: string;
     device_name: string;
-    user: { name: string };
+    user: { id: string; name: string; email: string };
     install: { product_name: string; theme_accent: string };
   };
   expect(body.device_name).toBe(device);
   expect(body.user.name).toBe(LONE.name);
+  expect(body.user.email).toBe(LONE.email);
+  expect(body.user.id).toBeTruthy();
   expect(body.install.theme_accent).toMatch(/^#[0-9a-f]{6}$/i);
   const [stored] = d1<{ token_hash: string; user_email: string }>(
     `select t.token_hash, u.email as user_email from recorder_tokens t join users u on u.id = t.user_id where t.id = '${body.token_id}'`,

@@ -127,7 +127,7 @@ describe('recorder connection', () => {
         token_id: expect.any(String),
         expires_at: expect.any(String),
         device_name: 'Mettes Mac',
-        user: { name: 'Mette Lund' },
+        user: { id: 'mette', name: 'Mette Lund', email: 'mette@example.com' },
         install: {
           product_name: 'Primux Møder',
           theme_accent: '#566b45',

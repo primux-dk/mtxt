@@ -740,11 +740,18 @@ components:
         user:
           type: object
           additionalProperties: false
-          required: [name]
+          required: [id, name, email]
+          description: The user the token belongs to. The recorder binds each recording to `id` and uploads it only with a token of the same user.
           properties:
+            id:
+              type: string
+              description: The user's id in this install. Stable for the user.
             name:
               type: string
               description: The user's display name, for the recorder's footer.
+            email:
+              type: string
+              description: The user's address, shown on a recording another user made on the same computer.
         install:
           type: object
           additionalProperties: false
