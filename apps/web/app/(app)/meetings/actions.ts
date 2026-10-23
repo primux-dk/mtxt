@@ -7,6 +7,7 @@ import { HttpError } from '@/lib/http-error';
 import { getAdapters } from '@/lib/install';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { accessTo } from '@/lib/meetings/queries';
+import { resetForRetry } from '@/lib/transcription/store';
 
 /**
  * The owner's changes to a meeting. Each sets a value rather than toggling
@@ -180,35 +181,9 @@ export async function retryTranscription(
       const before = await db.query.recordings.findFirst({
         where: and(eq(r.id, recordingId), eq(r.installId, installId)),
       });
-      // The recording and its failed transcript row go back to waiting together; this is the
-      // one place a failed row is reset (the job never does it).
-      const [recordings] = await db.batch([
-        db
-          .update(r)
-          .set({ status: 'transcribing', failure: null, failureReason: null })
-          .where(
-            and(
-              eq(r.id, recordingId),
-              eq(r.installId, installId),
-              eq(r.meetingId, meetingId),
-              eq(r.status, 'failed'),
-              isNotNull(r.confirmedAt),
-            ),
-          )
-          .returning({ id: r.id }),
-        db
-          .update(schema.transcripts)
-          .set({ status: 'pending', providerJobId: null, claimedAt: null, claimToken: null })
-          .where(
-            and(
-              eq(schema.transcripts.recordingId, recordingId),
-              eq(schema.transcripts.installId, installId),
-              eq(schema.transcripts.isComparison, false),
-              eq(schema.transcripts.status, 'failed'),
-            ),
-          ),
-      ]);
-      const updated = recordings[0];
+      // The recording and its transcript row go back to a fresh attempt together; this is
+      // the one place a failed row is reset (the job never does it).
+      const updated = await resetForRetry(db, installId, meetingId, recordingId);
       // Already queued by an earlier click: nothing to do, and no second job.
       if (!updated) return;
       try {

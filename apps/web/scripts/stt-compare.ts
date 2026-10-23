@@ -162,7 +162,7 @@ async function main() {
     }
 
     // The provider's own JSON and the segments it mapped to go to storage, like the primary's.
-    const path = rawPath(installId, rec.id, id, true);
+    const path = rawPath(installId, rec.id, id, `comparison-${crypto.randomUUID()}`);
     await storage.put(path, JSON.stringify({ provider: result.raw, segments: result.segments }), {
       contentType: 'application/json',
     });

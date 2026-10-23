@@ -8,7 +8,7 @@
   one whose claim expired, cannot write over it. A terminal row (done,
   failed) is never claimed.
 */
-import { and, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { schema, type Db, type Job, type StorageAdapter, type Transcript } from '@mtxt/adapters';
 import { SttError, type SttFailure, type SttResult } from '../stt/types';
 import { planSpeakers } from './speakers';
@@ -18,8 +18,12 @@ const r = schema.recordings;
 const s = schema.speakers;
 const g = schema.segments;
 
-/** A claim older than this may be taken over: the upload's 10 minutes plus room. */
+/** A claim lapses after this: the upload's 10 minutes plus room. A held delivery waits it out. */
 export const CLAIM_LEASE_MS = 15 * 60_000;
+/** How long the provider may keep an async job before the attempt fails as a timeout. */
+export const POLL_DEADLINE_MS = 6 * 3600_000;
+/** An outbox row left unsent this long is sent again by the next delivery. */
+export const OUTBOX_RESEND_MS = 60_000;
 /** D1 keeps a value to 2,000,000 bytes; nothing the pipeline writes comes near it. */
 export const MAX_D1_VALUE_BYTES = 1_900_000;
 /** Segments go in as JSON arrays of at most this many bytes per statement. */
@@ -71,8 +75,7 @@ export async function ensureTranscript(
     .onConflictDoNothing();
 }
 
-const unclaimed = (now: Date) =>
-  or(isNull(t.claimedAt), lt(t.claimedAt, new Date(now.getTime() - CLAIM_LEASE_MS)));
+const unclaimed = (now: Date) => or(isNull(t.claimExpiresAt), lt(t.claimExpiresAt, now));
 
 /**
  * Claims the recording's pending transcript for this delivery: to submit
@@ -91,7 +94,12 @@ export async function claimTranscript(
   const token = crypto.randomUUID();
   const [row] = await db
     .update(t)
-    .set({ ...set, claimedAt: now, claimToken: token })
+    .set({
+      ...set,
+      claimedAt: now,
+      claimToken: token,
+      claimExpiresAt: new Date(now.getTime() + CLAIM_LEASE_MS),
+    })
     .where(
       and(
         eq(t.installId, installId),
@@ -106,20 +114,37 @@ export async function claimTranscript(
   return row ? (row as Transcript & { claimToken: string }) : null;
 }
 
+/** When the live claim on the recording's transcript lapses, if another delivery holds one. */
+export async function heldUntil(db: Db, installId: string, recordingId: string, now = new Date()) {
+  const row = await primaryTranscript(db, installId, recordingId);
+  if (row?.status !== 'pending' || !row.claimExpiresAt || row.claimExpiresAt <= now) return null;
+  return row.claimExpiresAt;
+}
+
 const holds = (transcriptId: string, token: string) =>
   and(eq(t.id, transcriptId), eq(t.claimToken, token), eq(t.status, 'pending'));
 
-/** Stores the provider's job id and lets the claim go, so the webhook's delivery can take it. */
+const unclaim = { claimedAt: null, claimToken: null, claimExpiresAt: null } as const;
+
+/**
+ * Stores the provider's job id, starts the attempt's polling deadline and
+ * lets the claim go, so the webhook's delivery can take it.
+ */
 export async function storeJobId(
   db: Db,
   installId: string,
   transcriptId: string,
   token: string,
   handle: string,
+  now = new Date(),
 ) {
   const updated = await db
     .update(t)
-    .set({ providerJobId: boundD1(handle, 'provider_job_id'), claimedAt: null, claimToken: null })
+    .set({
+      providerJobId: boundD1(handle, 'provider_job_id'),
+      pollDeadlineAt: new Date(now.getTime() + POLL_DEADLINE_MS),
+      ...unclaim,
+    })
     .where(and(eq(t.installId, installId), holds(transcriptId, token)))
     .returning({ id: t.id });
   return updated.length > 0;
@@ -129,7 +154,7 @@ export async function storeJobId(
 export async function release(db: Db, installId: string, transcriptId: string, token: string) {
   await db
     .update(t)
-    .set({ claimedAt: null, claimToken: null })
+    .set(unclaim)
     .where(and(eq(t.installId, installId), holds(transcriptId, token)));
 }
 
@@ -157,7 +182,8 @@ export async function markFailed(
   const failRow = claim
     ? db
         .update(t)
-        .set({ status: 'failed', claimedAt: null, claimToken: null })
+        // The provider's job goes with the attempt; Try again submits anew.
+        .set({ status: 'failed', providerJobId: null, pollDeadlineAt: null, ...unclaim })
         .where(and(eq(t.installId, installId), holds(claim.transcriptId, claim.token)))
         .returning({ id: t.id })
     : null;
@@ -182,13 +208,13 @@ export async function markFailed(
   else await recording;
 }
 
-/** `transcripts/{install}/{recording}/{provider}.json`: the provider's raw result, in storage. */
-export const rawPath = (
-  installId: string,
-  recordingId: string,
-  provider: string,
-  comparison = false,
-) => `transcripts/${installId}/${recordingId}/${provider}${comparison ? '-comparison' : ''}.json`;
+/**
+ * `transcripts/{install}/{recording}/{provider}-{tag}.json`: the provider's
+ * raw result, in storage, under a key no other delivery writes (the tag is
+ * the claim token). Only the completion that wins publishes its key.
+ */
+export const rawPath = (installId: string, recordingId: string, provider: string, tag: string) =>
+  `transcripts/${installId}/${recordingId}/${provider}-${tag}.json`;
 
 /** Segment rows as JSON arrays under the per-statement size, each checked against D1's bound. */
 function segmentBatches(result: SttResult, speakerIds: Map<number, string>): string[] {
@@ -219,11 +245,11 @@ function segmentBatches(result: SttResult, speakerIds: Map<number, string>): str
 
 /**
  * Writes a finished result for the delivery that holds the claim: the raw
- * result to storage, the meeting's speakers (reused by number), then in one
- * D1 batch the segments, the row `done`, the recording `transcribed` and
- * `recap_enqueued_at`. Every statement in the batch checks the claim, so a
- * delivery that lost it writes nothing. Returns whether this call set
- * `recap_enqueued_at`, which is when the recap job goes out.
+ * result to storage under this claim's own key, the meeting's speakers
+ * (reused by number), then in one D1 batch the segments, the row `done`
+ * with its `raw_path`, the recording `transcribed` and the recap outbox
+ * row. Every statement in the batch checks the claim, so a delivery that
+ * lost it writes nothing, and removes its own object.
  */
 export async function completeTranscript(
   db: Db,
@@ -232,8 +258,8 @@ export async function completeTranscript(
   recording: { id: string; meetingId: string },
   claim: { transcriptId: string; token: string; provider: string },
   result: SttResult,
-): Promise<{ written: boolean; recapDue: boolean }> {
-  const path = rawPath(installId, recording.id, claim.provider);
+): Promise<{ written: boolean }> {
+  const path = rawPath(installId, recording.id, claim.provider, claim.token);
   await storage.put(path, JSON.stringify(result.raw ?? null), { contentType: 'application/json' });
 
   const held = sql`exists (select 1 from transcripts x where x.id = ${claim.transcriptId}
@@ -269,7 +295,6 @@ export async function completeTranscript(
     }
   }
 
-  const now = new Date();
   const results = await db.batch([
     db
       .delete(g)
@@ -282,6 +307,14 @@ export async function completeTranscript(
           from json_each(${json}) where ${held}`,
       ),
     ),
+    // The outbox row before the status flips, while the claim still shows as pending.
+    db
+      .insert(schema.recapOutbox)
+      .select(
+        sql`select ${claim.transcriptId}, ${installId}, ${recording.meetingId},
+          ${Date.now()}, null where ${held}`,
+      )
+      .onConflictDoNothing(),
     db
       .update(t)
       .set({
@@ -289,79 +322,138 @@ export async function completeTranscript(
         language: boundD1(result.language, 'language'),
         model: boundD1(result.model, 'model'),
         rawJson: {},
-        rawPath: path,
-        claimedAt: null,
+        rawPath: boundD1(path, 'raw_path'),
+        pollDeadlineAt: null,
+        ...unclaim,
       })
       .where(and(eq(t.installId, installId), holds(claim.transcriptId, claim.token)))
       .returning({ id: t.id }),
-    ...finishStatements(db, installId, recording.id, claim.transcriptId, now, claim.token),
+    markTranscribedStatement(db, installId, recording.id, claim.transcriptId),
   ]);
-  const written = (results.at(-3) as unknown[]).length > 0;
-  const recapDue = (results.at(-1) as unknown[]).length > 0;
-  return { written, recapDue };
+  const written = (results.at(-2) as unknown[]).length > 0;
+  if (!written) {
+    // Another delivery won: its raw result stays, this one goes.
+    await storage.delete(path).catch(() => {});
+  }
+  return { written };
 }
 
-/**
- * The recording `transcribed` and the one-time `recap_enqueued_at` mark, as
- * batch statements. With a token, only the row this delivery finished.
- */
-function finishStatements(
+/** The recording `transcribed`, once its transcript row is done. */
+function markTranscribedStatement(
   db: Db,
   installId: string,
   recordingId: string,
   transcriptId: string,
-  now: Date,
-  token?: string,
 ) {
-  const doneRow = sql`exists (select 1 from transcripts x where x.id = ${transcriptId}
-    and x.install_id = ${installId} and x.status = 'done')`;
-  return [
-    db
-      .update(r)
-      .set({ status: 'transcribed', failure: null, failureReason: null })
-      .where(
-        and(
-          eq(r.id, recordingId),
-          eq(r.installId, installId),
-          inArray(r.status, ['confirmed', 'transcribing']),
-          doneRow,
-        ),
+  return db
+    .update(r)
+    .set({ status: 'transcribed', failure: null, failureReason: null })
+    .where(
+      and(
+        eq(r.id, recordingId),
+        eq(r.installId, installId),
+        inArray(r.status, ['confirmed', 'transcribing']),
+        sql`exists (select 1 from transcripts x where x.id = ${transcriptId}
+          and x.install_id = ${installId} and x.status = 'done')`,
       ),
-    db
-      .update(t)
-      .set({ recapEnqueuedAt: now, ...(token ? { claimToken: null } : {}) })
-      .where(
-        and(
-          eq(t.id, transcriptId),
-          eq(t.installId, installId),
-          eq(t.status, 'done'),
-          isNull(t.recapEnqueuedAt),
-          ...(token ? [eq(t.claimToken, token)] : []),
-        ),
-      )
-      .returning({ id: t.id }),
-  ] as const;
+    );
 }
 
-/** For a done row a delivery found later: the status and the recap mark, if still missing. */
+/** For a done row a delivery found later: the recording status, if it was left behind. */
 export async function finishDone(
   db: Db,
   installId: string,
   recordingId: string,
   transcriptId: string,
 ) {
-  const results = await db.batch([
-    ...finishStatements(db, installId, recordingId, transcriptId, new Date()),
-  ]);
-  return { recapDue: (results.at(-1) as unknown[]).length > 0 };
+  await markTranscribedStatement(db, installId, recordingId, transcriptId);
 }
 
-/** The recap job did not go out: the mark comes off, so the next delivery sends it. */
-export async function unmarkRecap(db: Db, installId: string, transcriptId: string) {
-  await db
-    .update(t)
-    .set({ recapEnqueuedAt: null })
-    .where(and(eq(t.id, transcriptId), eq(t.installId, installId)));
+/**
+ * Sends the recap jobs the outbox still owes: for one transcript at once
+ * (right after its completion), or install-wide for rows left unsent past a
+ * minute (any later delivery, the poll included). `sent_at` is set only
+ * after the queue took the message; the consumer dedupes by transcript.
+ */
+export async function sendOutbox(
+  db: Db,
+  installId: string,
+  queue: { send(job: Job): Promise<void> },
+  only?: { transcriptId: string },
+  now = Date.now(),
+): Promise<number> {
+  const o = schema.recapOutbox;
+  const due = await db
+    .select({ transcriptId: o.transcriptId, meetingId: o.meetingId })
+    .from(o)
+    .where(
+      and(
+        eq(o.installId, installId),
+        isNull(o.sentAt),
+        only
+          ? eq(o.transcriptId, only.transcriptId)
+          : lt(o.createdAt, new Date(now - OUTBOX_RESEND_MS)),
+      ),
+    )
+    .limit(20);
+  for (const row of due) {
+    await queue.send({
+      type: 'recap',
+      meeting_id: row.meetingId,
+      transcript_id: row.transcriptId,
+      install_id: installId,
+    });
+    await db
+      .update(o)
+      .set({ sentAt: new Date() })
+      .where(
+        and(eq(o.transcriptId, row.transcriptId), eq(o.installId, installId), isNull(o.sentAt)),
+      );
+  }
+  return due.length;
+}
+
+/**
+ * The owner's Try again: the recording back to transcribing and its failed
+ * transcript row to a fresh pending attempt (no job id, claim or deadline),
+ * in one batch. False when the recording was not failed.
+ */
+export async function resetForRetry(
+  db: Db,
+  installId: string,
+  meetingId: string,
+  recordingId: string,
+) {
+  const [recordings] = await db.batch([
+    db
+      .update(r)
+      .set({ status: 'transcribing', failure: null, failureReason: null })
+      .where(
+        and(
+          eq(r.id, recordingId),
+          eq(r.installId, installId),
+          eq(r.meetingId, meetingId),
+          eq(r.status, 'failed'),
+          isNotNull(r.confirmedAt),
+        ),
+      )
+      .returning({ id: r.id }),
+    db
+      .update(t)
+      .set({ status: 'pending', providerJobId: null, pollDeadlineAt: null, ...unclaim })
+      .where(
+        and(
+          eq(t.recordingId, recordingId),
+          eq(t.installId, installId),
+          eq(t.isComparison, false),
+          inArray(t.status, ['failed', 'pending']),
+          // Only the recording reset above makes this row a fresh attempt.
+          sql`exists (select 1 from recordings x where x.id = ${recordingId}
+            and x.install_id = ${installId} and x.status = 'transcribing')`,
+        ),
+      ),
+  ]);
+  return recordings.length > 0;
 }
 
 /** The recap consumer's guard: true the first time a transcript's recap job is taken. */
@@ -392,7 +484,7 @@ export async function waitingRecordings(db: Db, installId: string, after: string
         sql`not exists (select 1 from transcripts x where x.install_id = ${installId}
           and x.recording_id = ${r.id} and x.is_comparison = 0
           and not (x.status = 'pending' and x.provider_job_id is null
-            and (x.claimed_at is null or x.claimed_at < ${now - CLAIM_LEASE_MS})))`,
+            and (x.claim_expires_at is null or x.claim_expires_at < ${now})))`,
       ),
     )
     .orderBy(r.id)

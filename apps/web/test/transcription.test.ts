@@ -7,11 +7,12 @@ import { MAX_ATTEMPTS, runTranscribe, type TranscribeDeps } from '../lib/transcr
 import { planSpeakers, unnamedNumber } from '../lib/transcription/speakers';
 import { nextStep, webhookWakes } from '../lib/transcription/state';
 import {
-  CLAIM_LEASE_MS,
   claimTranscript,
   drainStep,
   ensureTranscript,
   MAX_D1_VALUE_BYTES,
+  resetForRetry,
+  sendOutbox,
   takeRecapJob,
 } from '../lib/transcription/store';
 import { assemblyAiWebhook, parseWebhook, secretMatches } from '../lib/transcription/webhook';
@@ -27,12 +28,9 @@ describe('the state machine', () => {
     expect(nextStep('transcribing', { status: 'pending', providerJobId: 'x' })).toBe('fetch');
     expect(nextStep('transcribing', { status: 'done', providerJobId: 'x' })).toBe('finish');
     expect(nextStep('transcribing', { status: 'failed', providerJobId: 'x' })).toBe('skip');
-    expect(
-      nextStep('transcribed', { status: 'done', providerJobId: null, recapEnqueuedAt: null }),
-    ).toBe('finish');
-    expect(
-      nextStep('transcribed', { status: 'done', providerJobId: null, recapEnqueuedAt: new Date() }),
-    ).toBe('skip');
+    // A transcribed recording still looks at its outbox.
+    expect(nextStep('transcribed', { status: 'done', providerJobId: null })).toBe('finish');
+    expect(nextStep('transcribed', { status: 'pending', providerJobId: null })).toBe('skip');
     for (const status of ['failed', 'uploading'] as const)
       expect(nextStep(status, null)).toBe('skip');
   });
@@ -86,6 +84,9 @@ function harness(provider: Partial<SttProvider> & Pick<SttProvider, 'submit'>) {
       stored.set(key, body);
       return { key, size: body.length };
     },
+    delete: async (key: string | string[]) => {
+      for (const k of [key].flat()) stored.delete(k);
+    },
   } as unknown as StorageAdapter;
   const full: SttProvider = {
     describe: () => ({
@@ -129,7 +130,7 @@ describe('the transcribe job', () => {
   it('runs a synchronous provider to transcribed: speakers, segments, raw result in storage, one recap job', async () => {
     const submit = vi.fn(async () => ({ kind: 'done' as const, result: RESULT }));
     const h = harness({ submit });
-    await runTranscribe(deps(h), 'rec-1', 1);
+    expect(await runTranscribe(deps(h), 'rec-1', 1)).toBeUndefined();
     expect((submit.mock.calls as unknown as [unknown][])[0]![0]).toMatchObject({
       language: 'da',
       keyterms: ['linje 2', 'ugeplan'],
@@ -144,21 +145,23 @@ describe('the transcribe job', () => {
     ]);
     expect(rows(`select count(*) n from segments`)).toEqual([{ n: 5 }]);
     const [row] = rows(
-      `select id, status, language, raw_json, raw_path, claim_token from transcripts`,
+      `select id, status, language, raw_json, raw_path, claim_token, claim_expires_at from transcripts`,
     );
     expect(row).toMatchObject({
       status: 'done',
       language: 'da',
       raw_json: '{}',
-      raw_path: 'transcripts/test-install/rec-1/assemblyai.json',
       claim_token: null,
+      claim_expires_at: null,
     });
-    expect(JSON.parse(h.stored.get('transcripts/test-install/rec-1/assemblyai.json')!)).toEqual(
-      fixture,
+    expect(String(row!.raw_path)).toMatch(
+      /^transcripts\/test-install\/rec-1\/assemblyai-[0-9a-f-]{36}\.json$/,
     );
+    expect(JSON.parse(h.stored.get(String(row!.raw_path))!)).toEqual(fixture);
     expect(h.recaps().map((s) => s.job)).toEqual([
       { type: 'recap', meeting_id: 'meet-1', transcript_id: row!.id, install_id: INSTALL },
     ]);
+    expect(rows(`select sent_at is not null as sent from recap_outbox`)).toEqual([{ sent: 1 }]);
   });
 
   it('keeps a renamed speaker for a second recording of the same meeting', async () => {
@@ -193,18 +196,40 @@ describe('the transcribe job', () => {
     expect(rows(`select count(*) n from segments`)).toEqual([{ n: 5 }]);
   });
 
-  it('a claim that has not expired keeps a redelivery out; an expired one is taken over', async () => {
+  it('a delivery that finds a live claim is not acked: it comes back when the claim lapses', async () => {
     const submit = vi.fn(async () => ({ kind: 'done' as const, result: RESULT }));
     const h = harness({ submit });
     await ensureTranscript(ctx.db, INSTALL, 'rec-1', 'assemblyai', 'm');
-    const old = new Date(Date.now() - CLAIM_LEASE_MS + 60_000);
-    expect(await claimTranscript(ctx.db, INSTALL, 'rec-1', 'submit', {}, old)).not.toBeNull();
-    await runTranscribe(deps(h), 'rec-1', 1);
+    // Claimed 10 minutes ago: 5 minutes of the 15-minute lease are left.
+    const then = new Date(Date.now() - 10 * 60_000);
+    expect(await claimTranscript(ctx.db, INSTALL, 'rec-1', 'submit', {}, then)).not.toBeNull();
+    const outcome = await runTranscribe(deps(h), 'rec-1', 1);
+    expect(outcome).toEqual({ retryAfterS: expect.any(Number) });
+    expect((outcome as { retryAfterS: number }).retryAfterS).toBeGreaterThanOrEqual(60);
+    expect((outcome as { retryAfterS: number }).retryAfterS).toBeLessThanOrEqual(5 * 60 + 2);
     expect(submit).not.toHaveBeenCalled();
-    ctx.raw.exec(`UPDATE transcripts SET claimed_at = ${Date.now() - CLAIM_LEASE_MS - 1000}`);
-    await runTranscribe(deps(h), 'rec-1', 1);
+    ctx.raw.exec(`UPDATE transcripts SET claim_expires_at = ${Date.now() - 1000}`);
+    expect(await runTranscribe(deps(h), 'rec-1', 1)).toBeUndefined();
     expect(submit).toHaveBeenCalledTimes(1);
     expect(rows(`select status from recordings`)).toEqual([{ status: 'transcribed' }]);
+  });
+
+  it('a claimant that crashed after claiming: redeliveries wait, and the third submits once', async () => {
+    const submit = vi.fn(async () => ({ kind: 'done' as const, result: RESULT }));
+    const h = harness({ submit });
+    // The first delivery claims and dies without a word: no release, no throw we catch.
+    await ensureTranscript(ctx.db, INSTALL, 'rec-1', 'assemblyai', 'm');
+    expect(await claimTranscript(ctx.db, INSTALL, 'rec-1', 'submit')).not.toBeNull();
+    const outcomes = [];
+    for (let delivery = 1; delivery <= 3; delivery++) {
+      // The queue brings each one back after its delay; the last one arrives after the lease.
+      if (delivery === 3)
+        ctx.raw.exec(`UPDATE transcripts SET claim_expires_at = ${Date.now() - 1}`);
+      outcomes.push(await runTranscribe(deps(h), 'rec-1', delivery));
+    }
+    expect(outcomes.map((o) => (o ? 'retry' : 'ack'))).toEqual(['retry', 'retry', 'ack']);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(h.recaps()).toHaveLength(1);
   });
 
   it('a completion that lands between the read and the claim is never reset', async () => {
@@ -223,19 +248,28 @@ describe('the transcribe job', () => {
     ]);
   });
 
-  it('a delivery whose claim was taken over writes nothing', async () => {
-    const h = harness({
+  it("a superseded delivery writes nothing and leaves the winner's raw result in place", async () => {
+    const winner: SttResult = { ...RESULT, raw: { winner: 'new' } };
+    const second = harness({ submit: async () => ({ kind: 'done', result: winner }) });
+    const first = harness({
       submit: async () => {
-        // A slow provider: meanwhile the claim expires and another delivery takes it.
-        ctx.raw.exec(`UPDATE transcripts SET claim_token = 'someone-else'`);
-        return { kind: 'done', result: RESULT };
+        // A slow first delivery: its claim lapses, a second delivery takes over and completes.
+        ctx.raw.exec(`UPDATE transcripts SET claim_expires_at = ${Date.now() - 1}`);
+        await runTranscribe(secondDeps, 'rec-1', 1);
+        return { kind: 'done', result: { ...RESULT, raw: { winner: 'old' } } };
       },
     });
-    await runTranscribe(deps(h), 'rec-1', 1);
-    expect(rows(`select count(*) n from segments`)).toEqual([{ n: 0 }]);
-    expect(rows(`select status from transcripts`)).toEqual([{ status: 'pending' }]);
-    expect(rows(`select status from recordings`)).toEqual([{ status: 'transcribing' }]);
-    expect(h.recaps()).toHaveLength(0);
+    // Both deliveries share one bucket.
+    const secondDeps = deps({ ...second, storage: first.storage, stored: first.stored });
+    await runTranscribe(deps(first), 'rec-1', 1);
+    const [row] = rows(`select status, raw_path from transcripts`);
+    expect(row!.status).toBe('done');
+    expect(JSON.parse(first.stored.get(String(row!.raw_path))!)).toEqual({ winner: 'new' });
+    // The loser removed its own object; only the winner's is left.
+    expect([...first.stored.keys()]).toEqual([row!.raw_path]);
+    expect(rows(`select count(*) n from segments`)).toEqual([{ n: 5 }]);
+    expect(second.recaps()).toHaveLength(1);
+    expect(first.recaps()).toHaveLength(0);
   });
 
   it('stores an async job id, lets the claim go, queues a delayed check, and finishes once when woken', async () => {
@@ -269,24 +303,93 @@ describe('the transcribe job', () => {
     expect(rows(`select claim_token from transcripts`)).toEqual([{ claim_token: null }]);
   });
 
-  it('a recap send that fails is sent by the next delivery; a redelivery after success sends none', async () => {
+  it('a recap send interrupted before the queue took it: after a reload, a redelivery sends exactly one', async () => {
     const h = harness({ submit: async () => ({ kind: 'done', result: RESULT }) });
-    const send = h.queue.send;
-    let fail = true;
+    const accepted = h.queue.send;
     h.queue.send = async (job, options) => {
-      if (fail && job.type === 'recap') throw new Error('queue down');
-      return send(job, options);
+      if (job.type === 'recap') throw new Error('the isolate went away');
+      return accepted(job, options);
     };
-    await expect(runTranscribe(deps(h), 'rec-1', 1)).rejects.toThrow('queue down');
+    await expect(runTranscribe(deps(h), 'rec-1', 1)).rejects.toThrow('the isolate went away');
     expect(rows(`select status from recordings`)).toEqual([{ status: 'transcribed' }]);
-    expect(rows(`select recap_enqueued_at from transcripts`)).toEqual([
-      { recap_enqueued_at: null },
-    ]);
-    fail = false;
+    expect(rows(`select sent_at from recap_outbox`)).toEqual([{ sent_at: null }]);
+    // A fresh Worker: new adapters on the same database, the queue working again.
+    const reloaded = harness({ submit: vi.fn() });
+    for (const attempt of [2, 3, 1]) await runTranscribe(deps(reloaded), 'rec-1', attempt);
+    expect(reloaded.recaps()).toHaveLength(1);
+    expect(h.recaps()).toHaveLength(0);
+    expect(reloaded.provider.submit).not.toHaveBeenCalled();
+  });
+
+  it('a recap the queue took but the delivery did not record is sent again and taken once', async () => {
+    const h = harness({ submit: async () => ({ kind: 'done', result: RESULT }) });
+    const accepted = h.queue.send;
+    let crash = true;
+    h.queue.send = async (job, options) => {
+      await accepted(job, options);
+      if (crash && job.type === 'recap') throw new Error('crashed after the queue took it');
+    };
+    await expect(runTranscribe(deps(h), 'rec-1', 1)).rejects.toThrow('crashed');
+    crash = false;
     await runTranscribe(deps(h), 'rec-1', 2);
-    await runTranscribe(deps(h), 'rec-1', 3);
+    expect(h.recaps()).toHaveLength(2);
+    // The consumer takes one of them.
+    const taken = [];
+    for (const r of h.recaps()) {
+      if (r.job.type === 'recap')
+        taken.push(await takeRecapJob(ctx.db, INSTALL, r.job.transcript_id));
+    }
+    expect(taken).toEqual([true, false]);
+  });
+
+  it('the install-wide outbox sweep leaves a row younger than a minute to its own delivery', async () => {
+    const h = harness({ submit: async () => ({ kind: 'done', result: RESULT }) });
+    h.queue.send = async (job) => {
+      if (job.type === 'recap') throw new Error('down');
+    };
+    await expect(runTranscribe(deps(h), 'rec-1', 1)).rejects.toThrow('down');
+    const sweeper = harness({ submit: vi.fn() });
+    expect(await sendOutbox(ctx.db, INSTALL, sweeper.queue)).toBe(0);
+    expect(await sendOutbox(ctx.db, INSTALL, sweeper.queue, undefined, Date.now() + 61_000)).toBe(
+      1,
+    );
+    expect(sweeper.recaps()).toHaveLength(1);
+  });
+
+  it('a poll past the deadline fails the attempt; Try again submits anew and schedules its polls', async () => {
+    const submit = vi.fn(async () => ({
+      kind: 'pending' as const,
+      handle: `aai-${submit.mock.calls.length}`,
+    }));
+    const fetch = vi.fn(async (handle: string) => ({ kind: 'pending' as const, handle }));
+    const h = harness({ submit, fetch });
     await runTranscribe(deps(h), 'rec-1', 1);
-    expect(h.recaps()).toHaveLength(1);
+    ctx.raw.exec(`UPDATE transcripts SET poll_deadline_at = ${Date.now() - 1}`);
+    await runTranscribe(deps(h), 'rec-1', 1, { poll: true });
+    expect(
+      rows(`select status, provider_job_id, claim_token, poll_deadline_at from transcripts`),
+    ).toEqual([
+      { status: 'failed', provider_job_id: null, claim_token: null, poll_deadline_at: null },
+    ]);
+    expect(rows(`select status, failure, failure_reason from recordings`)).toEqual([
+      { status: 'failed', failure: 'stt_failed', failure_reason: 'timeout' },
+    ]);
+    // Try again: one fresh attempt on the same row.
+    expect(await resetForRetry(ctx.db, INSTALL, 'meet-1', 'rec-1')).toBe(true);
+    expect(await resetForRetry(ctx.db, INSTALL, 'meet-1', 'rec-1')).toBe(false);
+    h.sent.length = 0;
+    await runTranscribe(deps(h), 'rec-1', 1);
+    expect(submit).toHaveBeenCalledTimes(2);
+    const [row] = rows(`select status, provider_job_id, poll_deadline_at from transcripts`);
+    expect(row).toMatchObject({ status: 'pending', provider_job_id: 'aai-2' });
+    expect(Number(row!.poll_deadline_at)).toBeGreaterThan(Date.now() + 5 * 3600_000);
+    expect(h.sent).toEqual([
+      {
+        job: { type: 'transcribe', recording_id: 'rec-1', install_id: INSTALL, poll: true },
+        delaySeconds: 300,
+      },
+    ]);
+    expect(rows(`select count(*) n from transcripts`)).toEqual([{ n: 1 }]);
   });
 
   it('the recap consumer takes one job per transcript', async () => {

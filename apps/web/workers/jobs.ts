@@ -18,10 +18,15 @@ export const handleJobs = routeJobs<CloudflareEnv>({
       message.ack();
       return;
     }
-    await runTranscribe(await transcriptionDeps(env), job.recording_id, message.attempts, {
-      poll: job.poll === true,
-    });
-    message.ack();
+    const outcome = await runTranscribe(
+      await transcriptionDeps(env),
+      job.recording_id,
+      message.attempts,
+      { poll: job.poll === true },
+    );
+    // Held by a live claim: not acked, back when the claim lapses (never stranded).
+    if (outcome) message.retry({ delaySeconds: outcome.retryAfterS });
+    else message.ack();
   },
   async recap(job, message, env) {
     if (job.install_id !== env.INSTALL_ID) {
