@@ -304,7 +304,15 @@ export function RecapEditor(props: RecapEditorProps) {
       props.onVersion?.(version);
     },
     onNormalized: (bodyMd) => {
-      editorRef.current?.commands.setContent(parseMarkdown(bodyMd).toJSON(), { emitUpdate: false });
+      const e = editorRef.current;
+      if (!e) return;
+      const stored = parseMarkdown(bodyMd).toJSON();
+      // Only when the document itself differs (a foreign image or mention went), not its spelling.
+      if (JSON.stringify(stored) === JSON.stringify(e.getJSON())) return;
+      const { from, to } = e.state.selection;
+      e.commands.setContent(stored, { emitUpdate: false });
+      const end = e.state.doc.content.size;
+      e.commands.setTextSelection({ from: Math.min(from, end), to: Math.min(to, end) });
     },
     // A refused save undoes its ticks and keeps every other change (rule 2).
     onRefused: () => {
