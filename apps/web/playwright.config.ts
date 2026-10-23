@@ -48,6 +48,7 @@ export default defineConfig({
       `wrangler dev --local --define MTXT_E2E_BUILD:'"1"' --var MTXT_LOCAL_DEV:1` +
         ` --var PUBLIC_URL:http://localhost:${port}` +
         ` --var ASSEMBLYAI_BASE_URL:http://localhost:${port}/api/test/fake-assemblyai` +
+        ` --var ELEVENLABS_BASE_URL:http://localhost:${port}/api/test/fake-elevenlabs` +
         ` --var WORKERS_AI_FAKE_URL:http://localhost:${port}/api/test/fake-workers-ai` +
         ` --var RECAP_FAKE_URL:http://localhost:${port}/api/test/fake-recap` +
         ` --port ${port} --inspector-port ${port + 1000} --env-file e2e/e2e.vars --persist-to .wrangler/e2e` +

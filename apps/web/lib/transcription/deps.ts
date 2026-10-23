@@ -18,7 +18,7 @@ export async function transcriptionDeps(env: CloudflareEnv): Promise<TranscribeD
   // Written inline, not through a constant: esbuild drops the import only when the
   // condition itself folds to false.
   const e2e = typeof MTXT_E2E_BUILD !== 'undefined' && MTXT_E2E_BUILD === '1';
-  const test: { speech?: SpeechModels; assemblyAiBaseUrl?: string } =
+  const test: { speech?: SpeechModels; assemblyAiBaseUrl?: string; elevenLabsBaseUrl?: string } =
     typeof MTXT_E2E_BUILD !== 'undefined' && MTXT_E2E_BUILD === '1'
       ? (await import('../stt/test-hooks')).e2eOverrides(env)
       : {};
@@ -40,7 +40,9 @@ export async function transcriptionDeps(env: CloudflareEnv): Promise<TranscribeD
             if (!env.SETTINGS_KEY) throw new Error('SETTINGS_KEY is not set.');
             return seal(plain, 'settings.webhook_secret', env.SETTINGS_KEY);
           }),
+        gatewayUrl: (id, provider) => adapters.language.gatewayUrl(id, provider),
         assemblyAiBaseUrl: test.assemblyAiBaseUrl,
+        elevenLabsBaseUrl: test.elevenLabsBaseUrl,
       }),
   };
 }
