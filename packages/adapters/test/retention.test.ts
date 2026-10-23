@@ -13,6 +13,7 @@ function setup() {
   f.user('owner');
   const deleted: string[] = [];
   const storage = {
+    list: async () => [] as string[],
     delete: async (keys: string | string[]) => void deleted.push(...[keys].flat()),
   };
   const run = (limit?: number) =>
@@ -201,6 +202,7 @@ describe('retentionBatch', () => {
     // The reviewer's sequence: Keep lands on "second" while the first object deletion is awaited.
     const deleted: string[] = [];
     const storage = {
+      list: async () => [] as string[],
       delete: async (keys: string | string[]) => {
         deleted.push(...[keys].flat());
         t.sqlite.exec("UPDATE meetings SET keep = 1 WHERE id = 'second'");
@@ -222,6 +224,7 @@ describe('retentionBatch', () => {
     const t = setup();
     await t.full('kept-late', 400);
     const storage = {
+      list: async () => [] as string[],
       delete: async () => {
         // The audio went; then the owner pressed Keep before the transcript batch.
         t.sqlite.exec("UPDATE meetings SET keep = 1 WHERE id = 'kept-late'");
@@ -245,7 +248,10 @@ describe('retentionBatch', () => {
     const t = setup();
     t.f.meeting('m', { owner: 'owner', startedAt: ago(40) });
     t.f.recording('m-r', 'm');
-    const storage = { delete: async () => Promise.reject(new Error('R2 down')) };
+    const storage = {
+      list: async () => [] as string[],
+      delete: async () => Promise.reject(new Error('R2 down')),
+    };
     await expect(
       retentionBatch({ db: t.db, storage, installId: INSTALL }, SETTINGS, NOW),
     ).rejects.toThrow('R2 down');
@@ -267,7 +273,11 @@ describe('retentionBatch', () => {
     );
     await t.full('recent', 10, true);
     const result = await retentionBatch(
-      { db: t.db, storage: { delete: async () => {} }, installId: INSTALL },
+      {
+        db: t.db,
+        storage: { list: async () => [] as string[], delete: async () => {} },
+        installId: INSTALL,
+      },
       SETTINGS,
       NOW,
       100,
@@ -300,7 +310,11 @@ describe('retentionBatch', () => {
       "INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('foreign-s', 'other', 'mixed', 'X')",
     );
     const result = await retentionBatch(
-      { db: t.db, storage: { delete: async () => {} }, installId: INSTALL },
+      {
+        db: t.db,
+        storage: { list: async () => [] as string[], delete: async () => {} },
+        installId: INSTALL,
+      },
       SETTINGS,
       NOW,
       100,

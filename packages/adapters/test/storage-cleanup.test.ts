@@ -90,6 +90,7 @@ describe('storage cleanup', () => {
       });
     }
     const storage = {
+      list: async () => [] as string[],
       delete: async (key: string | string[]) => {
         if (key === 'exports/gone.docx') {
           // The owner presses Keep on the other meeting while storage is busy.

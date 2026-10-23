@@ -88,7 +88,8 @@ export interface RetentionResult {
  * - audio past `retention_audio_days`: `storage_path` is cleared and
  *   `delete_audio_at` records when, then the objects go from storage;
  * - past `retention_transcript_days`: segments, transcripts, recaps,
- *   versions, decisions and their search rows, then the recaps' docx;
+ *   versions, decisions and their search rows, then the recaps' docx and
+ *   images;
  * - past both: the meeting keeps its row, with `deleted_at` set.
  *
  * Every write carries the whole eligibility in its WHERE (no `keep`, not
@@ -99,7 +100,7 @@ export interface RetentionResult {
  * is left alone is listed with the reason, paged, never cut off.
  */
 export async function retentionBatch(
-  ctx: { db: Db; storage: Pick<StorageAdapter, 'delete'>; installId: string },
+  ctx: { db: Db; storage: Pick<StorageAdapter, 'delete' | 'list'>; installId: string },
   settings: RetentionSettings,
   now: Date,
   limit = RETENTION_BATCH,
@@ -216,8 +217,13 @@ export async function retentionBatch(
           join recordings r on r.id = t.recording_id and r.install_id = ${installId}
           where t.install_id = ${installId} and r.meeting_id = ${meeting.id} and t.raw_path is not null`);
       const guard = eligible(meeting.id, textCutoff);
+      // The recap's images (images/{install}/{meeting}/) go with the recap.
+      const images = await storage.list(`images/${installId}/${meeting.id}/`);
       // One cleanup entry per object, written in the batch only if the guard lets the rows go.
-      const cleanup = objects.map((o) => ({ id: crypto.randomUUID(), path: o.path }));
+      const cleanup = [...objects.map((o) => o.path), ...images].map((path) => ({
+        id: crypto.randomUUID(),
+        path,
+      }));
       const recordObjects = cleanup.map((e) =>
         db.insert(storageCleanup).select(
           db
