@@ -46,7 +46,8 @@
   ],
   "queues": {
     "producers": [{ "binding": "JOBS", "queue": "mtxt-jobs" }],
-    // A message that fails five deliveries goes to the dead-letter queue, not away
+    // A message that fails six deliveries (the first and five retries) goes to the
+    // dead-letter queue, not away
     // (the transcribe job gives up after three provider errors on its own).
     "consumers": [
       {
