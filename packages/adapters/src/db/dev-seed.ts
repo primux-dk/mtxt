@@ -9,6 +9,7 @@
  * is safe to build by string.
  */
 import { foldTitle } from './fold.ts';
+import { accessDemoSql } from './dev-seed-access.ts';
 
 /**
  * The users the demo library belongs to. Their subjects are the ones the e2e
@@ -185,7 +186,7 @@ function graphSql(installId: string): string {
       `UPDATE recaps SET current_version_id = 'demo-graph-v1' WHERE id = 'demo-graph-c1';`,
       `INSERT INTO decisions (id, install_id, recap_id, text) VALUES ('demo-graph-d1', ${i}, 'demo-graph-c1', 'Beslutning');`,
       `INSERT INTO meeting_shares (install_id, meeting_id, user_id) VALUES (${i}, 'demo-graph', 'dev-user');`,
-      `INSERT INTO audit_events (id, install_id, user_id, meeting_id, action) VALUES ('demo-graph-a1', ${i}, 'dev-user', 'demo-graph', 'opened');`,
+      `INSERT INTO audit_events (id, install_id, user_id, meeting_id, meeting_title, action) VALUES ('demo-graph-a1', ${i}, 'dev-user', 'demo-graph', 'Møde med alt i', 'opened');`,
     ].join('\n') + '\n'
   );
 }
@@ -296,6 +297,7 @@ export function demoSql(installId: string, count: number, now?: number): string 
   sql += graphSql(installId);
   sql += foreignInstallSql(installId);
   if (count > 5) sql += demoTranscriptsSql(installId);
+  sql += accessDemoSql(installId, meetings, now ?? Date.UTC(2026, 9, 22, 9, 0));
   return sql;
 }
 

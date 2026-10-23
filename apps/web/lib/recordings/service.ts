@@ -18,6 +18,7 @@ import {
   type Settings,
   type StorageAdapter,
   type UploadSessions,
+  syncSearch,
 } from '@mtxt/adapters';
 import type { SessionUser as CurrentUser } from '../auth/session';
 import { HttpError } from '../http-error';
@@ -225,6 +226,7 @@ export async function createRecording(
       })
       .returning({ id: m.id });
     meetingId = created!.id;
+    await syncSearch(ctx.db, ctx.installId, { meetingId, title });
   }
 
   const id = crypto.randomUUID();

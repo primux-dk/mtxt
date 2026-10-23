@@ -43,7 +43,8 @@
   "visibility": {
     "private": "Privat",
     "shared": "Delt",
-    "company": "Virksomhed"
+    "company": "Virksomhed",
+    "failed": "Synligheden blev ikke gemt. Den er tilbage på {visibility}."
   },
   "status": {
     "ready": "Klar",
@@ -144,8 +145,7 @@
     "back": "Alle møder",
     "speakers": "{count, plural, one {# taler} other {# talere}}",
     "visibility": {
-      "label": "Synlighed. Kun ejeren kan ændre den.",
-      "later": "Kommer i en senere pakke"
+      "label": "Synlighed. Kun ejeren kan ændre den."
     },
     "keep": {
       "text": "Behold",
@@ -230,9 +230,6 @@
       "teams": "Teams",
       "meet": "Meet",
       "device": "Diktafon"
-    },
-    "retention": {
-      "deleteOn": "Slettes {date}"
     },
     "conflict": "Data fra en anden installation afhænger af mødet, så det er ikke ændret. Kontakt din administrator."
   },
@@ -681,5 +678,132 @@
       "help": "Kald til Workers AI, og senere til referatmodellen, går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde Workers AI direkte."
     },
     "drainFailed": "Indstillingerne blev gemt, men de optagelser, der venter på en udbyder, blev ikke sat i kø. Gem igen for at sætte dem i kø."
+  },
+  "share": {
+    "manage": "{count, plural, =0 {Del…} one {Delt med # person} other {Delt med # personer}}",
+    "title": "Del “{title}”",
+    "description": "Kolleger, du tilføjer, kan åbne mødet, transskriptionen og referatet. Kun du bestemmer, hvem der har adgang; de kan ikke dele det videre.",
+    "search": {
+      "label": "Find en kollega",
+      "placeholder": "Navn eller e-mail",
+      "saving": "Gemmer synligheden først…",
+      "loading": "Søger…",
+      "none": "Ingen kollega passer til “{text}”.",
+      "everyone": "Alle i kataloget har allerede adgang.",
+      "failed": "Kunne ikke søge i kataloget.",
+      "retry": "Prøv igen",
+      "results": "Kolleger"
+    },
+    "add": "Tilføj {name}",
+    "addShort": "Tilføj",
+    "addFailed": "{name} blev ikke tilføjet. Prøv igen.",
+    "removeFailed": "{name} blev ikke fjernet. Prøv igen.",
+    "readers": "{count, plural, =0 {Ingen andre har adgang} one {# person har adgang} other {# personer har adgang}}",
+    "nobody": "Tilføj kolleger ovenfor. Indtil da er det kun dig, der kan åbne det.",
+    "remove": "Fjern {name}",
+    "done": "Færdig"
+  },
+  "retention": {
+    "notice": {
+      "on": {
+        "audio": "Lyden slettes den <date></date>",
+        "text": "Transskription og referat slettes den <date></date>",
+        "all": "Slettes den <date></date>"
+      },
+      "tonight": {
+        "audio": "Lyden slettes i nat",
+        "text": "Transskription og referat slettes i nat",
+        "all": "Slettes i nat"
+      },
+      "keep": "Behold",
+      "kept": "Beholdt. Automatisk sletning rører ikke mødet."
+    },
+    "audioDeleted": "Lyden blev slettet automatisk den <date></date>.",
+    "deletedRow": "Slettet automatisk den <date></date>",
+    "remove": {
+      "action": "Fjern",
+      "label": "Fjern {title} fra biblioteket",
+      "title": "Fjern mødet?",
+      "body": "Lyd, transskription og referat af “{title}” er allerede slettet automatisk. Når du fjerner det, forsvinder titel og dato også fra biblioteket.",
+      "confirm": "Fjern",
+      "failed": "Mødet blev ikke fjernet. Prøv igen."
+    }
+  },
+  "search": {
+    "sort": {
+      "relevance": "Bedste match"
+    },
+    "empty": {
+      "body": "Intet møde, du kan se, har “{q}” i titlen, transskriptionen eller referatet."
+    },
+    "kind": {
+      "title": "Titel",
+      "segment": "Transskription",
+      "recap": "Referat"
+    }
+  },
+  "audit": {
+    "title": "Revisionslog",
+    "subheading": "Hvem der åbnede, delte, ændrede eller slettede hvilket møde. Kun titler og ejere, aldrig indhold.",
+    "nav": {
+      "label": "Administration",
+      "settings": "Indstillinger",
+      "audit": "Revisionslog"
+    },
+    "filters": {
+      "label": "Filtrer efter handling",
+      "all": "Alle",
+      "user": "Bruger",
+      "everyone": "Alle brugere"
+    },
+    "action": {
+      "opened": "Åbnet",
+      "exported": "Eksporteret",
+      "shared": "Deling ændret",
+      "visibility_changed": "Synlighed ændret",
+      "deleted": "Slettet",
+      "mcp_read": "Læst via MCP",
+      "mcp_write": "Ændret via MCP"
+    },
+    "count": "{count, plural, one {# hændelse} other {# hændelser}}",
+    "range": "{from}–{to} af {total, plural, one {# hændelse} other {# hændelser}}",
+    "table": {
+      "caption": "Revisionshændelser, nyeste først",
+      "time": "Tid",
+      "user": "Bruger",
+      "action": "Handling",
+      "meeting": "Møde",
+      "owner": "Ejer",
+      "details": "Detaljer",
+      "noMeeting": "Intet møde",
+      "gone": "Slettet siden",
+      "noOwner": "Ingen ejer"
+    },
+    "details": {
+      "visibility": "{before} → {after}",
+      "sharesRemoved": "{count, plural, one {# deling fjernet} other {# delinger fjernet}}",
+      "added": "Tilføjede {names}",
+      "removed": "Fjernede {names}",
+      "readers": "{count, plural, =0 {ingen andre har adgang} one {# person har adgang} other {# personer har adgang}}",
+      "andMore": "{names} og {count} til",
+      "unknownUser": "en fjernet bruger"
+    },
+    "empty": {
+      "first": {
+        "title": "Ingen hændelser endnu",
+        "body": "Når nogen åbner en kollegas møde, eller en ejer deler, ændrer eller sletter et, står det her.",
+        "back": "Tilbage til indstillinger"
+      },
+      "noMatch": {
+        "title": "Ingen hændelser passer",
+        "body": "Ingen hændelse passer til den handling og bruger, du valgte.",
+        "reset": "Nulstil filtre"
+      },
+      "failed": {
+        "title": "Kunne ikke hente revisionsloggen",
+        "body": "Loggen blev ikke hentet. Tjek forbindelsen, og prøv igen.",
+        "retry": "Prøv igen"
+      }
+    }
   }
 }

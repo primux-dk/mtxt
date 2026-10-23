@@ -1,4 +1,11 @@
-import { cloudflareAdapters, routeJobs } from '@mtxt/adapters';
+import {
+  cloudflareAdapters,
+  readSettings,
+  retentionBatch,
+  retryStorageCleanup,
+  routeJobs,
+  type RetentionJob,
+} from '@mtxt/adapters';
 import { runTranscribe } from '../lib/transcription/job';
 import { transcriptionDeps } from '../lib/transcription/deps';
 import { drainStep, takeRecapJob } from '../lib/transcription/store';
@@ -43,6 +50,7 @@ export const handleJobs = routeJobs<CloudflareEnv>({
         job.transcript_id,
       );
     } else {
+      // TODO(packet 5): after writing the recap, syncSearch(db, installId, { meetingId, recap: { id, bodyMd } }).
       console.log('Recaps arrive in packet 5; acking the recap job for', job.meeting_id);
     }
     message.ack();
@@ -58,4 +66,70 @@ export const handleJobs = routeJobs<CloudflareEnv>({
     console.log(`Queued ${queued} waiting recordings for transcription`);
     message.ack();
   },
+  async retention(job, message, env) {
+    if (job.install_id !== env.INSTALL_ID) {
+      console.error('Dropping a retention job for another install', job.install_id);
+      message.ack();
+      return;
+    }
+    await runRetention(job, env);
+    message.ack();
+  },
 });
+
+/**
+ * One batch of retention (packages/adapters, src/db/retention.ts). A full
+ * batch queues the next with the same `now`, so one night's batches apply
+ * one set of deadlines. A throw retries the job; a batch that ran halfway
+ * finds what is left on the retry.
+ */
+export async function runRetention(job: RetentionJob, env: CloudflareEnv) {
+  const { db, storage, queue, installId } = cloudflareAdapters(env);
+  const settings = await readSettings(db, installId);
+  const batch = job.batch ?? 0;
+  if (batch === 0) {
+    // Objects whose rows are gone but that storage refused before: one more try each.
+    const cleanup = await retryStorageCleanup(db, storage, installId);
+    console.log(
+      `Storage cleanup: ${cleanup.deleted} deleted, ${cleanup.failed} still failing, ${cleanup.givenUp} given up`,
+    );
+  }
+  // The night's first batch lists what is past a deadline and left alone; later ones add what changed meanwhile.
+  const result = await retentionBatch(
+    { db, storage, installId },
+    settings,
+    new Date(job.now),
+    undefined,
+    {
+      reportSkips: batch === 0,
+    },
+  );
+  for (const skip of result.skipped) console.info(`Retention skipped ${skip.id}: ${skip.reason}`);
+  const skips = Object.entries(
+    result.skipped.reduce<Record<string, number>>(
+      (n, s) => ({ ...n, [s.reason]: (n[s.reason] ?? 0) + 1 }),
+      {},
+    ),
+  )
+    .map(([reason, n]) => `${n} ${reason}`)
+    .join(', ');
+  console.log(
+    `Retention as of ${new Date(job.now).toISOString()}, batch ${batch}: ${result.meetings} meetings, ` +
+      `${result.audioDeleted} audio, ${result.textDeleted} transcripts, ${result.markedDeleted} marked deleted, ` +
+      `skipped ${skips || 'none'}` +
+      (result.more ? '; queueing the next batch' : ''),
+  );
+  if (result.more) {
+    await queue.send({ type: 'retention', install_id: installId, now: job.now, batch: batch + 1 });
+  }
+}
+
+/**
+ * The Cron Trigger (wrangler.jsonc, daily at 03:00 UTC). It only queues the
+ * first retention batch through the queue adapter; the consumer does the work.
+ */
+export async function scheduleRetention(scheduledTime: number, env: CloudflareEnv) {
+  const { queue, installId } = cloudflareAdapters(env);
+  await queue.send({ type: 'retention', install_id: installId, now: scheduledTime });
+  console.log(`Queued retention for ${new Date(scheduledTime).toISOString()}`);
+}

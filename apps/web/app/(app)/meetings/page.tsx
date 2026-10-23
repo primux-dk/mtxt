@@ -45,9 +45,10 @@ const TITLES: Record<View, ['nav' | 'library', string]> = {
 export default async function MeetingsPage({ searchParams }: { searchParams: SearchParams }) {
   const raw = await searchParams;
   const params = parseLibraryParams(raw);
-  const [user, t, nav, format, settings, testMode] = await Promise.all([
+  const [user, t, ts, nav, format, settings, testMode] = await Promise.all([
     requireUser(),
     getTranslations('library'),
+    getTranslations('search'),
     getTranslations('nav'),
     getFormatter(),
     getInstallSettings(),
@@ -91,7 +92,8 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
           hidden={{
             view: params.view === 'mine' ? undefined : params.view,
             status: params.status,
-            sort: params.sort === 'date' ? undefined : params.sort,
+            // A new search ranks by relevance unless the reader sorted by title.
+            sort: params.sort === 'title' ? 'title' : undefined,
           }}
         />
         {canUpload && <UploadButton label={t('uploadAudio')} className="max-shell:hidden" />}
@@ -132,6 +134,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
             <SortSelect
               label={t('sort.label')}
               options={[
+                ...(params.q ? [{ value: 'relevance', label: ts('sort.relevance') }] : []),
                 { value: 'date', label: t('sort.newest') },
                 { value: 'title', label: t('sort.title') },
               ]}
@@ -180,7 +183,11 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Sea
         </EmptyState>
       )}
       {state === 'nomatch' && (
-        <EmptyState Icon={Search} title={t('empty.noMatch.title')} body={t('empty.noMatch.body')}>
+        <EmptyState
+          Icon={Search}
+          title={t('empty.noMatch.title')}
+          body={params.q ? ts('empty.body', { q: params.q }) : t('empty.noMatch.body')}
+        >
           <Button asChild>
             <Link href={libraryHref({ view: params.view, sort: params.sort })}>
               {t('empty.noMatch.reset')}

@@ -164,6 +164,28 @@ describe('the transcribe job', () => {
     expect(rows(`select sent_at is not null as sent from recap_outbox`)).toEqual([{ sent: 1 }]);
   });
 
+  it('puts the finished segments in the search index, every recording, never a comparison transcript (packet 6)', async () => {
+    const h = harness({ submit: async () => ({ kind: 'done', result: RESULT }) });
+    // A comparison transcript (pnpm stt:compare) on the same recording is not the record.
+    await runTranscribe(deps(h), 'rec-1', 1);
+    ctx.raw
+      .exec(`INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json, is_comparison, status)
+        VALUES ('cmp', '${INSTALL}', 'rec-1', 'workers-ai-whisper', 'w', 'da', '{}', 1, 'done');
+      INSERT INTO segments (id, install_id, transcript_id, start_ms, end_ms, text)
+        VALUES ('cmp-s', '${INSTALL}', 'cmp', 0, 1, 'kun i sammenligningen');`);
+    seedRecording(ctx.raw, 'rec-2');
+    await runTranscribe(deps(h), 'rec-2', 1);
+    const indexed = rows(
+      `select count(*) n from meeting_search where kind = 'segment' and meeting_id = 'meet-1'`,
+    );
+    expect(indexed).toEqual([{ n: 10 }]);
+    expect(
+      rows(
+        `select count(*) n from meeting_search where meeting_search match 'text : "sammenligningen"'`,
+      ),
+    ).toEqual([{ n: 0 }]);
+  });
+
   it('keeps a renamed speaker for a second recording of the same meeting', async () => {
     const h = harness({ submit: async () => ({ kind: 'done', result: RESULT }) });
     await runTranscribe(deps(h), 'rec-1', 1);

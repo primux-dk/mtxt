@@ -43,7 +43,8 @@
   "visibility": {
     "private": "Private",
     "shared": "Shared",
-    "company": "Company"
+    "company": "Company",
+    "failed": "Visibility was not saved. It is back to {visibility}."
   },
   "status": {
     "ready": "Ready",
@@ -144,8 +145,7 @@
     "back": "All meetings",
     "speakers": "{count, plural, one {# speaker} other {# speakers}}",
     "visibility": {
-      "label": "Visibility, only the owner can change it",
-      "later": "Coming in a later packet"
+      "label": "Visibility, only the owner can change it"
     },
     "keep": {
       "text": "Keep",
@@ -230,9 +230,6 @@
       "teams": "Teams",
       "meet": "Meet",
       "device": "Voice recorder"
-    },
-    "retention": {
-      "deleteOn": "Deleted on {date}"
     },
     "conflict": "Data from another installation depends on this meeting, so it was left as it is. Contact your admin."
   },
@@ -681,5 +678,132 @@
       "help": "Workers AI requests, and later the recap model's, go through this gateway in the company's Cloudflare account. Leave it empty to call Workers AI directly."
     },
     "drainFailed": "The settings were saved, but the recordings that wait for a provider were not queued. Save again to queue them."
+  },
+  "share": {
+    "manage": "{count, plural, =0 {Share…} one {Shared with # person} other {Shared with # people}}",
+    "title": "Share “{title}”",
+    "description": "Colleagues you add can open the meeting, its transcript and its recap. Only you choose who has access; they cannot share it on.",
+    "search": {
+      "label": "Find a colleague",
+      "placeholder": "Name or email",
+      "saving": "Saving the visibility first…",
+      "loading": "Searching…",
+      "none": "No colleague matches “{text}”.",
+      "everyone": "Everyone in the directory has access already.",
+      "failed": "Could not search the directory.",
+      "retry": "Try again",
+      "results": "Colleagues"
+    },
+    "add": "Add {name}",
+    "addShort": "Add",
+    "addFailed": "{name} was not added. Try again.",
+    "removeFailed": "{name} was not removed. Try again.",
+    "readers": "{count, plural, =0 {Nobody else has access} one {# person has access} other {# people have access}}",
+    "nobody": "Add colleagues above. Until then, only you can open it.",
+    "remove": "Remove {name}",
+    "done": "Done"
+  },
+  "retention": {
+    "notice": {
+      "on": {
+        "audio": "The audio will be deleted on <date></date>",
+        "text": "The transcript and recap will be deleted on <date></date>",
+        "all": "Will be deleted on <date></date>"
+      },
+      "tonight": {
+        "audio": "The audio will be deleted tonight",
+        "text": "The transcript and recap will be deleted tonight",
+        "all": "Will be deleted tonight"
+      },
+      "keep": "Keep",
+      "kept": "Kept. Retention will not delete this meeting."
+    },
+    "audioDeleted": "Retention deleted the audio on <date></date>.",
+    "deletedRow": "Deleted by retention on <date></date>",
+    "remove": {
+      "action": "Remove",
+      "label": "Remove {title} from the library",
+      "title": "Remove this meeting?",
+      "body": "Retention has already deleted the audio, transcript and recap of “{title}”. Removing it also takes its title and date out of the library.",
+      "confirm": "Remove",
+      "failed": "The meeting was not removed. Try again."
+    }
+  },
+  "search": {
+    "sort": {
+      "relevance": "Best match"
+    },
+    "empty": {
+      "body": "No meeting you can see has “{q}” in its title, transcript or recap."
+    },
+    "kind": {
+      "title": "Title",
+      "segment": "Transcript",
+      "recap": "Recap"
+    }
+  },
+  "audit": {
+    "title": "Audit log",
+    "subheading": "Who opened, shared, changed or deleted which meeting. Titles and owners only, never content.",
+    "nav": {
+      "label": "Admin",
+      "settings": "Settings",
+      "audit": "Audit log"
+    },
+    "filters": {
+      "label": "Filter by action",
+      "all": "All",
+      "user": "User",
+      "everyone": "Everyone"
+    },
+    "action": {
+      "opened": "Opened",
+      "exported": "Exported",
+      "shared": "Sharing changed",
+      "visibility_changed": "Visibility changed",
+      "deleted": "Deleted",
+      "mcp_read": "Read through MCP",
+      "mcp_write": "Changed through MCP"
+    },
+    "count": "{count, plural, one {# event} other {# events}}",
+    "range": "{from}–{to} of {total, plural, one {# event} other {# events}}",
+    "table": {
+      "caption": "Audit events, newest first",
+      "time": "Time",
+      "user": "User",
+      "action": "Action",
+      "meeting": "Meeting",
+      "owner": "Owner",
+      "details": "Details",
+      "noMeeting": "No meeting",
+      "gone": "Deleted since",
+      "noOwner": "No owner"
+    },
+    "details": {
+      "visibility": "{before} → {after}",
+      "sharesRemoved": "{count, plural, one {# share removed} other {# shares removed}}",
+      "added": "Added {names}",
+      "removed": "Removed {names}",
+      "readers": "{count, plural, =0 {nobody else has access} one {# person has access} other {# people have access}}",
+      "andMore": "{names} and {count} more",
+      "unknownUser": "a removed user"
+    },
+    "empty": {
+      "first": {
+        "title": "No events yet",
+        "body": "When someone opens a colleague's meeting, or an owner shares, changes or deletes one, it shows here.",
+        "back": "Back to settings"
+      },
+      "noMatch": {
+        "title": "No events match",
+        "body": "No event matches the action and user you chose.",
+        "reset": "Reset filters"
+      },
+      "failed": {
+        "title": "Could not load the audit log",
+        "body": "The log did not load. Check the connection and try again.",
+        "retry": "Try again"
+      }
+    }
   }
 }

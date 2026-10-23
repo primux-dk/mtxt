@@ -9,6 +9,7 @@ export type {
   JobType,
   JobHandlers,
   RecapJob,
+  RetentionJob,
   TranscribeJob,
 } from './jobs';
 export { createDb, schema, type Db } from './db';
@@ -61,6 +62,8 @@ export type {
   Visibility,
 } from './db/schema';
 export type {
+  AuditAction,
+  AuditEvent,
   Meeting,
   Recording,
   RecordingStatus,
@@ -69,6 +72,50 @@ export type {
   Transcript,
   TranscriptStatus,
 } from './db/schema';
+export { AUDIT_ACTIONS } from './db/schema';
+export {
+  audit,
+  auditStatement,
+  detachAuditRows,
+  OPENED_WINDOW_MS,
+  type AuditDetails,
+  type AuditEventInput,
+} from './db/audit';
+export { foreignRows, foreignRowsSql } from './db/integrity';
+export {
+  CLEANUP_MAX_ATTEMPTS,
+  cleanupEntries,
+  finishCleanup,
+  recordCleanup,
+  retryStorageCleanup,
+  type CleanupEntry,
+} from './db/storage-cleanup';
+export {
+  dropFromSearchStatement,
+  ftsQuery,
+  meetingKey,
+  meetingSegments,
+  SEARCH_KINDS,
+  searchHitsSql,
+  searchSnippets,
+  SNIPPET_CLOSE,
+  SNIPPET_OPEN,
+  syncSearch,
+  type SearchHit,
+  type SearchKind,
+  type SearchSync,
+} from './db/search';
+export {
+  DAY_MS,
+  RETENTION_BATCH,
+  RETENTION_NOTICE_DAYS,
+  retentionBatch,
+  retentionDeadlines,
+  retentionNotice,
+  type RetentionNotice,
+  type RetentionSkipReason,
+  type RetentionResult,
+} from './db/retention';
 export {
   cloudflareAdapters,
   cloudflareConsumer,

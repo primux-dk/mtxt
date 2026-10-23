@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { schema } from '@mtxt/adapters';
+import { audit, schema } from '@mtxt/adapters';
 import { api } from '@/lib/api';
 import { HttpError } from '@/lib/http-error';
 import { parseRange } from '@/lib/http-range';
@@ -27,12 +27,23 @@ async function serve(request: Request, id: string, head: boolean) {
       )
       .where(and(eq(schema.recordings.id, id), eq(schema.recordings.installId, installId)))
       .get();
-    if (!row || !(await accessTo(db, installId, row.meeting, user)) || !row.recording.confirmedAt) {
+    const access = row ? await accessTo(db, installId, row.meeting, user) : null;
+    if (!row || !access || !row.recording.confirmedAt) {
       throw new HttpError(404, 'not_found', 'No audio for this recording.');
     }
     const key = row.recording.storagePath;
-    const info = await storage.head(key);
+    // Retention clears the path when it deletes the audio.
+    const info = key ? await storage.head(key) : null;
     if (!info) throw new HttpError(404, 'not_found', 'The audio is not in storage.');
+    // Audio served to anyone but the owner is an `opened`, once an hour (the player sends many ranges).
+    if (access !== 'owner') {
+      await audit(db, installId, {
+        userId: user.id,
+        meetingId: row.meeting.id,
+        meetingTitle: row.meeting.title,
+        action: 'opened',
+      }).catch((error) => console.error('Could not write the audit row', error));
+    }
 
     const type = row.recording.contentType.split(';')[0]!.trim();
     const headers = new Headers({

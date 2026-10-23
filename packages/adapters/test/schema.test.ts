@@ -64,6 +64,7 @@ describe('schema', () => {
       'segments',
       'settings',
       'speakers',
+      'storage_cleanup',
       'templates',
       'transcripts',
       'users',
@@ -163,7 +164,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0005 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0006 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -192,6 +193,7 @@ describe('schema', () => {
       '0003_capture.sql',
       '0004_transcription.sql',
       '0005_transcription_claims.sql',
+      '0006_access_retention.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);
@@ -207,11 +209,29 @@ describe('schema', () => {
     // The fold is left to the app.
     expect(old.prepare(`SELECT title_folded FROM meetings`).get()).toEqual({ title_folded: null });
     expect(old.prepare(`PRAGMA foreign_key_check`).all()).toEqual([]);
+    // 0006 indexes what is there: the title and the three segments, under the meeting.
+    expect(
+      old
+        .prepare(
+          `SELECT kind, count(*) AS n FROM meeting_search WHERE meeting_id = 'm1' GROUP BY kind`,
+        )
+        .all(),
+    ).toEqual([
+      { kind: 'segment', n: 3 },
+      { kind: 'title', n: 1 },
+    ]);
+    expect(
+      old
+        .prepare(`SELECT meeting_id FROM meeting_search WHERE meeting_search MATCH 'text : "ærø"'`)
+        .all(),
+    ).toEqual([{ meeting_id: 'm1' }]);
   });
 
-  it('only adds to the schema: 0003 drops and rebuilds nothing', async () => {
-    const sql = await readFile(new URL('0003_capture.sql', migrationsDir), 'utf8');
-    expect(sql).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
+  it('only adds to the schema: 0003 and 0006 drop and rebuild nothing', async () => {
+    for (const file of ['0003_capture.sql', '0006_access_retention.sql']) {
+      const sql = await readFile(new URL(file, migrationsDir), 'utf8');
+      expect(sql, file).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
+    }
   });
 
   it('folds packet-1 titles with backfillTitleKeys, once', async () => {
@@ -261,11 +281,13 @@ describe('dev seed', () => {
       db.exec(demoSql('dev', 30));
     }
     const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
-    expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(3);
+    // The three dev users, packet 6's 40 colleagues and the owner of the old meetings.
+    expect(count(`SELECT count(*) AS n FROM users WHERE install_id = 'dev'`)).toBe(44);
     expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-user'`)).toBe(30);
-    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(4);
-    // The colleague's shared meeting, and the delete test's graph meeting.
-    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(2);
+    // Three demo meetings, the graph meeting and packet 6's two search meetings.
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-colleague'`)).toBe(6);
+    // The colleague's shared meeting, the delete test's graph meeting, and demo-0001's 40.
+    expect(count(`SELECT count(*) AS n FROM meeting_shares WHERE install_id = 'dev'`)).toBe(42);
     expect(count(`SELECT count(*) AS n FROM segments WHERE transcript_id = 'demo-graph-t1'`)).toBe(
       3,
     );
@@ -276,6 +298,21 @@ describe('dev seed', () => {
     expect(count(`SELECT count(*) AS n FROM speakers WHERE meeting_id = 'demo-0002'`)).toBe(14);
     expect(count(`SELECT count(*) AS n FROM speakers WHERE meeting_id = 'demo-0004'`)).toBe(0);
     expect(count(`SELECT count(*) AS n FROM segments WHERE transcript_id = 'demo-0005-t'`)).toBe(0);
+    // Packet 6: 10,000 audit rows plus the graph's one, 230 old meetings, the search index.
+    expect(count(`SELECT count(*) AS n FROM audit_events WHERE install_id = 'dev'`)).toBe(10_001);
+    expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-archivist'`)).toBe(230);
+    // The index holds every demo segment, packet 4's transcripts included, and every title.
+    expect(count(`SELECT count(*) AS n FROM meeting_search WHERE kind = 'segment'`)).toBe(
+      count(`SELECT count(*) AS n FROM segments g
+        JOIN transcripts t ON t.id = g.transcript_id AND t.is_comparison = 0
+        JOIN recordings r ON r.id = t.recording_id
+        WHERE g.install_id = 'dev' AND r.meeting_id LIKE 'demo%' AND trim(g.text) != ''`),
+    );
+    expect(
+      count(
+        `SELECT count(DISTINCT meeting_id) AS n FROM meeting_search WHERE meeting_search MATCH 'text : "ugeplanen"' AND meeting_id LIKE 'demo-search-%'`,
+      ),
+    ).toBe(2);
     // The foreign-install fixtures: one meeting, one share, one recording.
     expect(count(`SELECT count(*) AS n FROM meetings WHERE install_id = 'other-install'`)).toBe(1);
     expect(

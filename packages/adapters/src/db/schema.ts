@@ -514,21 +514,49 @@ export const auditEvents = sqliteTable(
       .notNull()
       .references(() => users.id),
     meetingId: text('meeting_id').references(() => meetings.id, { onDelete: 'set null' }),
+    /** The meeting's title when the row was written. The row outlives the meeting; the title says what it was. */
+    meetingTitle: text('meeting_title'),
     action: text('action', { enum: AUDIT_ACTIONS }).notNull(),
+    /** Before and after, for `shared` and `visibility_changed` (src/db/audit.ts, AuditDetails). */
+    details: text('details', { mode: 'json' }).$type<Record<string, unknown>>(),
     at: createdAt('at'),
   },
   (t) => [
     index('audit_events_user').on(t.userId),
     index('audit_events_meeting').on(t.meetingId),
     index('audit_events_install_at').on(t.installId, t.at),
+    /** The `opened` dedupe looks up the user's latest row on a meeting. */
+    index('audit_events_install_meeting_user_at').on(t.installId, t.meetingId, t.userId, t.at),
+    index('audit_events_install_action_at').on(t.installId, t.action, t.at),
     inValues('audit_events', 'action', AUDIT_ACTIONS),
   ],
+);
+
+/**
+ * Storage objects whose rows are already gone and that are still to be
+ * deleted. A delete commits its rows (and its audit row) first and records
+ * the paths here in the same transaction; only then are the objects
+ * deleted, each row going with its object. What storage refuses stays here
+ * for the nightly job, which retries a bounded number of times.
+ */
+export const storageCleanup = sqliteTable(
+  'storage_cleanup',
+  {
+    id: id(),
+    installId: installId(),
+    path: text('path').notNull(),
+    createdAt: createdAt(),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  (t) => [index('storage_cleanup_install_attempts').on(t.installId, t.attempts, t.createdAt)],
 );
 
 export type Settings = typeof settings.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;
 export type RecordingStatus = (typeof RECORDING_STATUSES)[number];
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+export type AuditEvent = typeof auditEvents.$inferSelect;
 export type NewSettings = typeof settings.$inferInsert;
 export type Visibility = (typeof VISIBILITIES)[number];
 export type InterfaceLanguage = (typeof INTERFACE_LANGUAGES)[number];

@@ -1,11 +1,12 @@
-import { Download, FileText, Loader, Lock, MicOff, TriangleAlert, Upload } from 'lucide-react';
+import { Download, FileText, Loader, MicOff, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { cn } from 'cn';
-import type { Recording } from '@mtxt/adapters';
+import { audit, retentionNotice, type Recording } from '@mtxt/adapters';
 import { AudioPlayer } from '@/components/meeting/audio-player';
 import { BackLink } from '@/components/meeting/back-link';
+import { KeepProvider } from '@/components/meeting/keep-state';
 import { KeepToggle } from '@/components/meeting/keep-toggle';
 import { ArchivedNotice, MeetingMenu } from '@/components/meeting/meeting-menu';
 import { MeetingTabs } from '@/components/meeting/meeting-tabs';
@@ -14,6 +15,7 @@ import { MakePrimary, RetryTranscription } from '@/components/meeting/recording-
 import { LocalTime } from '@/components/local-time';
 import { RetentionNotice } from '@/components/meeting/retention-notice';
 import { RefreshWhile } from '@/components/meeting/refresh-while';
+import { VisibilityControl } from '@/components/meeting/visibility-control';
 import { VisibilityBadge } from '@/components/meetings/badges';
 import { TranscriptView } from '@/components/transcript/transcript-view';
 import { formatClock, formatDuration } from '@/components/meetings/format';
@@ -81,11 +83,20 @@ export default async function MeetingPage({ params, searchParams }: Props) {
   const detail = await loadMeeting(db, installId, user, id);
   // Not readable looks the same as absent: a link is never permission.
   if (!detail) notFound();
+  // Who opened what: anyone but the owner, once an hour per meeting.
+  if (detail.access !== 'owner') {
+    await audit(db, installId, {
+      userId: user.id,
+      meetingId: detail.meeting.id,
+      meetingTitle: detail.meeting.title,
+      action: 'opened',
+    }).catch((error) => console.error('Could not write the audit row', error));
+  }
 
-  const { meeting, access, recordings, current, hasRecap } = detail;
-  const [t, tv, ts, tf, tlocale, tt, tstt, settings, view, keyterms] = await Promise.all([
+  const { meeting, access, recordings, current, hasRecap, hasTranscript, shares } = detail;
+  const [t, tr, ts, tf, tlocale, tt, tstt, settings, view, keyterms] = await Promise.all([
     getTranslations('meeting'),
-    getTranslations('visibility'),
+    getTranslations('retention'),
     getTranslations('status'),
     getTranslations('format'),
     getTranslations('locale'),
@@ -99,7 +110,16 @@ export default async function MeetingPage({ params, searchParams }: Props) {
   const owner = access === 'owner';
   const state = meetingState(current?.status);
   const audioReady =
-    current?.confirmedAt && !(current.failure && UPLOAD_FAILURES.includes(current.failure));
+    current?.confirmedAt &&
+    current.storagePath &&
+    !(current.failure && UPLOAD_FAILURES.includes(current.failure));
+  // Retention: audio and text deadlines from started_at and the settings (rule 3).
+  // Computed as if not kept: the notice reads the live keep flag and says "Kept" instead.
+  const notice = retentionNotice({ ...meeting, keep: false }, settings, {
+    audio: recordings.some((rec) => rec.storagePath),
+    text: hasTranscript || hasRecap,
+  });
+  const audioDeletedAt = current && !current.storagePath ? current.deleteAudioAt : null;
   const rawT = Array.isArray(query.t) ? query.t[0] : query.t;
   const startAt = parseStartAt(rawT);
   const canUpload = settings.recordingSources.includes('upload');
@@ -278,71 +298,72 @@ export default async function MeetingPage({ params, searchParams }: Props) {
       <BackLink label={t('back')} />
       {meeting.archivedAt && <ArchivedNotice meetingId={meeting.id} owner={owner} />}
 
-      <header className="grid gap-2">
-        <MeetingTitle meetingId={meeting.id} title={meeting.title} canRename={owner} />
-        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-          {meta.flatMap((item, i) =>
-            i === 0
-              ? [item]
-              : [
-                  <span key={`sep-${i}`} aria-hidden="true" className="text-text-muted">
-                    ·
-                  </span>,
-                  item,
-                ],
-          )}
-        </p>
-        <RetentionNotice deleteAt={null} />
-      </header>
+      <KeepProvider meetingId={meeting.id} keep={meeting.keep}>
+        <header className="grid gap-2">
+          <MeetingTitle meetingId={meeting.id} title={meeting.title} canRename={owner} />
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            {meta.flatMap((item, i) =>
+              i === 0
+                ? [item]
+                : [
+                    <span key={`sep-${i}`} aria-hidden="true" className="text-text-muted">
+                      ·
+                    </span>,
+                    item,
+                  ],
+            )}
+          </p>
+          <RetentionNotice notice={notice} owner={owner} />
+        </header>
 
-      <div className="my-5 mb-6 flex flex-wrap items-center gap-2">
-        {owner ? (
-          <label className="inline-flex items-center gap-2 text-xs" title={t('visibility.later')}>
-            <Lock aria-hidden="true" className="size-5" strokeWidth={1.5} />
-            <select
+        <div className="my-5 mb-6 flex flex-wrap items-center gap-2">
+          {owner ? (
+            <VisibilityControl
+              meetingId={meeting.id}
+              title={meeting.title}
+              visibility={meeting.visibility}
+              shares={shares}
+            />
+          ) : (
+            <VisibilityBadge visibility={meeting.visibility} />
+          )}
+          {owner && <KeepToggle />}
+          <div className="grow" />
+          {/* The primary action, disabled until export exists (rule 10). */}
+          <span title={t('exportLater')}>
+            <Button
+              variant="primary"
               disabled
-              value={meeting.visibility}
-              aria-label={t('visibility.label')}
-              title={t('visibility.later')}
-              className="min-h-10 rounded-control border border-input bg-card px-3 text-sm disabled:opacity-60 max-shell:min-h-11 max-shell:text-xs"
+              aria-describedby="export-later"
+              className="max-shell:text-xs"
             >
-              {(['private', 'shared', 'company'] as const).map((v) => (
-                <option key={v} value={v}>
-                  {tv(v)}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <VisibilityBadge visibility={meeting.visibility} />
-        )}
-        {owner && <KeepToggle meetingId={meeting.id} keep={meeting.keep} />}
-        <div className="grow" />
-        {/* The primary action, disabled until export exists (rule 10). */}
-        <span title={t('exportLater')}>
-          <Button
-            variant="primary"
-            disabled
-            aria-describedby="export-later"
-            className="max-shell:text-xs"
-          >
-            <Download aria-hidden="true" />
-            {t('export')}
-          </Button>
-          <span id="export-later" className="sr-only">
-            {t('exportLater')}
+              <Download aria-hidden="true" />
+              {t('export')}
+            </Button>
+            <span id="export-later" className="sr-only">
+              {t('exportLater')}
+            </span>
           </span>
-        </span>
-        {owner && (
-          <MeetingMenu
-            meetingId={meeting.id}
-            archived={Boolean(meeting.archivedAt)}
-            recordings={recordings.length}
-            hasRecap={hasRecap}
-            canUpload={canUpload}
-          />
-        )}
-      </div>
+          {owner && (
+            <MeetingMenu
+              meetingId={meeting.id}
+              archived={Boolean(meeting.archivedAt)}
+              recordings={recordings.length}
+              hasRecap={hasRecap}
+              canUpload={canUpload}
+            />
+          )}
+        </div>
+      </KeepProvider>
+
+      {audioDeletedAt && (
+        <p className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Trash2 aria-hidden="true" className="size-4" strokeWidth={1.5} />
+          {tr.rich('audioDeleted', {
+            date: () => <LocalTime date={audioDeletedAt} options={{ dateStyle: 'long' }} />,
+          })}
+        </p>
+      )}
 
       {current && audioReady && (
         <AudioPlayer

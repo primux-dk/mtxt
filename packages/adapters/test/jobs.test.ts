@@ -20,6 +20,8 @@ describe('jobs', () => {
     expect(isJob({ type: 'transcribe', recording_id: 'r', install_id: 'i', poll: true })).toBe(
       true,
     );
+    expect(isJob({ type: 'retention', install_id: 'i', now: 1 })).toBe(true);
+    expect(isJob({ type: 'retention', install_id: 'i', now: 'tonight' })).toBe(false);
     expect(isJob({ type: 'transcribe', install_id: 'i' })).toBe(false);
     expect(isJob({ type: 'export', install_id: 'i' })).toBe(false);
     expect(isJob(null)).toBe(false);

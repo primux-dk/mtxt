@@ -9,7 +9,15 @@
   failed) is never claimed.
 */
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
-import { schema, type Db, type Job, type StorageAdapter, type Transcript } from '@mtxt/adapters';
+import {
+  meetingSegments,
+  schema,
+  syncSearch,
+  type Db,
+  type Job,
+  type StorageAdapter,
+  type Transcript,
+} from '@mtxt/adapters';
 import { SttError, type SttFailure, type SttResult } from '../stt/types';
 import { planSpeakers } from './speakers';
 
@@ -334,8 +342,23 @@ export async function completeTranscript(
   if (!written) {
     // Another delivery won: its raw result stays, this one goes.
     await storage.delete(path).catch(() => {});
+    return { written };
   }
+  await indexSegments(db, installId, recording.meetingId);
   return { written };
+}
+
+/**
+ * The search index (packet 6) gets the meeting's segments again: every
+ * recording's, never a comparison transcript's. A replace, so a later
+ * delivery that runs it again changes nothing. A failure throws, and the
+ * job's retry (the `finish` step) runs it once more.
+ */
+export async function indexSegments(db: Db, installId: string, meetingId: string) {
+  await syncSearch(db, installId, {
+    meetingId,
+    segments: await meetingSegments(db, installId, meetingId),
+  });
 }
 
 /** The recording `transcribed`, once its transcript row is done. */
@@ -359,14 +382,16 @@ function markTranscribedStatement(
     );
 }
 
-/** For a done row a delivery found later: the recording status, if it was left behind. */
+/** For a done row a delivery found later: the recording status and the search index, if left behind. */
 export async function finishDone(
   db: Db,
   installId: string,
   recordingId: string,
   transcriptId: string,
+  meetingId?: string,
 ) {
   await markTranscribedStatement(db, installId, recordingId, transcriptId);
+  if (meetingId) await indexSegments(db, installId, meetingId);
 }
 
 /**

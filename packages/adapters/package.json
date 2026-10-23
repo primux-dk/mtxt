@@ -9,7 +9,8 @@
     "./cloudflare": "./src/cloudflare/index.ts",
     "./db/schema": "./src/db/schema.ts",
     "./db/seed": "./src/db/seed.ts",
-    "./db/dev-seed": "./src/db/dev-seed.ts"
+    "./db/dev-seed": "./src/db/dev-seed.ts",
+    "./test/sqlite": "./test/sqlite.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
