@@ -1,5 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   expect,
   request as playwrightRequest,
@@ -124,45 +126,49 @@ export async function signInHeaders(baseURL: string) {
   }
 }
 
-const BUSY = /SQLITE_BUSY|database is locked/;
+/**
+ * The SQLite file behind one of Miniflare's local stores in the e2e run's
+ * state (.wrangler/e2e, playwright.config.ts): D1's database, or the R2
+ * bucket's object index. One store each in this install.
+ */
+function localStore(kind: 'd1/miniflare-D1DatabaseObject' | 'r2/miniflare-R2BucketObject') {
+  const dir = join('.wrangler/e2e/v3', kind);
+  const [file, ...more] = readdirSync(dir).filter((f) => /^[0-9a-f]{64}\.sqlite$/.test(f));
+  if (!file || more.length) throw new Error(`Expected one SQLite file in ${dir}`);
+  return join(dir, file);
+}
 
 /**
- * Runs wrangler against the e2e run's local state. It opens the same SQLite
- * files as the running Worker, so while a job writes (the retention batches)
- * it can meet SQLITE_BUSY: the statement did not run, and it is tried again,
- * up to 20 times 250 ms apart. Any other failure throws at once, with
- * wrangler's stderr on the error.
+ * Opens a local store's SQLite file beside the running Worker. The Worker
+ * writes it in WAL mode; a read or write that meets its lock waits for it
+ * (busy timeout, 10 s) instead of failing with SQLITE_BUSY. Opening the file
+ * costs milliseconds, where a `wrangler d1 execute` boots its own Miniflare
+ * for about 1.6 s and blocks the test's event loop meanwhile.
  */
-export function wrangler(args: string[]): string {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return execFileSync('wrangler', args, {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-    } catch (error) {
-      const stderr = String((error as { stderr?: unknown }).stderr ?? '');
-      if (attempt >= 20 || !BUSY.test(stderr + String(error))) throw error;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
-    }
+export function withLocalStore<T>(
+  kind: Parameters<typeof localStore>[0],
+  run: (db: DatabaseSync) => T,
+): T {
+  const db = new DatabaseSync(localStore(kind), { timeout: 10_000 });
+  try {
+    return run(db);
+  } finally {
+    db.close();
   }
 }
 
 /**
- * A read on the e2e run's local D1 (.wrangler/e2e, playwright.config.ts),
- * for checks the API rightly cannot make, such as rows of another install.
+ * A statement on the e2e run's local D1, for checks the API rightly cannot
+ * make, such as rows of another install. Foreign keys are on, as in D1.
+ * Several statements run as one script and return no rows.
  */
 export function d1<T = Record<string, unknown>>(sql: string): T[] {
-  const out = wrangler([
-    'd1',
-    'execute',
-    'DB',
-    '--local',
-    '--persist-to',
-    '.wrangler/e2e',
-    '--json',
-    '--command',
-    sql,
-  ]);
-  return JSON.parse(out)[0].results as T[];
+  return withLocalStore('d1/miniflare-D1DatabaseObject', (db) => {
+    db.exec('PRAGMA foreign_keys = ON');
+    if (sql.trim().replace(/;$/, '').includes(';')) {
+      db.exec(sql);
+      return [];
+    }
+    return db.prepare(sql).all() as T[];
+  });
 }
