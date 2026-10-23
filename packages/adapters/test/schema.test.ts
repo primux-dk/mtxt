@@ -189,7 +189,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0011 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0013 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -226,6 +226,7 @@ describe('schema', () => {
       '0010_api_tokens.sql',
       '0011_decision_due.sql',
       '0012_mcp_oauth.sql',
+      '0013_transcript_pieces.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);

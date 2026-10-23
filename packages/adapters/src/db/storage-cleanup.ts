@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
-import type { StorageAdapter } from '../storage';
+import { deleteStored, type StorageAdapter } from '../storage';
 import type { Db } from './index';
 import { storageCleanup } from './schema';
 
@@ -35,7 +35,7 @@ export function recordCleanup(db: Db, installId: string, entries: readonly Clean
  */
 export async function finishCleanup(
   db: Db,
-  storage: Pick<StorageAdapter, 'delete'>,
+  storage: Pick<StorageAdapter, 'delete'> & Partial<Pick<StorageAdapter, 'list'>>,
   installId: string,
   entries: readonly CleanupEntry[],
   log: Pick<Console, 'error'> = console,
@@ -44,7 +44,8 @@ export async function finishCleanup(
   let failed = 0;
   for (const entry of entries) {
     try {
-      await storage.delete(entry.path);
+      // A path ending in "/" is a prefix: a transcript's pieces (packet 17).
+      await deleteStored(storage, entry.path);
       await db
         .delete(storageCleanup)
         .where(and(eq(storageCleanup.installId, installId), eq(storageCleanup.id, entry.id)));
@@ -69,7 +70,7 @@ export async function finishCleanup(
  */
 export async function retryStorageCleanup(
   db: Db,
-  storage: Pick<StorageAdapter, 'delete'>,
+  storage: Pick<StorageAdapter, 'delete'> & Partial<Pick<StorageAdapter, 'list'>>,
   installId: string,
   log: Pick<Console, 'error'> = console,
 ): Promise<{ deleted: number; failed: number; givenUp: number }> {

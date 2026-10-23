@@ -100,7 +100,11 @@ export interface RetentionResult {
  * is left alone is listed with the reason, paged, never cut off.
  */
 export async function retentionBatch(
-  ctx: { db: Db; storage: Pick<StorageAdapter, 'delete'>; installId: string },
+  ctx: {
+    db: Db;
+    storage: Pick<StorageAdapter, 'delete'> & Partial<Pick<StorageAdapter, 'list'>>;
+    installId: string;
+  },
   settings: RetentionSettings,
   now: Date,
   limit = RETENTION_BATCH,

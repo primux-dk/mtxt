@@ -230,6 +230,7 @@
     "state": {
       "transcribing": {
         "body": "Transcribing with {provider}. The transcript appears here when it is ready. You can leave this page.",
+        "pieces": "Transcribing with {provider} in {total} parts, {done} done. The transcript appears here when it is ready. You can leave this page.",
         "waiting": "Waiting for a speech-to-text provider. Transcription starts when an admin chooses one in Settings."
       },
       "failed": {
@@ -262,6 +263,7 @@
       "provider_error": "The provider had an error{status, select, none {} other { (HTTP {status})}}.",
       "timeout": "The provider did not answer in time.",
       "too_long": "The recording is over the provider's size limit.",
+      "unsplittable": "The recording is over the provider's size limit, in a format that cannot be sent in parts (FLAC, or a damaged file).",
       "missing_audio": "The audio file is missing from storage.",
       "config": "A setting the installation needs is missing or wrong.",
       "internal": "The installation had an error while it saved the transcript."
