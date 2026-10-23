@@ -311,7 +311,9 @@
         "too_long": "Referatet er for langt til at blive gemt (højst 500.000 tegn)",
         "refused": "serveren afviste at gemme"
       },
-      "tickUndone": "afkrydsningen blev fortrudt"
+      "tickUndone": "afkrydsningen blev fortrudt",
+      "dueUndone": "fristen blev fortrudt",
+      "bothUndone": "afkrydsningen og fristen blev fortrudt"
     },
     "toolbar": {
       "label": "Referatformatering",
@@ -324,7 +326,14 @@
     },
     "decision": {
       "markDone": "Markér som færdig: {task}",
-      "untitled": "en tom beslutning"
+      "untitled": "en tom beslutning",
+      "due": "Frist {date}",
+      "addDue": "Tilføj frist",
+      "dueField": "Frist for {task}",
+      "dueLabel": "Frist",
+      "clearDue": "Fjern frist",
+      "dueButton": "{label}, {task}",
+      "saveDue": "Gem"
     },
     "editorHint": "Skriv / for blokke. Brug @ til kolleger.",
     "versionLine": {
@@ -520,6 +529,12 @@
       "field": "Standardsprog for brugerfladen",
       "note": "Brugerens browser- eller systemsprog bruges, hvis der findes en oversættelse."
     },
+    "timeZone": {
+      "heading": "Tidszone",
+      "help": "Den dag et møde holdes på.",
+      "field": "Installationens tidszone",
+      "note": "Referatets udkast regner frister som \"på torsdag\" eller \"i morgen\" fra mødets dag i denne zone."
+    },
     "keyterms": {
       "heading": "Virksomhedens ord",
       "help": "Produktnavne, navne og fagord.",
@@ -555,6 +570,8 @@
       "help": "Flere skabeloner. Medarbejderen vælger én til hvert møde.",
       "name": "Skabelonnavn",
       "body": "Indhold i Markdown",
+      "bodyHelp": "Skriv beslutningsafsnittet som en tjekliste-linje: opgaven, den ansvarlige efter @, fristen efter ~. Udkastet udfylder ansvarlig og frist, når mødet nævnte dem, for eksempel",
+      "decisionLine": "- [ ] Opgave · @ansvarlig · ~frist",
       "add": "Tilføj skabelon",
       "list": "Skabeloner",
       "empty": "Ingen skabeloner endnu. Tilføj den første; medarbejderne vælger én til hvert møde.",

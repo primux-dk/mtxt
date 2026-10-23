@@ -58,11 +58,17 @@ import { allowedImage, recapExtensions, recapMention } from '@/lib/recap/extensi
 import { draftsFor, deleteDraft, type LocalDraft } from '@/lib/recap/local-draft';
 import { parseMarkdown, toMarkdown } from '@/lib/recap/markdown';
 import type { VersionView } from '@/lib/recap/view';
-import { FLUSH_SAVE, ROLLBACK, viewOverrides, ViewContext, type Tick } from './node-views';
+import {
+  FLUSH_SAVE,
+  ROLLBACK,
+  viewOverrides,
+  ViewContext,
+  type DecisionChange,
+} from './node-views';
 
 /** The transaction that takes the server's stored text: kept locally, not saved again. */
 const NORMALIZED = 'recapNormalized';
-import { useAutosave, type SaveState } from './save-state';
+import { useAutosave, type SaveState, type Undone } from './save-state';
 import { createMenu, SuggestionMenu, type MenuItem } from './suggestion-menu';
 
 export interface RecapEditorProps {
@@ -73,8 +79,6 @@ export interface RecapEditorProps {
   bodyMd: string;
   /** The number of the newest AI version, for "AI draft v1, edited by Mette v4". */
   lastAi: number | null;
-  meetingDate: string;
-  owners: (string | null)[];
   /** The panel's head: the template select, Versions, Regenerate. */
   head?: React.ReactNode;
   /** Above the toolbar: a draft running or failed. */
@@ -86,6 +90,12 @@ export interface RecapEditorProps {
 }
 
 type BlockItem = MenuItem & { run: (editor: Editor, range: Range) => void };
+
+const UNDONE = {
+  tick: 'status.tickUndone',
+  due: 'status.dueUndone',
+  both: 'status.bothUndone',
+} as const satisfies Record<NonNullable<Undone>, string>;
 
 /** Says which version is current and who made it; the status word follows. */
 export function VersionLine({
@@ -135,7 +145,7 @@ export function VersionLine({
                     time: when(save.conflict.createdAt),
                   })
                 : t('status.changedElsewhere')}
-              {save.tickUndone && <span>· {t('status.tickUndone')}</span>}
+              {save.undone && <span>· {t(UNDONE[save.undone])}</span>}
               <span aria-hidden="true">·</span>
               <button
                 type="button"
@@ -164,8 +174,8 @@ export function VersionLine({
                   · {t(`status.problem.${save.problem}`)}
                 </span>
               )}
-              {save.tickUndone && (
-                <span className="text-muted-foreground"> · {t('status.tickUndone')}</span>
+              {save.undone && (
+                <span className="text-muted-foreground"> · {t(UNDONE[save.undone])}</span>
               )}
             </span>
           )}
@@ -290,13 +300,11 @@ export function RecapEditor(props: RecapEditorProps) {
     [props.bodyMd],
   );
   /**
-   * Decision ticks the server has not confirmed: their place among the
-   * decisions, and the save that carries them (null until one starts). A
-   * refused save rolls back exactly its own ticks (rule 2).
+   * Decision ticks and due dates the server has not confirmed: their place
+   * among the decisions, the change, and the save that carries them (null
+   * until one starts). A refused save rolls back exactly its own (rule 2).
    */
-  const pendingTicks = useRef<{ ordinal: number; checked: boolean; carriedBy: number | null }[]>(
-    [],
-  );
+  const pending = useRef<(DecisionChange & { ordinal: number; carriedBy: number | null })[]>([]);
   const {
     state: save,
     changed,
@@ -309,10 +317,10 @@ export function RecapEditor(props: RecapEditorProps) {
     initialMd: props.bodyMd,
     read,
     onSaveStart: (seq) => {
-      for (const tick of pendingTicks.current) tick.carriedBy ??= seq;
+      for (const change of pending.current) change.carriedBy ??= seq;
     },
     onSaved: (version, seq) => {
-      pendingTicks.current = pendingTicks.current.filter((tick) => tick.carriedBy !== seq);
+      pending.current = pending.current.filter((change) => change.carriedBy !== seq);
       props.onVersion?.(version);
     },
     // The stored text differs (a foreign mention or image went): change only what differs,
@@ -334,28 +342,36 @@ export function RecapEditor(props: RecapEditorProps) {
       const tr = e.state.tr.replace(start, endA, next.slice(start, endB));
       e.view.dispatch(tr.setMeta(NORMALIZED, true).setMeta('addToHistory', false));
     },
-    onRefused: (seq) => {
+    onRefused: (seq): Undone => {
       const e = editorRef.current;
-      const ticks = pendingTicks.current.filter((tick) => tick.carriedBy === seq);
-      pendingTicks.current = pendingTicks.current.filter((tick) => tick.carriedBy !== seq);
-      if (!e || !ticks.length) return false;
-      const items: { pos: number; checked: boolean }[] = [];
+      const changes = pending.current.filter((change) => change.carriedBy === seq);
+      pending.current = pending.current.filter((change) => change.carriedBy !== seq);
+      if (!e || !changes.length) return null;
+      const items: number[] = [];
       e.state.doc.descendants((n, pos) => {
-        if (n.type.name === 'decisionItem') items.push({ pos, checked: Boolean(n.attrs.checked) });
+        if (n.type.name === 'decisionItem') items.push(pos);
         return n.type.name !== 'decisionItem';
       });
       const tr = e.state.tr;
-      let undone = false;
-      for (const tick of [...ticks].reverse()) {
-        const item = items[tick.ordinal];
-        if (!item || item.checked !== tick.checked) continue;
-        const node = tr.doc.nodeAt(item.pos)!;
-        tr.setNodeMarkup(item.pos, undefined, { ...node.attrs, checked: !tick.checked });
-        item.checked = !tick.checked;
-        undone = true;
+      const undone = new Set<'tick' | 'due'>();
+      // Newest first, so two changes to one item end where the first began.
+      for (const change of [...changes].reverse()) {
+        const at = items[change.ordinal];
+        const node = at === undefined ? null : tr.doc.nodeAt(at);
+        if (!node || node.type.name !== 'decisionItem') continue;
+        if (change.attr === 'checked') {
+          if (Boolean(node.attrs.checked) !== change.value) continue;
+          tr.setNodeMarkup(at!, undefined, { ...node.attrs, checked: !change.value });
+          undone.add('tick');
+        } else {
+          if ((node.attrs.due ?? null) !== change.value) continue;
+          tr.setNodeMarkup(at!, undefined, { ...node.attrs, due: change.previous });
+          undone.add('due');
+        }
       }
-      if (undone) e.view.dispatch(tr.setMeta(ROLLBACK, true).setMeta('addToHistory', false));
-      return undone;
+      if (!undone.size) return null;
+      e.view.dispatch(tr.setMeta(ROLLBACK, true).setMeta('addToHistory', false));
+      return undone.size === 2 ? 'both' : undone.has('tick') ? 'tick' : 'due';
     },
   });
 
@@ -600,16 +616,16 @@ export function RecapEditor(props: RecapEditorProps) {
         if (transaction.getMeta(ROLLBACK) || transaction.getMeta(NORMALIZED)) {
           return changed(false, true);
         }
-        const tick = transaction.getMeta(FLUSH_SAVE) as Tick | undefined;
-        if (tick) {
+        const change = transaction.getMeta(FLUSH_SAVE) as DecisionChange | undefined;
+        if (change) {
           let ordinal = 0;
           e.state.doc.descendants((n, pos) => {
-            if (n.type.name === 'decisionItem' && pos < tick.pos) ordinal++;
+            if (n.type.name === 'decisionItem' && pos < change.pos) ordinal++;
             return n.type.name !== 'decisionItem';
           });
-          pendingTicks.current.push({ ordinal, checked: tick.checked, carriedBy: null });
+          pending.current.push({ ...change, ordinal, carriedBy: null });
         }
-        changed(Boolean(tick));
+        changed(Boolean(change));
       },
     },
     [extensions],
@@ -682,9 +698,7 @@ export function RecapEditor(props: RecapEditorProps) {
   };
 
   return (
-    <ViewContext.Provider
-      value={{ meetingDate: props.meetingDate, locale: intl, owners: props.owners }}
-    >
+    <ViewContext.Provider value={{ locale: intl }}>
       {props.head}
       <VersionLine current={save.current} lastAi={props.lastAi} save={owner ? save : undefined} />
       {props.notice}

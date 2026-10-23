@@ -34,8 +34,6 @@ export interface RecapPanelProps {
   lastAi: number | null;
   templates: { id: string; name: string }[];
   templateId: string | null;
-  meetingDate: string;
-  owners: (string | null)[];
   /** A transcript the recap can be drafted from. */
   canDraft: boolean;
 }
@@ -288,8 +286,6 @@ export function RecapPanel(props: RecapPanelProps) {
         current={props.current}
         bodyMd={props.bodyMd}
         lastAi={lastAi}
-        meetingDate={props.meetingDate}
-        owners={props.owners}
         head={head}
         notice={notice}
         onVersion={(version) => {
