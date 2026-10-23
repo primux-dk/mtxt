@@ -13,12 +13,12 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
 
 /**
  * "Produktionsmøde, uge 43 2026-10-22.docx": the title made safe for a file
- * system, and the meeting's date. `json` is a webhook's transcript link.
+ * system, and the meeting's date. `json` and `txt` are the transcript's.
  */
 export function exportFileName(
   title: string,
   startedAt: Date,
-  format: ExportFormat | 'json',
+  format: ExportFormat | 'json' | 'txt',
 ): string {
   const safe = title
     .normalize('NFC')

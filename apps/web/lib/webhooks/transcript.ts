@@ -63,3 +63,26 @@ export async function transcriptExport(
     })),
   };
 }
+
+/** `[h:mm:ss]` from milliseconds. */
+const stamp = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  const two = (n: number) => String(n).padStart(2, '0');
+  return `[${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}]`;
+};
+
+/**
+ * The transcript as plain text for the API's `?format=text`: one line per
+ * segment, `[h:mm:ss] Name: text`, the name left out where a segment has no
+ * speaker.
+ */
+export function transcriptText(transcript: TranscriptExport): string {
+  const names = new Map(transcript.speakers.map((s) => [s.id, s.name]));
+  return transcript.segments
+    .map((seg) => {
+      const name = seg.speaker_id ? names.get(seg.speaker_id) : undefined;
+      return `${stamp(seg.start_ms)} ${name ? `${name}: ` : ''}${seg.text.replace(/\s*\n\s*/g, ' ')}`;
+    })
+    .join('\n')
+    .concat(transcript.segments.length ? '\n' : '');
+}

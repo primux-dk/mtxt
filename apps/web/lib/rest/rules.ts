@@ -146,3 +146,99 @@ export function etagMatches(header: string | null, etag: string): boolean {
   const bare = (tag: string) => tag.trim().replace(/^W\//, '');
   return header.split(',').some((tag) => bare(tag) === bare(etag));
 }
+
+export const LIST_VIEWS = ['all', 'mine', 'shared', 'company', 'archived'] as const;
+export const LIST_STATUSES = ['ready', 'transcribing', 'failed'] as const;
+const LIST_PARAMS = ['view', 'q', 'status', 'since', 'cursor', 'limit'];
+
+export interface ListParams {
+  view: (typeof LIST_VIEWS)[number];
+  q?: string;
+  status?: (typeof LIST_STATUSES)[number];
+  since?: Date;
+  limit: number;
+  cursor?: string;
+  /** The filters a cursor is bound to. */
+  fingerprint: string;
+}
+
+/** An ISO 8601 date-time with a zone (RFC 3339), or a bare date taken as UTC midnight. */
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
+/**
+ * `GET /meetings`'s query, strictly: an unknown parameter or value is an
+ * error naming it, not a silent default, so a client's typo shows at once.
+ */
+export function parseListParams(search: URLSearchParams): ListParams | { error: string } {
+  for (const key of new Set(search.keys())) {
+    if (!LIST_PARAMS.includes(key)) return { error: `Unknown parameter "${key}".` };
+    if (search.getAll(key).length > 1) return { error: `"${key}" is given more than once.` };
+  }
+  const view = search.get('view') ?? 'all';
+  if (!(LIST_VIEWS as readonly string[]).includes(view))
+    return { error: `view is one of ${LIST_VIEWS.join(', ')}.` };
+  const status = search.get('status') ?? undefined;
+  if (status !== undefined && !(LIST_STATUSES as readonly string[]).includes(status))
+    return { error: `status is one of ${LIST_STATUSES.join(', ')}.` };
+  const q = search.get('q')?.trim() || undefined;
+  if (q && q.length > 200) return { error: 'q is at most 200 characters.' };
+  const rawSince = search.get('since');
+  let since: Date | undefined;
+  if (rawSince !== null) {
+    since = new Date(rawSince);
+    if (!ISO_TIME.test(rawSince) || Number.isNaN(since.getTime()))
+      return { error: 'since is an ISO 8601 time, for example 2026-10-01T00:00:00Z.' };
+  }
+  const limit = parseLimit(search.get('limit'));
+  if (limit === null) return { error: `limit is a whole number from 1 to ${MAX_LIMIT}.` };
+  return {
+    view: view as ListParams['view'],
+    q,
+    status: status as ListParams['status'],
+    since,
+    limit,
+    cursor: search.get('cursor') ?? undefined,
+    fingerprint: queryFingerprint({ view, q, status, since: since?.getTime() }),
+  };
+}
+
+/** `GET /search`'s query: `q` (1 to 200 characters), `cursor`, `limit`. */
+export function parseSearchParams(
+  search: URLSearchParams,
+): { q: string; limit: number; cursor?: string; fingerprint: string } | { error: string } {
+  for (const key of new Set(search.keys())) {
+    if (!['q', 'cursor', 'limit'].includes(key)) return { error: `Unknown parameter "${key}".` };
+    if (search.getAll(key).length > 1) return { error: `"${key}" is given more than once.` };
+  }
+  const q = search.get('q')?.trim() ?? '';
+  if (!q || q.length > 200) return { error: 'q is 1 to 200 characters.' };
+  const limit = parseLimit(search.get('limit'));
+  if (limit === null) return { error: `limit is a whole number from 1 to ${MAX_LIMIT}.` };
+  return {
+    q,
+    limit,
+    cursor: search.get('cursor') ?? undefined,
+    fingerprint: queryFingerprint({ search: q }),
+  };
+}
+
+/** One query parameter that must be one of `values`, `fallback` when absent; anything else is an error. */
+export function parseFormat<T extends string>(
+  search: URLSearchParams,
+  values: readonly T[],
+  fallback: T,
+): T | { error: string } {
+  for (const key of new Set(search.keys())) {
+    if (key !== 'format') return { error: `Unknown parameter "${key}".` };
+  }
+  const format = search.get('format') ?? fallback;
+  return (values as readonly string[]).includes(format)
+    ? (format as T)
+    : { error: `format is one of ${values.join(', ')}.` };
+}
+
+/** A query that takes no parameters: the first one given is an error. */
+export function noParams(search: URLSearchParams): { error: string } | null {
+  const [key] = search.keys();
+  return key === undefined ? null : { error: `Unknown parameter "${key}".` };
+}

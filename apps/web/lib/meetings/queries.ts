@@ -62,7 +62,8 @@ export interface LibraryPage {
 }
 
 const m = schema.meetings;
-const STATE_SQL = sql<string>`case when m.deleted_at is not null then 'deleted' else case r.status
+/** A meeting's state from its row (`m`) and its primary or latest recording (`r`). */
+export const STATE_SQL = sql<string>`case when m.deleted_at is not null then 'deleted' else case r.status
   when 'transcribed' then 'ready'
   when 'failed' then 'failed'
   when 'uploading' then 'uploading'
@@ -78,7 +79,11 @@ const likeContains = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c
  * (`deleted_at`) shows only to its owner, as a muted row, in My meetings or,
  * when it was archived, in Archived, until the owner removes it.
  */
-function viewScope(installId: string, user: CurrentUser, params: LibraryParams): SQL {
+export function viewScope(
+  installId: string,
+  user: Pick<CurrentUser, 'id'>,
+  params: Pick<LibraryParams, 'view'>,
+): SQL {
   const own = sql`m.install_id = ${installId}`;
   const base = sql`${own} and m.deleted_at is null`;
   switch (params.view) {
@@ -202,7 +207,7 @@ export async function listMeetings(
 
 /** How many meetings the user has archived: the library header's "Archived" link (packet 12). */
 export async function countArchived(db: Db, installId: string, user: CurrentUser): Promise<number> {
-  const where = viewScope(installId, user, { view: 'archived', sort: 'date', page: 1 });
+  const where = viewScope(installId, user, { view: 'archived' });
   const [row] = await db.all<{ n: number }>(
     sql`select count(*) as n from meetings m where ${where}`,
   );
@@ -213,7 +218,7 @@ export async function countArchived(db: Db, installId: string, user: CurrentUser
  * The speakers of a page of meetings, in one query: the colleague's name
  * when a speaker is linked, else the label. Install-scoped on both sides.
  */
-async function speakersFor(db: Db, installId: string, meetingIds: string[]) {
+export async function speakersFor(db: Db, installId: string, meetingIds: string[]) {
   const out = new Map<string, { name: string; unnamed: number | null }[]>();
   if (!meetingIds.length) return out;
   const rows = await db.all<{ meeting_id: string; label: string; user_name: string | null }>(

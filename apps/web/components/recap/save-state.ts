@@ -15,7 +15,7 @@
 */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteDraft, putDraft } from '@/lib/recap/local-draft';
-import type { VersionView } from '@/lib/recap/view';
+import { fromApiVersion, type ApiVersion, type VersionView } from '@/lib/recap/view';
 
 export const AUTOSAVE_MS = 1500;
 const RETRY_MS = 5000;
@@ -131,10 +131,9 @@ export function useAutosave(options: {
     }
     inFlight.current = false;
     if (response?.ok) {
-      const { version, body_md: stored } = (await response.json()) as {
-        version: VersionView;
-        body_md?: string;
-      };
+      const answer = (await response.json()) as { version: ApiVersion; body_md?: string };
+      const version = fromApiVersion(answer.version);
+      const stored = answer.body_md;
       base.current = version.id;
       confirmed.current = stored ?? body;
       void deleteDraft(recapId, sentOn).catch(() => {});
@@ -159,11 +158,17 @@ export function useAutosave(options: {
       return;
     }
     if (response?.status === 409) {
-      const { current } = (await response.json().catch(() => ({}))) as { current?: VersionView };
+      const { current } = (await response.json().catch(() => ({}))) as {
+        current?: ApiVersion | null;
+      };
       // Network saves stop; the text typed from here on is still kept in this browser.
       stopped.current = true;
       const undone = onRefused.current?.(seq) ?? false;
-      set({ status: 'conflict', conflict: current ?? null, tickUndone: undone });
+      set({
+        status: 'conflict',
+        conflict: current ? fromApiVersion(current) : null,
+        tickUndone: undone,
+      });
       return;
     }
     const problem: SaveProblem =

@@ -931,7 +931,9 @@
       "mcp_write": "Changed through MCP",
       "recorder_connected": "Recorder connected",
       "recorder_disconnected": "Recorder disconnected",
-      "webhook_sent": "Sent to a connected system"
+      "webhook_sent": "Sent to a connected system",
+      "api_token_created": "API token created",
+      "api_token_revoked": "API token revoked"
     },
     "count": "{count, plural, one {# event} other {# events}}",
     "range": "{from}–{to} of {total, plural, one {# event} other {# events}}",
@@ -959,11 +961,19 @@
       "format": {
         "md": "Markdown",
         "docx": "Word",
-        "transcript": "Transcript"
+        "transcript": "Transcript",
+        "json": "Recap as JSON",
+        "text": "Transcript as text"
       },
       "unnamedEndpoint": "an unnamed endpoint",
       "viaWebhook": "{format}, fetched by {endpoint}",
-      "webhook": "{endpoint} · {event}"
+      "webhook": "{endpoint} · {event}",
+      "viaApi": "through the API ({token})",
+      "token": "{name} · {scope}",
+      "scope": {
+        "read": "Read only",
+        "readWrite": "Read and write"
+      }
     },
     "empty": {
       "first": {
@@ -1039,6 +1049,64 @@
     "disconnect": "Disconnect",
     "disconnectLabel": "Disconnect {device}",
     "disconnectFailed": "{device} was not disconnected. Try again."
+  },
+  "apiTokens": {
+    "open": "API tokens",
+    "title": "API tokens",
+    "description": "Personal tokens for your company's own systems. A token reads, and with Read and write also changes, only the meetings you can see.",
+    "loading": "Loading API tokens…",
+    "failed": "Could not load your API tokens. Check the connection and try again.",
+    "retry": "Try again",
+    "new": "New token",
+    "full": "You have {max} tokens, the most there can be. Revoke one to make another.",
+    "empty": {
+      "title": "No API tokens",
+      "body": "Make a token for a system that reads your meetings, such as a CRM. It is shown once."
+    },
+    "count": "{count, plural, one {# token} other {# tokens}}",
+    "created": "Created",
+    "expires": "expires",
+    "lastUsed": "last used",
+    "neverUsed": "not used yet",
+    "revoke": "Revoke",
+    "revokeLabel": "Revoke {name}",
+    "revokeFailed": "{name} was not revoked. Try again.",
+    "scope": {
+      "read": "Read only",
+      "readWrite": "Read and write"
+    },
+    "create": {
+      "title": "New API token",
+      "body": "The token acts as you. It sees what you see and nothing more.",
+      "name": "Name",
+      "nameHelp": "The system it is for, so you know it again. Up to {max} characters.",
+      "scope": "Access",
+      "readHelp": "Lists meetings and reads transcripts and recaps.",
+      "readWriteHelp": "Also saves recaps, renames meetings, and changes visibility and readers of your own meetings.",
+      "lifetime": "Expires after",
+      "days": {
+        "30": "30 days",
+        "90": "90 days",
+        "365": "1 year"
+      },
+      "submit": "Create token"
+    },
+    "secret": {
+      "title": "Copy your token now",
+      "body": "This is the only time the token for {name} is shown. Store it in the system that uses it.",
+      "label": "Token",
+      "copy": "Copy",
+      "copied": "Copied",
+      "note": "Send it as Authorization: Bearer <token>. Revoke it here if it leaks.",
+      "done": "Done"
+    },
+    "errors": {
+      "nameRequired": "Give the token a name.",
+      "nameTooLong": "The name is at most {max} characters. Shorten it.",
+      "nameInvalid": "The name cannot hold line breaks or control characters.",
+      "tooMany": "You have {max} tokens. Revoke one, then make the new one.",
+      "createFailed": "The token was not made. Try again."
+    }
   },
   "editor": {
     "block": {

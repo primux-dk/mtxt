@@ -20,3 +20,21 @@ export const versionView = (v: VersionInfo): VersionView => ({
   createdAt: v.createdAt.toISOString(),
   note: v.note,
 });
+
+/** A version as the REST API answers with it (lib/rest/meetings.ts, recapVersionView). */
+export interface ApiVersion {
+  id: string;
+  number: number;
+  author: { id: string; name: string } | null;
+  created_at: string;
+  note: string | null;
+}
+
+/** The API's version as the editor holds it. */
+export const fromApiVersion = (v: ApiVersion): VersionView => ({
+  id: v.id,
+  number: v.number,
+  author: v.author ? v.author.name : null,
+  createdAt: v.created_at,
+  note: v.note,
+});

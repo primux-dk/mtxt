@@ -931,7 +931,9 @@
       "mcp_write": "Ændret via MCP",
       "recorder_connected": "Optager forbundet",
       "recorder_disconnected": "Optager afbrudt",
-      "webhook_sent": "Sendt til et forbundet system"
+      "webhook_sent": "Sendt til et forbundet system",
+      "api_token_created": "API-nøgle oprettet",
+      "api_token_revoked": "API-nøgle tilbagekaldt"
     },
     "count": "{count, plural, one {# hændelse} other {# hændelser}}",
     "range": "{from}–{to} af {total, plural, one {# hændelse} other {# hændelser}}",
@@ -959,11 +961,19 @@
       "format": {
         "md": "Markdown",
         "docx": "Word",
-        "transcript": "Transskription"
+        "transcript": "Transskription",
+        "json": "Referat som JSON",
+        "text": "Transskription som tekst"
       },
       "unnamedEndpoint": "et endpoint uden navn",
       "viaWebhook": "{format}, hentet af {endpoint}",
-      "webhook": "{endpoint} · {event}"
+      "webhook": "{endpoint} · {event}",
+      "viaApi": "via API ({token})",
+      "token": "{name} · {scope}",
+      "scope": {
+        "read": "Kun læse",
+        "readWrite": "Læse og skrive"
+      }
     },
     "empty": {
       "first": {
@@ -1039,6 +1049,64 @@
     "disconnect": "Afbryd",
     "disconnectLabel": "Afbryd {device}",
     "disconnectFailed": "{device} blev ikke afbrudt. Prøv igen."
+  },
+  "apiTokens": {
+    "open": "API-nøgler",
+    "title": "API-nøgler",
+    "description": "Personlige nøgler til virksomhedens egne systemer. En nøgle læser, og med Læse og skrive også ændrer, kun de møder, du selv kan se.",
+    "loading": "Henter API-nøgler…",
+    "failed": "Dine API-nøgler kunne ikke hentes. Tjek forbindelsen, og prøv igen.",
+    "retry": "Prøv igen",
+    "new": "Ny nøgle",
+    "full": "Du har {max} nøgler, og flere kan der ikke være. Tilbagekald en for at lave en ny.",
+    "empty": {
+      "title": "Ingen API-nøgler",
+      "body": "Lav en nøgle til et system, der læser dine møder, fx et CRM. Den vises én gang."
+    },
+    "count": "{count, plural, one {# nøgle} other {# nøgler}}",
+    "created": "Oprettet",
+    "expires": "udløber",
+    "lastUsed": "sidst brugt",
+    "neverUsed": "ikke brugt endnu",
+    "revoke": "Tilbagekald",
+    "revokeLabel": "Tilbagekald {name}",
+    "revokeFailed": "{name} blev ikke tilbagekaldt. Prøv igen.",
+    "scope": {
+      "read": "Kun læse",
+      "readWrite": "Læse og skrive"
+    },
+    "create": {
+      "title": "Ny API-nøgle",
+      "body": "Nøglen handler som dig. Den ser det, du ser, og intet andet.",
+      "name": "Navn",
+      "nameHelp": "Systemet den er til, så du kan kende den igen. Op til {max} tegn.",
+      "scope": "Adgang",
+      "readHelp": "Viser møder og læser transskriptioner og referater.",
+      "readWriteHelp": "Gemmer også referater, omdøber møder og ændrer synlighed og læsere på dine egne møder.",
+      "lifetime": "Udløber efter",
+      "days": {
+        "30": "30 dage",
+        "90": "90 dage",
+        "365": "1 år"
+      },
+      "submit": "Lav nøgle"
+    },
+    "secret": {
+      "title": "Kopiér nøglen nu",
+      "body": "Det er eneste gang, nøglen til {name} vises. Gem den i det system, der skal bruge den.",
+      "label": "Nøgle",
+      "copy": "Kopiér",
+      "copied": "Kopieret",
+      "note": "Send den som Authorization: Bearer <token>. Tilbagekald den her, hvis den slipper ud.",
+      "done": "Færdig"
+    },
+    "errors": {
+      "nameRequired": "Giv nøglen et navn.",
+      "nameTooLong": "Navnet er højst {max} tegn. Gør det kortere.",
+      "nameInvalid": "Navnet må ikke have linjeskift eller kontroltegn.",
+      "tooMany": "Du har {max} nøgler. Tilbagekald en, og lav så den nye.",
+      "createFailed": "Nøglen blev ikke lavet. Prøv igen."
+    }
   },
   "editor": {
     "block": {
