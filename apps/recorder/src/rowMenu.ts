@@ -1,7 +1,8 @@
 // The three-dot menu on a row of "Recent recordings": which items it offers
 // and which are enabled. Rust refuses the same cases again (`delete_local`).
 //
-// - Save audio to…: whenever the audio is on this Mac.
+// - Save audio to…: whenever the audio is on this Mac and finished (not
+//   while it records: the file is still growing).
 // - Open in library: once the library has the recording.
 // - Delete from this Mac: the local copy only. Never offered while the
 //   recording records or uploads. Without a question for a confirmed
@@ -19,7 +20,7 @@ export interface MenuItem {
 
 export function menuFor(q: QueueItem): MenuItem[] {
   const items: MenuItem[] = [
-    { id: 'save', enabled: q.has_file },
+    { id: 'save', enabled: q.has_file && q.status !== 'recording' && q.status !== 'discarding' },
     { id: 'open', enabled: !!q.meeting_url },
   ];
   const busy = q.status === 'recording' || q.status === 'uploading' || q.active;

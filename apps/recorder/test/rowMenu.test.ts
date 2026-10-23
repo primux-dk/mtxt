@@ -44,6 +44,12 @@ describe('row menu', () => {
     }
   });
 
+  it('does not save a recording that is still being recorded', () => {
+    // Seen on the Mac: the copy held 22 of the recording's 30 seconds.
+    expect(byId(item({ status: 'recording' })).save?.enabled).toBe(false);
+    expect(byId(item({ status: 'discarding' })).save?.enabled).toBe(false);
+  });
+
   it('never offers delete while it records or uploads', () => {
     expect(byId(item({ status: 'recording' })).delete).toBeUndefined();
     expect(byId(item({ status: 'uploading' })).delete).toBeUndefined();
