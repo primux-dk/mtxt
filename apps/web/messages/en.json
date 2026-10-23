@@ -776,7 +776,8 @@
       "owner": "Owner",
       "details": "Details",
       "noMeeting": "No meeting",
-      "gone": "Deleted since"
+      "gone": "Deleted since",
+      "noOwner": "No owner"
     },
     "details": {
       "visibility": "{before} → {after}",

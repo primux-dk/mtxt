@@ -776,7 +776,8 @@
       "owner": "Ejer",
       "details": "Detaljer",
       "noMeeting": "Intet møde",
-      "gone": "Slettet siden"
+      "gone": "Slettet siden",
+      "noOwner": "Ingen ejer"
     },
     "details": {
       "visibility": "{before} → {after}",
