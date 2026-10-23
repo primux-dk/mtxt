@@ -20,6 +20,11 @@ const item = (
   server_status: null,
   meeting_url: null,
   active: false,
+  blocked: null,
+  local_error: null,
+  can_save: false,
+  recovered: false,
+  gaps: 0,
   ...over,
 });
 
@@ -141,6 +146,7 @@ const base: Snapshot = {
   },
   ask: null,
   notice: null,
+  damaged: [],
   version: '0.2.0',
 };
 
@@ -153,6 +159,54 @@ const recording = {
   stopping: false,
   starting: false,
 };
+
+/** The rows Codex's review added: why a row waits, local failures, damaged entries. */
+export const review: QueueItem[] = [
+  item({
+    id: 'r1',
+    title: 'Kundemøde, Aarhus',
+    status: 'pending',
+    blocked: { kind: 'other_host', host: 'moeder.eksempel.dk' },
+    can_save: true,
+  }),
+  item({
+    id: 'r2',
+    title: 'Ugemøde',
+    status: 'pending',
+    blocked: { kind: 'other_user', email: 'anne.holm@example.com' },
+    can_save: true,
+  }),
+  item({
+    id: 'r3',
+    title: 'Genfundet optagelse 2026-10-21 14:02',
+    status: 'uploading',
+    blocked: { kind: 'no_owner' },
+    recovered: true,
+    can_save: true,
+  }),
+  item({
+    id: 'r4',
+    title: 'Strategidag',
+    status: 'failed_local',
+    local_error: 'No space left on device (os error 28)',
+    can_save: true,
+  }),
+  item({
+    id: 'r5',
+    title: 'Morgenmøde',
+    status: 'unreadable',
+    local_error: 'Permission denied (os error 13)',
+    can_save: true,
+  }),
+  item({
+    id: 'r6',
+    title: 'Leverancer',
+    status: 'confirmed',
+    server_status: 'failed',
+    meeting_url: 'https://app.mtxt.co/meetings/r6',
+    gaps: 1,
+  }),
+];
 
 export const states: Record<string, Partial<Snapshot>> = {
   setup: { phase: 'setup', host: null, host_label: null, connection: null },
@@ -205,6 +259,27 @@ export const states: Record<string, Partial<Snapshot>> = {
     },
   },
   ask: { queue: hard.slice(5, 6).concat(figure05.slice(1, 2)), ask: hard[5]! },
+  review: {
+    queue: review,
+    damaged: [
+      {
+        id: '5f2c9a1e-0000-4000-8000-000000000000',
+        error: 'EOF while parsing an object at line 1 column 1',
+        has_audio: true,
+      },
+    ],
+  },
+  'mic-lost': {
+    recording: { ...recording, sources: { microphone: 'lost', system_audio: 'on' } },
+    queue: figure05.slice(1, 2),
+  },
+  'state-save': {
+    notice: {
+      key: 'recorder.error.stateSave',
+      args: { error: 'No space left on device (os error 28)' },
+    },
+    queue: figure05.slice(0, 2),
+  },
   'mic-only': {
     recording: { ...recording, sources: { microphone: 'on', system_audio: 'off' } },
     permissions: { microphone: 'granted', system_audio: 'denied' },

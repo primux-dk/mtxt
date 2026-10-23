@@ -480,7 +480,15 @@ function renderQueue(s: Snapshot): void {
       titleNode = el('span', { className: 'queue-title', textContent: q.title, title: meta });
     }
     titleNode.lang = '';
-    list.append(el('li', { className: 'queue-row' }, titleNode, statusNode(statusOf(q), q.id)));
+    const v = statusOf(q);
+    // A row with more than one action gets a line of its own for them.
+    const row = el(
+      'li',
+      { className: v.extra?.length ? 'queue-row stacked' : 'queue-row' },
+      titleNode,
+      statusNode(v, q.id),
+    );
+    list.append(row);
   }
   const damaged = $('damaged-list');
   damaged.replaceChildren();
@@ -495,7 +503,7 @@ function renderQueue(s: Snapshot): void {
     damaged.append(
       el(
         'li',
-        { className: 'queue-row' },
+        { className: 'queue-row stacked' },
         el('span', { className: 'queue-title', textContent: title, title: d.error }),
         statusNode(
           { icon: 'warning', cls: 'warn', text: t('recorder.queue.damagedStatus'), extra },

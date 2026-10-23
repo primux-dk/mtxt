@@ -695,3 +695,23 @@ dialog .actions .btn {
   padding: 4px 20px 12px;
   flex-shrink: 0;
 }
+
+/* A row with several actions: the title on its own line, the state and the
+   actions below it, wrapping instead of cutting a word off. */
+.queue-row.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px 0;
+}
+.queue-row.stacked .queue-status {
+  max-width: 100%;
+  white-space: normal;
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.queue-row.stacked .queue-status > span,
+.queue-row.stacked .queue-action {
+  white-space: normal;
+  overflow: visible;
+}
