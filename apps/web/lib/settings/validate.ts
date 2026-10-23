@@ -378,6 +378,7 @@ export type EndpointError =
   | { code: 'tooLong'; max: number }
   | { code: 'urlInvalid' }
   | { code: 'urlNotHttps' }
+  | { code: 'urlPort' }
   | { code: 'urlCredentials' }
   | { code: 'urlPrivate' }
   | { code: 'atLeastOneEvent' };
@@ -385,6 +386,7 @@ export type EndpointError =
 const URL_ERRORS = {
   invalid: { code: 'urlInvalid' },
   not_https: { code: 'urlNotHttps' },
+  port: { code: 'urlPort' },
   credentials: { code: 'urlCredentials' },
   private_host: { code: 'urlPrivate' },
   too_long: { code: 'tooLong', max: MAX_URL_LENGTH },
@@ -392,7 +394,7 @@ const URL_ERRORS = {
 
 /**
  * A new webhook endpoint (docs/spec.md "Webhooks"): an optional label, an
- * https URL up to 2,048 characters that names no local or private host, and
+ * https URL on port 443, up to 2,048 characters, that names no local or private host, and
  * at least one event. `allowLocal` lets the e2e run's receiver through.
  */
 export function validateEndpoint(

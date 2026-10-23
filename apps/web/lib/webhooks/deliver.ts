@@ -21,7 +21,7 @@ import {
   type QueueAdapter,
   type WebhookJob,
 } from '@mtxt/adapters';
-import { checkTarget } from './address';
+import { checkTarget, type TargetProblem } from './address';
 import { available, buildPayload, meetingMeta, signedLinks } from './payload';
 import {
   ATTEMPT_LEASE_MS,
@@ -50,7 +50,7 @@ export interface WebhookDeps {
 
 /** Why an attempt failed, as stored in `last_error`: fixed words, never the consumer's. */
 export type FailReason =
-  'http_status' | 'redirect' | 'timeout' | 'network' | 'private_address' | 'dns' | 'config';
+  'http_status' | 'redirect' | 'timeout' | 'network' | TargetProblem | 'config';
 
 /** Why a delivery was not sent at all. */
 export type CancelReason = 'not_eligible' | 'meeting_gone' | 'endpoint_disabled';

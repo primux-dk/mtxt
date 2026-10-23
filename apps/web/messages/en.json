@@ -631,7 +631,8 @@
       "urlNotHttps": "Use an https URL. Events are never sent over plain http.",
       "urlCredentials": "Leave the user name and password out of the URL. The signature proves who sent the event.",
       "urlPrivate": "Refused: this is a local or private address. Use the receiving system's public https address.",
-      "atLeastOneEvent": "Choose at least one event."
+      "atLeastOneEvent": "Choose at least one event.",
+      "urlPort": "Use the standard https port, 443. Other ports are refused."
     },
     "saved": "Settings saved.",
     "recap": {
@@ -722,7 +723,8 @@
         "config": "The install's own settings are incomplete",
         "not_eligible": "The meeting may no longer be sent",
         "meeting_gone": "The meeting is gone",
-        "endpoint_disabled": "The endpoint is disabled"
+        "endpoint_disabled": "The endpoint is disabled",
+        "short_ttl": "Refused: the host's DNS answer may change within a minute"
       },
       "dialog": {
         "title": "Add endpoint",
@@ -730,7 +732,7 @@
         "label": "Label",
         "labelHelp": "Optional. The receiving system's name, for example Alex. The meeting page then says Send to Alex.",
         "url": "URL",
-        "urlHelp": "https only, at most {max} characters. Private and local addresses are refused.",
+        "urlHelp": "https on port 443 only, at most {max} characters. Private and local addresses are refused.",
         "events": "Events to send",
         "submit": "Add endpoint",
         "secretTitle": "Copy the signing secret",

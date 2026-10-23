@@ -631,7 +631,8 @@
       "urlNotHttps": "Brug en https-URL. Hændelser sendes aldrig over almindelig http.",
       "urlCredentials": "Udelad brugernavn og adgangskode i URL'en. Signaturen viser, hvem der har sendt hændelsen.",
       "urlPrivate": "Afvist: det er en lokal eller privat adresse. Brug det modtagende systems offentlige https-adresse.",
-      "atLeastOneEvent": "Vælg mindst én hændelse."
+      "atLeastOneEvent": "Vælg mindst én hændelse.",
+      "urlPort": "Brug standardporten for https, 443. Andre porte afvises."
     },
     "saved": "Indstillingerne er gemt.",
     "recap": {
@@ -722,7 +723,8 @@
         "config": "Installationens egne indstillinger er ufuldstændige",
         "not_eligible": "Mødet må ikke længere sendes",
         "meeting_gone": "Mødet findes ikke længere",
-        "endpoint_disabled": "Endpointet er slået fra"
+        "endpoint_disabled": "Endpointet er slået fra",
+        "short_ttl": "Afvist: værtens DNS-svar kan skifte inden for et minut"
       },
       "dialog": {
         "title": "Tilføj endpoint",
@@ -730,7 +732,7 @@
         "label": "Navn",
         "labelHelp": "Valgfrit. Det modtagende systems navn, for eksempel Alex. Mødesiden siger så Send til Alex.",
         "url": "URL",
-        "urlHelp": "Kun https, højst {max} tegn. Private og lokale adresser afvises.",
+        "urlHelp": "Kun https på port 443, højst {max} tegn. Private og lokale adresser afvises.",
         "events": "Hændelser der sendes",
         "submit": "Tilføj endpoint",
         "secretTitle": "Kopiér signeringshemmeligheden",

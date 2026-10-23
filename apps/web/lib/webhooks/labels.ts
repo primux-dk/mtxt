@@ -31,6 +31,7 @@ const ANSWERS = [
   'network',
   'private_address',
   'dns',
+  'short_ttl',
   'config',
   'not_eligible',
   'meeting_gone',

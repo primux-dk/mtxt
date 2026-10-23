@@ -116,6 +116,13 @@ describe('outbound addresses', () => {
       ok: false,
       problem: 'not_https',
     });
+    expect(checkEndpointUrl('https://alex.example.com:443/hook').ok).toBe(true);
+    for (const port of [80, 22, 8443]) {
+      expect(checkEndpointUrl(`https://alex.example.com:${port}/hook`)).toEqual({
+        ok: false,
+        problem: 'port',
+      });
+    }
     expect(checkEndpointUrl('https://user:pw@alex.example.com/')).toEqual({
       ok: false,
       problem: 'credentials',
@@ -187,22 +194,29 @@ describe('outbound addresses', () => {
     }
   });
 
-  it('resolves the host and refuses a private answer, an empty one, and a failed lookup', async () => {
+  it('resolves the host and refuses a private answer, an empty one, a short TTL and a failed lookup', async () => {
     const resolver = (answers: Record<string, string[] | Error>): HostResolver => ({
       async resolve(host) {
         const answer = answers[host];
         if (answer instanceof Error) throw answer;
-        return answer ?? [];
+        return (answer ?? []).map((a) => {
+          const [address, ttl] = a.split('/');
+          return { address: address!, ttl: ttl ? Number(ttl) : 300 };
+        });
       },
     });
     const r = resolver({
       'alex.example.com': ['93.184.216.34'],
+      'fast.example.com': ['93.184.216.34/59'],
+      'sixty.example.com': ['93.184.216.34/60'],
       'rebind.example.com': ['93.184.216.34', '10.0.0.5'],
       'six.example.com': ['::1'],
       'broken.example.com': new Error('SERVFAIL'),
     });
     const target = (host: string) => checkTarget(new URL(`https://${host}/hook`), r);
     expect(await target('alex.example.com')).toBeNull();
+    expect(await target('fast.example.com')).toBe('short_ttl');
+    expect(await target('sixty.example.com')).toBeNull();
     expect(await target('rebind.example.com')).toBe('private_address');
     expect(await target('six.example.com')).toBe('private_address');
     expect(await target('nothing.example.com')).toBe('dns');
@@ -336,7 +350,9 @@ describe('deliveries', () => {
     },
     async sendBatch() {},
   };
-  const publicResolver: HostResolver = { resolve: async () => ['93.184.216.34'] };
+  const publicResolver: HostResolver = {
+    resolve: async () => [{ address: '93.184.216.34', ttl: 300 }],
+  };
   const deps = (over: Partial<WebhookDeps> = {}): WebhookDeps => ({
     db,
     installId: INSTALL,
@@ -561,13 +577,37 @@ describe('deliveries', () => {
 
   it('refuses a host that resolves to a private address, and counts it as a failure', async () => {
     await queueMeetingEvent(q(), { event: 'meeting.transcribed', meetingId: 'm-company' });
-    await runLast({ resolver: { resolve: async () => ['10.0.0.8'] } });
+    await runLast({ resolver: { resolve: async () => [{ address: '10.0.0.8', ttl: 300 }] } });
     expect(posts).toHaveLength(0);
     expect(deliveries()[0]).toMatchObject({
       status: 'pending',
       attempts: 1,
       last_error: 'private_address',
     });
+  });
+
+  it('resolves the host again before every attempt, and refuses it once it turns private', async () => {
+    answer = async () => new Response('down', { status: 500 });
+    let calls = 0;
+    let address = '93.184.216.34';
+    const resolver: HostResolver = {
+      resolve: async () => {
+        calls++;
+        return [{ address, ttl: 300 }];
+      },
+    };
+    await queueMeetingEvent(q(), { event: 'meeting.transcribed', meetingId: 'm-company' });
+    for (let i = 0; i < 3; i++) {
+      await runLast({ resolver });
+      clock = new Date(deliveries()[0]!.next_attempt_at);
+    }
+    expect(calls).toBe(3);
+    expect(posts).toHaveLength(3);
+    address = '10.0.0.8';
+    await runLast({ resolver });
+    expect(calls).toBe(4);
+    expect(posts).toHaveLength(3);
+    expect(deliveries()[0]).toMatchObject({ attempts: 4, last_error: 'private_address' });
   });
 
   it('records a timeout and a redirect, and never follows one', async () => {

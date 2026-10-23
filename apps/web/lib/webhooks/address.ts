@@ -10,8 +10,12 @@
 import type { HostResolver } from '@mtxt/adapters';
 import { MAX_URL_LENGTH } from './rules';
 
-export type UrlProblem = 'invalid' | 'not_https' | 'credentials' | 'too_long' | 'private_host';
-export type TargetProblem = 'private_address' | 'dns';
+export type UrlProblem =
+  'invalid' | 'not_https' | 'port' | 'credentials' | 'too_long' | 'private_host';
+export type TargetProblem = 'private_address' | 'dns' | 'short_ttl';
+
+/** An answer that may change sooner than this is refused: it leaves the check too little time to hold. */
+export const MIN_TTL_S = 60;
 
 const LOCAL_TEST_HOSTS = new Set(['localhost', '127.0.0.1']);
 const LOCAL_NAMES = /(^|\.)(localhost|internal|local)$/i;
@@ -33,6 +37,8 @@ export function checkEndpointUrl(
   }
   if (options.allowLocal && isLocalTestUrl(url)) return { ok: true, url };
   if (url.protocol !== 'https:') return { ok: false, problem: 'not_https' };
+  // https on 443 only: the URL parser drops an explicit :443, so any port left is another one.
+  if (url.port !== '') return { ok: false, problem: 'port' };
   if (url.username || url.password) return { ok: false, problem: 'credentials' };
   const host = hostOf(url);
   if (!host || LOCAL_NAMES.test(host) || (!host.includes('.') && !host.includes(':')))
@@ -49,8 +55,11 @@ function hostOf(url: URL) {
 const isIpLiteral = (host: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':');
 
 /**
- * Resolves the URL's host and refuses it when any address is private, or
- * when it has none. Null means the request may go.
+ * Resolves the URL's host, at each attempt, and refuses it when any address
+ * is private, when it has none, or when the answer's TTL is under a minute.
+ * Null means the request may go. Best effort on Cloudflare: the Worker's
+ * fetch resolves the name again and cannot be pinned to the checked address
+ * (docs/decisions.md, packet 13 review).
  */
 export async function checkTarget(
   url: URL,
@@ -62,14 +71,15 @@ export async function checkTarget(
   if (!checked.ok) return 'private_address';
   const host = hostOf(url);
   if (isIpLiteral(host)) return isPrivateAddress(host) ? 'private_address' : null;
-  let addresses: string[];
+  let answers: { address: string; ttl: number }[];
   try {
-    addresses = await resolver.resolve(host);
+    answers = await resolver.resolve(host);
   } catch {
     return 'dns';
   }
-  if (addresses.length === 0) return 'dns';
-  return addresses.some(isPrivateAddress) ? 'private_address' : null;
+  if (answers.length === 0) return 'dns';
+  if (answers.some((a) => isPrivateAddress(a.address))) return 'private_address';
+  return answers.some((a) => !(a.ttl >= MIN_TTL_S)) ? 'short_ttl' : null;
 }
 
 /** IPv4 as four numbers, or null. */

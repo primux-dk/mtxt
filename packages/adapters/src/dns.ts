@@ -5,7 +5,13 @@
  * HTTPS; a Docker edition binds the system resolver behind the same
  * interface.
  */
+export interface ResolvedAddress {
+  address: string;
+  /** Seconds, as the resolver answered: the lowest TTL on the chain to this address. */
+  ttl: number;
+}
+
 export interface HostResolver {
   /** Every A and AAAA address of the host, CNAMEs followed. Throws when the lookup itself fails. */
-  resolve(host: string): Promise<string[]>;
+  resolve(host: string): Promise<ResolvedAddress[]>;
 }
