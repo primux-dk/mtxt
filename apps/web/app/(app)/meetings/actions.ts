@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { foldTitle, schema } from '@mtxt/adapters';
 import { getSessionUser } from '@/lib/auth/session';
 import { HttpError } from '@/lib/http-error';
@@ -112,8 +112,24 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
       const recap = await db.query.recaps.findFirst({
         where: and(eq(schema.recaps.meetingId, meetingId), eq(schema.recaps.installId, installId)),
       });
+      // The providers' raw results live in storage too (transcripts.raw_path).
+      const raws = recordings.length
+        ? await db
+            .select({ path: schema.transcripts.rawPath })
+            .from(schema.transcripts)
+            .where(
+              and(
+                inArray(
+                  schema.transcripts.recordingId,
+                  recordings.map((rec) => rec.id),
+                ),
+                eq(schema.transcripts.installId, installId),
+              ),
+            )
+        : [];
       const keys = [
         ...recordings.map((rec) => rec.storagePath),
+        ...raws.flatMap((raw) => (raw.path ? [raw.path] : [])),
         ...(recap?.docxPath ? [recap.docxPath] : []),
       ];
       if (keys.length) await storage.delete(keys);
@@ -164,19 +180,35 @@ export async function retryTranscription(
       const before = await db.query.recordings.findFirst({
         where: and(eq(r.id, recordingId), eq(r.installId, installId)),
       });
-      const [updated] = await db
-        .update(r)
-        .set({ status: 'transcribing', failure: null, failureReason: null })
-        .where(
-          and(
-            eq(r.id, recordingId),
-            eq(r.installId, installId),
-            eq(r.meetingId, meetingId),
-            eq(r.status, 'failed'),
-            isNotNull(r.confirmedAt),
+      // The recording and its failed transcript row go back to waiting together; this is the
+      // one place a failed row is reset (the job never does it).
+      const [recordings] = await db.batch([
+        db
+          .update(r)
+          .set({ status: 'transcribing', failure: null, failureReason: null })
+          .where(
+            and(
+              eq(r.id, recordingId),
+              eq(r.installId, installId),
+              eq(r.meetingId, meetingId),
+              eq(r.status, 'failed'),
+              isNotNull(r.confirmedAt),
+            ),
+          )
+          .returning({ id: r.id }),
+        db
+          .update(schema.transcripts)
+          .set({ status: 'pending', providerJobId: null, claimedAt: null, claimToken: null })
+          .where(
+            and(
+              eq(schema.transcripts.recordingId, recordingId),
+              eq(schema.transcripts.installId, installId),
+              eq(schema.transcripts.isComparison, false),
+              eq(schema.transcripts.status, 'failed'),
+            ),
           ),
-        )
-        .returning({ id: r.id });
+      ]);
+      const updated = recordings[0];
       // Already queued by an earlier click: nothing to do, and no second job.
       if (!updated) return;
       try {

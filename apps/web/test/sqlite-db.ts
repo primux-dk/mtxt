@@ -9,13 +9,27 @@ import { schema, type Db } from '@mtxt/adapters';
 
 const migrationsDir = new URL('../../../packages/adapters/migrations/', import.meta.url);
 
-export async function testDb(): Promise<{ db: Db; raw: DatabaseSync }> {
+export async function testDb(): Promise<{
+  db: Db;
+  raw: DatabaseSync;
+  /** The largest bound value written so far, in UTF-8 bytes (D1 refuses over 2,000,000). */
+  largestValue: () => number;
+}> {
+  let largest = 0;
+  const measure = (params: unknown[]) => {
+    for (const p of params) {
+      const size =
+        typeof p === 'string' ? Buffer.byteLength(p) : p instanceof Uint8Array ? p.byteLength : 0;
+      if (size > largest) largest = size;
+    }
+  };
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON');
   const files = (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort();
   for (const file of files) raw.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
 
   const run = (query: string, params: unknown[], method: string) => {
+    measure(params);
     const statement = raw.prepare(query);
     if (method === 'run') {
       statement.run(...(params as never[]));
@@ -40,7 +54,7 @@ export async function testDb(): Promise<{ db: Db; raw: DatabaseSync }> {
     },
     { schema },
   );
-  return { db: db as unknown as Db, raw };
+  return { db: db as unknown as Db, raw, largestValue: () => largest };
 }
 
 export const INSTALL = 'test-install';

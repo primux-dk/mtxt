@@ -34,6 +34,7 @@ import { providerFor, type SttResult } from '../lib/stt';
 import { diffStats, formatDiff, wordDiff, words } from '../lib/stt/compare';
 import { fakeSpeech } from '../lib/stt/test-hooks';
 import { keytermList } from '../lib/transcription/job';
+import { rawPath } from '../lib/transcription/store';
 
 const PROVIDERS = { 'workers-ai': 'workers-ai-whisper', assemblyai: 'assemblyai' } as const;
 
@@ -117,6 +118,7 @@ async function main() {
         settingsKey: env.SETTINGS_KEY,
         speech: fakeSpeech(env) ?? workersAiSpeech(env.AI),
         publicUrl: env.PUBLIC_URL,
+        allowLocalPublicUrl: !remote,
         webhookSecret: () =>
           ensureWebhookSecret(db, installId, (plain) =>
             seal(plain, 'settings.webhook_secret', env.SETTINGS_KEY!),
@@ -159,14 +161,19 @@ async function main() {
       process.stdout.write('\n');
     }
 
+    // The provider's own JSON and the segments it mapped to go to storage, like the primary's.
+    const path = rawPath(installId, rec.id, id, true);
+    await storage.put(path, JSON.stringify({ provider: result.raw, segments: result.segments }), {
+      contentType: 'application/json',
+    });
     await db.insert(schema.transcripts).values({
       installId,
       recordingId: rec.id,
       provider: id,
       model: result.model,
       language: result.language,
-      // The provider's own JSON and the segments it mapped to, for a later look.
-      rawJson: { provider: result.raw, segments: result.segments },
+      rawJson: {},
+      rawPath: path,
       status: 'done',
       providerJobId: jobId,
       isComparison: true,

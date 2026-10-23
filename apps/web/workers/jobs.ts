@@ -1,12 +1,14 @@
-import { routeJobs } from '@mtxt/adapters';
+import { cloudflareAdapters, routeJobs } from '@mtxt/adapters';
 import { runTranscribe } from '../lib/transcription/job';
 import { transcriptionDeps } from '../lib/transcription/deps';
+import { drainStep, takeRecapJob } from '../lib/transcription/store';
 
 /**
  * The queue consumer, routed by job type. A transcribe job runs the
  * install's speech-to-text provider (lib/transcription/job.ts); a throw
- * puts the message back on the queue. Recap jobs are acked and logged until
- * packet 5 writes the recap.
+ * puts the message back on the queue. A drain job queues the recordings
+ * that waited for a provider, 100 at a time. Recap jobs are taken once per
+ * transcript and logged until packet 5 writes the recap.
  */
 export const handleJobs = routeJobs<CloudflareEnv>({
   async transcribe(job, message, env) {
@@ -16,7 +18,9 @@ export const handleJobs = routeJobs<CloudflareEnv>({
       message.ack();
       return;
     }
-    await runTranscribe(transcriptionDeps(env), job.recording_id, message.attempts);
+    await runTranscribe(await transcriptionDeps(env), job.recording_id, message.attempts, {
+      poll: job.poll === true,
+    });
     message.ack();
   },
   async recap(job, message, env) {
@@ -25,7 +29,28 @@ export const handleJobs = routeJobs<CloudflareEnv>({
       message.ack();
       return;
     }
-    console.log('Recaps arrive in packet 5; acking the recap job for', job.meeting_id);
+    const { db } = cloudflareAdapters(env);
+    // One recap job per transcript, whatever the queue delivers twice.
+    const first = await takeRecapJob(db, env.INSTALL_ID, job.transcript_id).catch(() => false);
+    if (!first) {
+      console.log(
+        'Recap job already taken, or its transcript is gone; skipping',
+        job.transcript_id,
+      );
+    } else {
+      console.log('Recaps arrive in packet 5; acking the recap job for', job.meeting_id);
+    }
+    message.ack();
+  },
+  async drain_transcriptions(job, message, env) {
+    if (job.install_id !== env.INSTALL_ID) {
+      console.error('Dropping a drain job for another install', job.install_id);
+      message.ack();
+      return;
+    }
+    const { db, queue } = cloudflareAdapters(env);
+    const queued = await drainStep(db, env.INSTALL_ID, queue, job.after);
+    console.log(`Queued ${queued} waiting recordings for transcription`);
     message.ack();
   },
 });
