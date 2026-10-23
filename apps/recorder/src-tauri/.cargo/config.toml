@@ -1,0 +1,4 @@
+# One deployment target for Rust and for the C and C++ the build scripts
+# compile (libopus, whisper.cpp): the bundle's minimum, macOS 14.2.
+[env]
+MACOSX_DEPLOYMENT_TARGET = "14.2"

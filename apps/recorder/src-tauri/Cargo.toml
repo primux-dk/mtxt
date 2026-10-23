@@ -28,7 +28,7 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "io-util"] }
-reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls", "http2", "system-proxy"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls", "http2", "system-proxy", "blocking"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 sha2 = "0.10"
@@ -52,13 +52,14 @@ whisper-rs = { version = "0.16", optional = true, features = ["metal"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSUUID", "NSValue", "NSProcessInfo"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSUUID", "NSValue", "NSProcessInfo", "NSDictionary", "NSObject"] }
 objc2-core-foundation = { version = "0.3", features = ["CFDictionary", "CFString", "CFNumber", "CFArray", "CFBase"] }
 objc2-core-audio = "0.3"
 objc2-core-audio-types = "0.3"
 objc2-av-foundation = { version = "0.3", features = ["AVCaptureDevice", "AVMediaFormat"] }
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSButton", "NSControl", "NSView", "NSResponder"] }
 block2 = "0.6"
+libc = "0.2"
 
 [dev-dependencies]
 axum = "0.8"

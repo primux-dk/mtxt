@@ -1,6 +1,9 @@
 pub mod api;
+pub mod audio;
 pub mod connect;
 pub mod contract;
+pub mod live;
+pub mod permissions;
 pub mod queue;
 
 pub fn run() {
