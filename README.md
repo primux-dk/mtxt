@@ -56,6 +56,7 @@ Layout: `apps/web` is the library (Next.js on Cloudflare Workers), `packages/con
 An install runs in the owning company's own Cloudflare account, on a hostname in one of its zones. One command creates or reuses the D1 database, the R2 bucket, the queues and the AI Gateway, applies the migrations, writes the first settings row, deploys the Worker with its custom domain and sets its secrets:
 
 ```sh
+mkdir -p deploy/installs
 cp deploy/install.example.json deploy/installs/acme.json   # then fill it in
 pnpm deploy:install --config deploy/installs/acme.json --dry-run
 pnpm deploy:install --config deploy/installs/acme.json
