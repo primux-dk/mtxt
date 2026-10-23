@@ -31,31 +31,47 @@ export function limitChunkBody(request: Request): Guarded | Response {
 }
 
 /*
-  The speech-to-text webhook (docs/decisions.md, packet 4 review) gets the
-  same bound, at 64 KiB: AssemblyAI's body is two short fields, and the
-  route is open to anyone who knows the address.
+  The small bodies of routes open to anyone get the same bound: the
+  speech-to-text webhook (docs/decisions.md, packet 4 review) at 64 KiB,
+  since AssemblyAI's body is two short fields, and the recorder's token poll
+  (packet 8) at 4 KiB, a challenge and a verifier.
 */
 export const WEBHOOK_PATH = '/api/v1/webhooks/assemblyai';
 export const WEBHOOK_MAX_BYTES = 64 * 1024;
+export const RECORDER_TOKEN_PATH = '/api/v1/recorder/token';
+export const RECORDER_TOKEN_MAX_BYTES = 4 * 1024;
 
-export const webhookTooLarge = () =>
+const SMALL_BODIES: Record<string, { max: number; what: string }> = {
+  [WEBHOOK_PATH]: { max: WEBHOOK_MAX_BYTES, what: 'A webhook body' },
+  [RECORDER_TOKEN_PATH]: { max: RECORDER_TOKEN_MAX_BYTES, what: 'A token request' },
+};
+
+const smallTooLarge = (path: string) => () =>
   Response.json(
     {
       error: {
         code: 'too_large',
-        message: `A webhook body is at most ${WEBHOOK_MAX_BYTES} bytes.`,
+        message: `${SMALL_BODIES[path]!.what} is at most ${SMALL_BODIES[path]!.max} bytes.`,
       },
     },
     { status: 413, headers: { 'cache-control': 'no-store' } },
   );
 
+export const webhookTooLarge = smallTooLarge(WEBHOOK_PATH);
+
+/** The 413 for whichever small-body route the request was for. */
+export const smallBodyTooLarge = (request: Request) =>
+  smallTooLarge(new URL(request.url).pathname)();
+
 export function limitWebhookBody(request: Request): Guarded | Response {
   const pass: Guarded = { request, overrun: () => null };
   if (request.method !== 'POST' || !request.body) return pass;
-  if (new URL(request.url).pathname !== WEBHOOK_PATH) return pass;
+  const path = new URL(request.url).pathname;
+  const bound = SMALL_BODIES[path];
+  if (!bound) return pass;
   const declared = request.headers.get('content-length');
-  if (declared !== null && Number(declared) > WEBHOOK_MAX_BYTES) return webhookTooLarge();
-  return limitBody(request, WEBHOOK_MAX_BYTES);
+  if (declared !== null && Number(declared) > bound.max) return smallTooLarge(path)();
+  return limitBody(request, bound.max);
 }
 
 /** The body cut off after `max` + 1 bytes; `overrun` says when it ran past. */

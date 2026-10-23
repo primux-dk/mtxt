@@ -1,5 +1,5 @@
 import 'server-only';
-import { getSessionUser, type SessionUser } from './auth/session';
+import { getApiUser, type SessionUser } from './auth/session';
 import { HttpError } from './http-error';
 import { getAdapters, getInstallSettings } from './install';
 import type { RecordingContext } from './recordings/service';
@@ -33,10 +33,13 @@ export async function recordingContext(): Promise<RecordingContext> {
   return { db, installId, storage, queue, uploads, settings };
 }
 
-/** Runs an API handler with the signed-in user, turning errors into contract responses. */
+/**
+ * Runs an API handler with the caller (a recorder's bearer token or the
+ * session cookie), turning errors into contract responses.
+ */
 export async function api(handler: (user: SessionUser) => Promise<Response>): Promise<Response> {
   try {
-    const user = await getSessionUser();
+    const user = await getApiUser();
     // In the contract's error shape; the middleware sends most of these away first.
     if (!user) throw new HttpError(401, 'unauthorized', 'Sign in with the company login.');
     return await handler(user);

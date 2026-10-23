@@ -37,7 +37,9 @@ test.describe('keyboard and focus (rule 11)', () => {
       await expectFocusRing(nav.getByRole('link', { name }));
       await page.keyboard.press('Tab');
     }
-    // Then the user slot's "Sign out", and past the sidebar the page: the search field first.
+    // Then the user slot's "Recorders" and "Sign out", and past the sidebar the page: the search field first.
+    await expectFocusRing(page.getByRole('button', { name: 'Recorders', exact: true }));
+    await page.keyboard.press('Tab');
     await expectFocusRing(page.getByRole('button', { name: 'Sign out' }));
     await page.keyboard.press('Tab');
     await expect(page.getByRole('searchbox')).toBeFocused();
@@ -47,7 +49,7 @@ test.describe('keyboard and focus (rule 11)', () => {
     await expectFocusRing(page.getByRole('button', { name: 'New meeting' }));
 
     // Enter on a nav item navigates, and the current item is marked.
-    for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+Tab');
+    for (let i = 0; i < 7; i++) await page.keyboard.press('Shift+Tab');
     await expect(nav.getByRole('link', { name: 'Shared with me' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/view=shared/);

@@ -68,7 +68,7 @@ const query = (sql) =>
 const COUNT = `SELECT
   (SELECT count(*) FROM meetings) AS meetings, (SELECT count(*) FROM recordings) AS recordings,
   (SELECT count(*) FROM transcripts) AS transcripts, (SELECT count(*) FROM speakers) AS speakers,
-  (SELECT count(*) FROM segments) AS segments`;
+  (SELECT count(*) FROM segments) AS segments, (SELECT count(*) FROM audit_events) AS audit`;
 
 const recordings = EXTENSIONS.map(
   (ext, i) =>
@@ -132,6 +132,15 @@ try {
   const audit = query(`SELECT meeting_title FROM audit_events WHERE id = 'a1'`)[0];
   if (audit?.meeting_title !== 'MØDE ÆRØ ÅR')
     throw new Error('The audit row has no meeting title.');
+  // Packet 8 (0007) rebuilds audit_events for the recorder actions: rows, indexes and the new enum.
+  const indexes = query(
+    `SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'audit_events' AND name LIKE 'audit_events_%' ORDER BY name`,
+  ).map((r) => r.name);
+  console.log('audit indexes', JSON.stringify(indexes));
+  if (indexes.length !== 5) throw new Error('The audit indexes were not rebuilt.');
+  query(
+    `INSERT INTO audit_events (id, install_id, user_id, action, details, at) VALUES ('a2', 'dev', 'u1', 'recorder_connected', '{"device":"Mac"}', 2000)`,
+  );
   console.log('D1 upgrade check passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });

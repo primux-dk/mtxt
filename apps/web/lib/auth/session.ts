@@ -1,7 +1,14 @@
 import 'server-only';
 import { cache } from 'react';
+import { headers } from 'next/headers';
 import { forbidden, redirect } from 'next/navigation';
-import { findUser } from '@mtxt/adapters';
+import {
+  bearerToken,
+  findRecorderUser,
+  findUser,
+  hashRecorderToken,
+  type User,
+} from '@mtxt/adapters';
 import { getAdapters } from '../install';
 import { auth } from './index';
 
@@ -11,6 +18,8 @@ export interface SessionUser {
   email: string;
   /** The user row's is_admin, kept from the admin list at sign-in and on every save of the list. */
   isAdmin: boolean;
+  /** Set when the caller is a desktop recorder: the id of the bearer token it authenticated with. */
+  recorderTokenId?: string;
 }
 
 /**
@@ -25,8 +34,32 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const id = session?.user?.id;
   if (!id) return null;
   const user = await findUser(db, installId, id);
-  if (!user) return null;
-  return { id: user.id, name: user.name || user.email, email: user.email, isAdmin: user.isAdmin };
+  return user ? sessionUser(user) : null;
+});
+
+const sessionUser = (user: User): SessionUser => ({
+  id: user.id,
+  name: user.name || user.email,
+  email: user.email,
+  isAdmin: user.isAdmin,
+});
+
+/**
+ * The caller of an API route: a desktop recorder's bearer token when the
+ * request carries an Authorization header, else the session cookie. A header
+ * that is there but not a working token is no one, cookie or not, so a
+ * recorder with a revoked token gets 401 rather than someone's session. The
+ * token's user row decides, the same as for a cookie (docs/spec.md
+ * "Recorder connection").
+ */
+export const getApiUser = cache(async (): Promise<SessionUser | null> => {
+  const authorization = (await headers()).get('authorization');
+  if (authorization === null) return getSessionUser();
+  const token = bearerToken(authorization);
+  if (!token) return null;
+  const { db, installId } = await getAdapters();
+  const found = await findRecorderUser(db, installId, await hashRecorderToken(token));
+  return found ? { ...sessionUser(found.user), recorderTokenId: found.tokenId } : null;
 });
 
 /** A page that needs a session sends the reader to the login page, and back after. */
@@ -45,7 +78,7 @@ export async function requireAdmin(returnTo?: string): Promise<SessionUser> {
 
 /** For route handlers: the user, or the 401 or 403 JSON response to return. */
 export async function apiUser(options: { admin?: boolean } = {}): Promise<SessionUser | Response> {
-  const user = await getSessionUser();
+  const user = await getApiUser();
   if (!user)
     return Response.json({ error: 'unauthorized', message: 'Sign in first.' }, { status: 401 });
   if (options.admin && !user.isAdmin) {

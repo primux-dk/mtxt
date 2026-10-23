@@ -4,6 +4,73 @@
  */
 
 export interface paths {
+    "/recorder/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange an approved connection for a bearer token. Poll until 200 or 410.
+         * @description The recorder opened `/connect?challenge=<challenge>&name=<device name>`
+         *     in the default browser and now polls here every 2 seconds (the 202's
+         *     `Retry-After`) with the challenge and the verifier it was made from.
+         *
+         *     - 202: no grant for this challenge yet; the user has not approved.
+         *       Keep polling. The recorder gives up after 10 minutes on its own and
+         *       says "Open the recorder and connect again" in its own words.
+         *     - 200: the token, once. Store it in the OS keychain. The server keeps
+         *       only its hash, so a lost response cannot be repeated: the next poll
+         *       is 410 and the recorder connects again.
+         *     - 410: `expired` (the grant passed its 10 minutes or was already
+         *       used) or `denied` (the user chose Cancel, or the verifier does not
+         *       hash to the challenge). Stop polling; connect again.
+         *     - 429: more than one poll a second on an approved grant; wait
+         *       `Retry-After` seconds.
+         *
+         *     The body is checked before anything else, so 400 and a wrong
+         *     verifier cost the server nothing; a challenge with no grant costs
+         *     one read.
+         */
+        post: operations["pollRecorderToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recorder/tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The `token_id` from the token response. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect a recorder. The token stops working at once.
+         * @description The recorder disconnects itself with its own `token_id` (a "Sign out"
+         *     in the recorder). With a bearer token, `{id}` must be the id of that
+         *     same token; any other id is 404, so a recorder never revokes another
+         *     of the user's recorders. With the library's session cookie, any of
+         *     the user's own recorder tokens may be revoked, and one already
+         *     revoked is 204 again. After revoking its own token the recorder
+         *     deletes it from the keychain; every later call with it is 401.
+         */
+        delete: operations["revokeRecorderToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/recordings": {
         parameters: {
             query?: never;
@@ -200,7 +267,8 @@ export interface components {
              *     `forbidden`, `not_found`, `invalid_request`, `too_large`,
              *     `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
              *     `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
-             *     `unsupported_media_type` and `internal`.
+             *     `unsupported_media_type`, `rate_limited`, `expired`, `denied` and
+             *     `internal`.
              */
             code: string;
             /** @description English text for logs. The recorder shows its own localised message per code. */
@@ -208,6 +276,45 @@ export interface components {
         };
         Error: {
             error: components["schemas"]["ErrorBody"];
+        };
+        RecorderTokenRequest: {
+            /** @description The challenge in the `/connect` URL, base64url SHA-256 of the verifier without padding (RFC 7636 S256). */
+            challenge: string;
+            /** @description The code verifier, kept by the recorder and never shown to the browser. 32 random bytes in base64url (43 characters). */
+            verifier: string;
+        };
+        RecorderToken: {
+            /** @description Send as `Authorization: Bearer <token>`. Shown once. */
+            token: string;
+            /** @description For `DELETE /recorder/tokens/{id}`. */
+            token_id: string;
+            /**
+             * Format: date-time
+             * @description 180 days after the token was issued.
+             */
+            expires_at: string;
+            /** @description The device name the user approved, as the library lists it. */
+            device_name: string;
+            user: {
+                /** @description The user's display name, for the recorder's footer. */
+                name: string;
+            };
+            /** @description The install's branding. The recorder reads it here at connect. */
+            install: {
+                product_name: string;
+                /** @description Accent colour. */
+                theme_accent: string;
+                /** @description Button colour. */
+                theme_primary: string;
+            };
+        };
+        RecorderTokenPending: {
+            /** @enum {string} */
+            status: "pending";
+        };
+        RateLimited: {
+            error: components["schemas"]["ErrorBody"];
+            retry_after: number;
         };
     };
     responses: {
@@ -220,7 +327,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description No valid company login. */
+        /** @description No valid company login, or a bearer token that is unknown, expired or revoked (`unauthorized`). */
         Unauthorized: {
             headers: {
                 [name: string]: unknown;
@@ -266,6 +373,104 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    pollRecorderToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecorderTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Approved. The token, with what the recorder needs to brand itself. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecorderToken"];
+                };
+            };
+            /** @description Not approved yet. Poll again after `Retry-After` seconds. */
+            202: {
+                headers: {
+                    /** @description Seconds to wait before the next poll (2). */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecorderTokenPending"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description The grant expired, was used, was denied, or the verifier does not match (`expired`, `denied`). Stop polling. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The body is over 4 KiB (`too_large`). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description More than one poll a second on an approved grant (`rate_limited`). */
+            429: {
+                headers: {
+                    /** @description Seconds to wait. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateLimited"];
+                };
+            };
+            500: components["responses"]["Internal"];
+        };
+    };
+    revokeRecorderToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The `token_id` from the token response. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description With a bearer token, `{id}` is not the calling token; with the session, no recorder token with this id belongs to the caller (`not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["Internal"];
+        };
+    };
     createRecording: {
         parameters: {
             query?: never;

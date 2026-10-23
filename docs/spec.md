@@ -80,6 +80,23 @@ Each chunk is one part of a multipart upload in R2, tracked by an upload session
 
 Recorder states per recording: Recording, Uploading, Pending (no network), Warn (24 h), AskUser (7 d), Confirmed, Deleted (7 d after confirm).
 
+## Recorder connection
+
+A recorder connects through the browser, with the company login the library already has. It never sees an identity provider's credentials or secrets; the web app stays the only OIDC client.
+
+1. The recorder makes a random code verifier (32 random bytes, base64url, 43 characters) and its challenge, the base64url SHA-256 of the verifier (RFC 7636 S256, 43 characters).
+2. It opens `https://<host>/connect?challenge=<challenge>&name=<device name>` in the default browser. The device name is 1 to 64 characters, no control characters; the recorder shortens a longer one.
+3. The user signs in with the company login (an existing session, or the normal login redirect and back) and sees "Connect <device name> to <product name>?" with the user's name, the pairing code, "Only approve a connection you just started in your own recorder. If you did not, press Cancel.", Approve (the one primary) and Cancel. Approve and Cancel are server actions, so the page is CSRF-safe. The recorder shows the same pairing code next to "Waiting for approval". The code is six characters, `XXX-XXX`: the first 30 bits of SHA-256 of the challenge's ASCII bytes, in six 5-bit groups from the most significant, each mapped through Crockford's base32 alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ`. Both sides derive it from the challenge, so the server keeps no state for it.
+4. On Approve the server stores a pending grant keyed by the challenge, bound to the user and the device name, for 10 minutes. Cancel stores a denied grant. A challenge is used once: a second Approve or Cancel changes nothing. A user has at most 20 pending grants.
+5. Meanwhile the recorder polls `POST /api/v1/recorder/token` with the challenge and the verifier, every 2 seconds. A poll for a challenge with no grant costs one database read and writes nothing. It gets 202 while no grant exists, 200 with a token once, and 410 when the grant expired, was denied, was already used, or the verifier does not match the challenge. The recorder gives up after 10 minutes on its own. One poll per second per approved grant; a faster one gets 429 with `Retry-After`.
+6. The token goes with every API call as `Authorization: Bearer <token>`. It is `mtxt_` and 32 random bytes in base64url, valid 180 days, bound to one user and one device name, and revocable. The token response also carries the install's product name, the two theme colours and the user's name, so the recorder brands itself without a second call.
+
+The approval is not bound to the browser that the recorder opened. Anyone who makes a verifier can send a signed-in user a `/connect` link, and if that user approves it, the sender's poll receives a token for the user. Two things stand against that: the pairing code, which the user compares with the code on their own recorder, and the wording above the buttons. A token that was approved by mistake shows under Recorders, where the user disconnects it.
+
+The server keeps only the SHA-256 of a token, never the token, and never logs it. A call with a bearer token resolves the token's user row the same way a session cookie does: the row decides email and admin. A bad, expired or revoked token is 401 in the contract's error shape, never a login redirect. `last_used_at` is written at most once per 5 minutes.
+
+A user sees their recorders under the user slot's menu, "Recorders": device name, connected since, last used, and Disconnect. Disconnect revokes the token at once; the recorder's next call gets 401. The recorder can disconnect itself with `DELETE /api/v1/recorder/tokens/{id}`, for its own token only; a recorder never revokes another of the user's recorders. Admins see nothing extra; the audit log gets `recorder_connected` and `recorder_disconnected`. A recorder connection is the user's own, so the settings page has no row for it.
+
 ## Local models in the recorder
 
 Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-4.0, includes Danish) is the default; Whisper large-v3-turbo (MIT) is the fallback. Both switchable in the recorder. The live transcript is discarded when the meeting ends.
@@ -134,9 +151,15 @@ settings         product_name, company_name, theme_accent, theme_primary, identi
                  default_visibility, retention_audio_days, retention_transcript_days, mcp_enabled,
                  recording_sources (JSON array of desktop|upload|browser|teams|meet),
                  admin_emails (JSON array), admin_bootstrap_claimed_at
-audit_events     id, user_id, meeting_id, meeting_title, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write),
-                 details (JSON: before and after for shared and visibility_changed), at
+audit_events     id, user_id, meeting_id, meeting_title, action (opened|exported|shared|visibility_changed|deleted|mcp_read|mcp_write
+                 |recorder_connected|recorder_disconnected),
+                 details (JSON: before and after for shared and visibility_changed; the device name for the recorder actions), at
                  -- meeting_title is the title when the row was written; the row outlives the meeting
+recorder_tokens  id, install_id, user_id, device_name, token_hash, created_at, last_used_at, expires_at, revoked_at
+                 -- token_hash: SHA-256 hex of the token, unique per install; the token itself is never stored
+recorder_grants  install_id, challenge, user_id, device_name, status (approved|denied|redeemed), created_at,
+                 expires_at, last_poll_at, token_id
+                 -- one per challenge; written by Approve or Cancel on /connect, redeemed by the token poll
 meeting_search   install_id, meeting_id, kind (title|segment|recap), ref, text   -- FTS5 index, kept in sync by the app
 storage_cleanup  id, path, created_at, attempts   -- objects whose rows are gone, still to delete from storage
 ```
@@ -154,7 +177,7 @@ Rules:
 - A comparison transcript (`is_comparison`, written by `pnpm stt:compare`) is never shown, searched or exported by the app.
 - Every query, join and mutation carries `install_id`, child rows and shares included. A row whose install differs from the Worker's is ignored, whatever it points at; a meeting that another install's rows depend on is not deleted or archived.
 - Retention runs nightly. Audio past `retention_audio_days` is deleted unless the meeting has `keep`; transcripts and recaps follow `retention_transcript_days` the same way. Both count from the meeting's `started_at`. The meeting page announces a deletion 7 days ahead with Keep. A meeting whose audio and transcript are both gone keeps its metadata row with `deleted_at` set and shows in its owner's library as "Deleted by retention" until the owner removes it.
-- Audit rows: `opened` when a meeting page or its audio is served to someone other than the owner, at most one per user, meeting and hour; `shared` and `visibility_changed` with before and after; `deleted` on delete; `exported` on export; `mcp_read` and `mcp_write` from MCP. Deleting a meeting keeps its audit rows, detached from it, with the title they were written with.
+- Audit rows: `opened` when a meeting page or its audio is served to someone other than the owner, at most one per user, meeting and hour; `shared` and `visibility_changed` with before and after; `deleted` on delete; `exported` on export; `mcp_read` and `mcp_write` from MCP; `recorder_connected` when a recorder receives its token and `recorder_disconnected` when one is disconnected, with no meeting. Deleting a meeting keeps its audit rows, detached from it, with the title they were written with.
 - Search covers titles, transcript segments and recap text, through the same permission scope as the library, and answers with a snippet per meeting.
 - Admin queries never join `segments`, `recaps` or `recap_versions` for a private meeting. Admin sees title, owner, dates and the audit log.
 - Only the owner changes visibility. Shared colleagues read; they do not re-share.
