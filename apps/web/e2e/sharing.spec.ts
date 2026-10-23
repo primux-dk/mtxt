@@ -214,7 +214,13 @@ test('visibility and sharing roll back when the server does not get them (rule 2
   await visibility.selectOption('shared');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByText('Saving the visibility first…')).toHaveCount(0);
+  // The directory search runs 200 ms after typing, as a server action: wait for its answer
+  // before actions are dropped, or the drop fails the search instead of the add.
+  const searched = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes('"anne"'),
+  );
   await dialog.getByLabel('Find a colleague').fill('anne');
+  await searched;
   await expect(dialog.getByRole('button', { name: 'Add Anne Holm' })).toBeEnabled();
   await dropActions(page);
   await dialog.getByRole('button', { name: 'Add Anne Holm' }).click();
