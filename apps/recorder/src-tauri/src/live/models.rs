@@ -84,7 +84,7 @@ pub const ALL: [&ModelSpec; 2] = [&PARAKEET, &WHISPER];
 pub fn available() -> Vec<&'static ModelSpec> {
     ALL.into_iter()
         .filter(|s| match s.id {
-            "parakeet" => cfg!(all(feature = "parakeet", target_arch = "aarch64")),
+            "parakeet" => cfg!(all(feature = "parakeet", any(target_arch = "aarch64", target_os = "windows"))),
             "whisper" => cfg!(feature = "whisper"),
             _ => false,
         })

@@ -7,7 +7,7 @@
 //! mono into the ring. Without the user's permission the tap delivers
 //! silence, so `permissions::system_audio()` is asked first.
 
-use super::capture::{push_mono, Capture, CaptureError, SharedSink, Sink, SourceShared, SourceState, ThreadCapture, WATCH_EVERY};
+use super::{push_mono, Capture, CaptureError, SharedSink, Sink, SourceShared, SourceState, ThreadCapture, WATCH_EVERY};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use objc2::rc::Retained;
@@ -95,7 +95,7 @@ fn cfstr_to_ns(s: &CFString) -> Retained<NSString> {
 /// that stopped being called, rebuilds the tap; while that fails the source
 /// is Lost and the mixer writes silence.
 pub fn start(sink: Sink) -> Result<Box<dyn Capture>, CaptureError> {
-    if !super::super::permissions::macos_supports_taps() {
+    if !crate::permissions::macos::supports_taps() {
         return Err(CaptureError::Unsupported);
     }
     let sink: SharedSink = Arc::new(Mutex::new(sink));

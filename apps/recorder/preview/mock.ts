@@ -1,5 +1,5 @@
 // A stand-in for Tauri's IPC, so the real pages render in a browser from a
-// fixture: `?state=figure05&lang=da&theme=dark`. For screenshots and design
+// fixture: `?state=figure05&lang=da&theme=dark&platform=windows`. For screenshots and design
 // review only; the app never loads this.
 
 import { live, snapshot } from './fixtures';
@@ -7,6 +7,7 @@ import { live, snapshot } from './fixtures';
 const params = new URLSearchParams(location.search);
 const state = params.get('state') ?? 'figure05';
 const lang = params.get('lang') ?? 'en';
+const platform = params.get('platform') ?? 'macos';
 const liveState = params.get('live') ?? 'listening';
 const dark = params.get('theme') === 'dark';
 
@@ -30,7 +31,7 @@ const label = location.pathname.includes('live') ? 'live' : 'main';
   invoke: async (cmd: string) => {
     switch (cmd) {
       case 'snapshot':
-        return snapshot(state, lang);
+        return snapshot(state, lang, platform);
       case 'live_state':
         return {
           session: 1,

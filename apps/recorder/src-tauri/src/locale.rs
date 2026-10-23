@@ -1,12 +1,18 @@
 //! The few strings Rust shows itself (the menu bar menu, native dialogs),
 //! from the same locale files the windows use. Messages are ICU: `{name}`
-//! arguments and `{count, plural, one {...} other {...}}`.
+//! arguments and `{count, plural, one {...} other {...}}`. On Windows the
+//! `<lang>.windows.json` wording is read before the base file, as in the window.
 
 use serde_json::Value;
 use std::collections::HashMap;
 
 const EN: &str = include_str!("../../locales/en.json");
 const DA: &str = include_str!("../../locales/da.json");
+const EN_WINDOWS: &str = include_str!("../../locales/en.windows.json");
+const DA_WINDOWS: &str = include_str!("../../locales/da.windows.json");
+
+/// The platform the strings are for, as the window gets it in the snapshot.
+pub const PLATFORM: &str = if cfg!(target_os = "windows") { "windows" } else { "macos" };
 
 pub struct Strings {
     lang: &'static str,
@@ -20,8 +26,18 @@ fn parse(src: &str) -> HashMap<String, String> {
 
 impl Strings {
     pub fn new(lang: &str) -> Strings {
+        Strings::for_platform(lang, PLATFORM)
+    }
+
+    pub fn for_platform(lang: &str, platform: &str) -> Strings {
         let lang = if lang == "da" { "da" } else { "en" };
-        Strings { lang, map: parse(if lang == "da" { DA } else { EN }), fallback: parse(EN) }
+        let mut map = parse(if lang == "da" { DA } else { EN });
+        let mut fallback = parse(EN);
+        if platform == "windows" {
+            map.extend(parse(if lang == "da" { DA_WINDOWS } else { EN_WINDOWS }));
+            fallback.extend(parse(EN_WINDOWS));
+        }
+        Strings { lang, map, fallback }
     }
 
     pub fn lang(&self) -> &'static str {
@@ -181,5 +197,16 @@ mod tests {
         assert_eq!(choose(Some("nb-NO"), None), "en");
         assert_eq!(choose(None, None), "en");
         assert_eq!(Strings::new("da").get("menu.stop", &[]), "Stop optagelse");
+    }
+
+    #[test]
+    fn windows_wording_replaces_the_mac() {
+        let mac = Strings::for_platform("da", "macos");
+        let win = Strings::for_platform("da", "windows");
+        assert_eq!(mac.get("recorder.disconnect.local", &[]), "Afbryd kun på denne Mac");
+        assert_eq!(win.get("recorder.disconnect.local", &[]), "Afbryd kun på denne pc");
+        // Keys without Windows wording come from the base file.
+        assert_eq!(win.get("menu.stop", &[]), "Stop optagelse");
+        assert_eq!(Strings::for_platform("en", "windows").get("recorder.permission.openSettings", &[]), "Open Settings");
     }
 }

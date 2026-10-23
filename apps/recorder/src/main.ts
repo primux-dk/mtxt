@@ -66,7 +66,7 @@ function defaultTitle(): string {
 
 function render(s: Snapshot): void {
   snap = s;
-  setLanguage(s.language);
+  setLanguage(s.language, s.platform);
   translate();
   applyTheme(s.connection?.theme_accent, s.connection?.theme_primary);
   document.title = product();

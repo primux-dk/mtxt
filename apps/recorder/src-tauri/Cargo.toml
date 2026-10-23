@@ -15,9 +15,14 @@ crate-type = ["rlib"]
 [features]
 default = ["parakeet", "whisper"]
 # The two local models for the live preview. Each can be left out of a build;
-# Parakeet is compiled on aarch64 only (see the ort dependency).
+# Parakeet is compiled on aarch64 and on Windows only (see the ort dependency).
 parakeet = ["dep:ort"]
 whisper = ["dep:whisper-rs"]
+
+# ONNX Runtime directly: built only where Parakeet is.
+[[example]]
+name = "onnx_io"
+required-features = ["parakeet"]
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
@@ -48,12 +53,33 @@ cpal = "0.18"
 rtrb = "0.4"
 opus = "0.4"
 ogg = "0.9"
-whisper-rs = { version = "0.16", optional = true, features = ["metal"] }
+whisper-rs = { version = "0.16", optional = true }
 
 # ONNX Runtime ships no prebuilt library for Intel Macs: Parakeet is in the
-# Apple silicon slice of the universal build only; Whisper is in both.
-[target.'cfg(target_arch = "aarch64")'.dependencies]
+# Apple silicon slice of the universal build only; Whisper is in both. Windows
+# has a prebuilt library for x64 and Arm, so both models are in the Windows build.
+[target.'cfg(any(target_arch = "aarch64", target_os = "windows"))'.dependencies]
 ort = { version = "=2.0.0-rc.15", optional = true }
+
+# whisper.cpp on the GPU through Metal on a Mac; on Windows it runs on the CPU.
+[target.'cfg(target_os = "macos")'.dependencies.whisper-rs]
+version = "0.16"
+optional = true
+features = ["metal"]
+
+# WASAPI loopback for system audio (src/audio/capture/windows.rs) and the
+# microphone privacy switches (src/permissions/windows.rs). The same crate and
+# version cpal uses for its WASAPI host.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Media_Audio",
+  "Win32_Media_KernelStreaming",
+  "Win32_Media_Multimedia",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Registry",
+] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

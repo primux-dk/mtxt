@@ -120,6 +120,8 @@ pub struct Snapshot {
     pub connection: Option<ConnectionView>,
     pub signed_out: bool,
     pub language: &'static str,
+    /// `macos` or `windows`: which wording of the locale files the window uses.
+    pub platform: &'static str,
     pub permissions: Permissions,
     pub permissions_asked: bool,
     pub recording: Option<RecordingView>,
@@ -364,6 +366,7 @@ impl App {
             }),
             signed_out: p.connection.is_some() && inner.credential.is_none(),
             language: Self::language(inner),
+            platform: locale::PLATFORM,
             permissions: permissions::current(),
             permissions_asked: p.permissions_asked,
             recording: inner.active.as_ref().map(|a| RecordingView {

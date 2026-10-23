@@ -25,7 +25,8 @@
     "deploy:smoke": "node deploy/smoke.mjs",
     "deploy:backup": "node deploy/backup.mjs",
     "recorder:dev": "pnpm --filter @mtxt/recorder tauri dev",
-    "recorder:build": "pnpm --filter @mtxt/recorder tauri build --target universal-apple-darwin"
+    "recorder:build": "pnpm --filter @mtxt/recorder tauri build --target universal-apple-darwin",
+    "recorder:build:windows": "pnpm --filter @mtxt/recorder tauri build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -212,8 +212,16 @@ impl Store {
 }
 
 /// Make a rename or a removal in `dir` durable.
+#[cfg(unix)]
 pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
     fs::File::open(dir)?.sync_all()
+}
+
+/// Windows cannot open a directory as a file, and needs no directory sync:
+/// NTFS journals the rename itself.
+#[cfg(not(unix))]
+pub fn sync_dir(_dir: &Path) -> std::io::Result<()> {
+    Ok(())
 }
 
 /// Ids are UUIDs made here; anything else is reduced to safe characters.
@@ -283,10 +291,15 @@ mod tests {
         assert_eq!(store.export("a", &store.audio_path("a"), Some(&hash)), Err(ExportError::InsideQueue));
         assert_eq!(store.export("a", &store.audio_path("b"), Some(&hash)), Err(ExportError::InsideQueue));
         assert_eq!(store.export("a", &store.dir().join("new.ogg"), Some(&hash)), Err(ExportError::InsideQueue));
-        // Through a symlink to the queue directory.
-        let link = tmp.path().join("link");
-        std::os::unix::fs::symlink(store.dir(), &link).unwrap();
-        assert_eq!(store.export("a", &link.join("a.ogg"), Some(&hash)), Err(ExportError::InsideQueue));
+        // Through a symlink to the queue directory (Windows needs a privilege
+        // to make one).
+        #[cfg(unix)]
+        {
+            let link = tmp.path().join("link");
+            std::os::unix::fs::symlink(store.dir(), &link).unwrap();
+            assert_eq!(store.export("a", &link.join("a.ogg"), Some(&hash)), Err(ExportError::InsideQueue));
+        }
+        let _ = &tmp;
         assert_eq!(fs::read(store.audio_path("a")).unwrap(), data);
         assert_eq!(fs::read(store.audio_path("b")).unwrap(), b"other");
     }

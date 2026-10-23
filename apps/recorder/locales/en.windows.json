@@ -1,0 +1,23 @@
+{
+  "recorder.error.file": "Could not write the recording on this PC · Free some disk space and try again",
+  "recorder.live.help": "A local preview on this PC. It is never uploaded.",
+  "recorder.queue.deleted": "Uploaded · Removed from this PC",
+  "recorder.queue.fileMissing": "The file is no longer on this PC · Remove",
+  "recorder.network.offline": "No connection to {host} · Recordings are kept on this PC and upload when the connection is back",
+  "recorder.ask.body": "The recording is still on this PC and the recorder keeps trying. Keep trying, or save the file somewhere else and stop trying. Nothing is deleted unless you save it elsewhere.",
+  "recorder.disconnect.pending": "{count, plural, one {# recording is} other {# recordings are}} not uploaded yet. They stay on this PC and upload when you connect again.",
+  "recorder.disconnect.body": "The recorder signs out of {host}. Recordings on this PC stay.",
+  "recorder.disconnect.failed": "Could not reach {host} to disconnect · Try again, or disconnect this PC only and remove it under Recorders in the library",
+  "recorder.disconnect.local": "Disconnect this PC only",
+  "recorder.permission.system.explain": "System audio: the other participants, from the speakers or headset you listen on.",
+  "recorder.permission.mic.denied": "The microphone is not allowed · Open Settings → Privacy & security → Microphone and allow desktop apps",
+  "recorder.permission.openSettings": "Open Settings",
+  "recorder.model.size": "{model} needs a {size} download and the same space on this PC. It runs on this PC only.",
+  "recorder.error.stateSave": "Could not save the queue on this PC: {error}",
+  "recorder.queue.unsaved": "Not saved on this PC: {error}",
+  "recorder.menu.delete": "Delete from this PC",
+  "recorder.delete.title": "Delete “{title}” from this PC?",
+  "recorder.delete.noFile": "The audio is no longer on this PC",
+  "recorder.queue.discarding": "Deleting from this PC",
+  "recorder.delete.failed": "Could not delete the files on this PC · Try again"
+}

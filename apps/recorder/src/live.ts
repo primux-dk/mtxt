@@ -32,7 +32,7 @@ function lineNode(l: LiveLine): HTMLLIElement {
 }
 
 function renderSnapshot(s: Snapshot): void {
-  setLanguage(s.language);
+  setLanguage(s.language, s.platform);
   translate();
   applyTheme(s.connection?.theme_accent, s.connection?.theme_primary);
   $('product').textContent = s.connection?.product_name ?? '';

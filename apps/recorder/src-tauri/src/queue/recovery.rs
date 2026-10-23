@@ -45,7 +45,6 @@ pub fn inspect_file(path: &Path) -> FileCheck {
 mod tests {
     use super::*;
     use crate::audio::ogg_opus::{OggOpusWriter, FRAME};
-    use std::os::unix::fs::PermissionsExt;
 
     fn recording(path: &Path, frames: usize) {
         let mut w = OggOpusWriter::create(path).unwrap();
@@ -55,8 +54,10 @@ mod tests {
         w.finish().unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_permission_error_is_not_empty() {
+        use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("r.ogg");
         recording(&path, 100);

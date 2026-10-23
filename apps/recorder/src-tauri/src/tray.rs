@@ -1,5 +1,6 @@
-//! The menu bar item: the product name, what the recorder is doing, Open,
-//! Stop recording, Disconnect, About and Quit.
+//! The menu bar item on macOS, the notification area icon on Windows: the
+//! product name, what the recorder is doing, Open, Stop recording, Disconnect,
+//! About and Quit.
 
 use crate::app::{App, Snapshot};
 use crate::locale::Strings;
@@ -20,8 +21,18 @@ pub struct TrayItems {
     quit: MenuItem<Wry>,
 }
 
+// macOS: a template glyph the menu bar tints. Windows: the app tile, which
+// reads on a light and a dark taskbar, with a red dot while recording.
+#[cfg(target_os = "macos")]
 const ICON: &[u8] = include_bytes!("../icons/tray@2x.png");
+#[cfg(target_os = "macos")]
 const ICON_RECORDING: &[u8] = include_bytes!("../icons/tray-recording@2x.png");
+#[cfg(not(target_os = "macos"))]
+const ICON: &[u8] = include_bytes!("../icons/tray-windows.png");
+#[cfg(not(target_os = "macos"))]
+const ICON_RECORDING: &[u8] = include_bytes!("../icons/tray-windows-recording.png");
+/// Only macOS tints a template icon.
+const TEMPLATE: bool = cfg!(target_os = "macos");
 
 pub fn build(handle: &AppHandle) -> tauri::Result<()> {
     let item = |id: &str, enabled: bool| MenuItem::with_id(handle, id, id, enabled, None::<&str>);
@@ -51,7 +62,7 @@ pub fn build(handle: &AppHandle) -> tauri::Result<()> {
     )?;
     TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(ICON)?)
-        .icon_as_template(true)
+        .icon_as_template(TEMPLATE)
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(on_menu)
@@ -119,7 +130,7 @@ pub fn refresh(handle: &AppHandle, snap: &Snapshot, s: &Strings) {
         let bytes = if snap.recording.is_some() { ICON_RECORDING } else { ICON };
         if let Ok(img) = Image::from_bytes(bytes) {
             let _ = tray.set_icon(Some(img));
-            let _ = tray.set_icon_as_template(true);
+            let _ = tray.set_icon_as_template(TEMPLATE);
         }
         let _ = tray.set_tooltip(Some(&product));
     }

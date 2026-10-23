@@ -2602,6 +2602,7 @@ dependencies = [
  "unicode-properties",
  "uuid",
  "whisper-rs",
+ "windows",
 ]
 
 [[package]]
