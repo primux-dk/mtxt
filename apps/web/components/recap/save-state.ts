@@ -41,13 +41,16 @@ export function useAutosave(options: {
   initialMd: string;
   /** The editor's markdown now. */
   read: () => string;
-  /** A new version landed (the version line, the decisions). */
-  onSaved?: (version: VersionView) => void;
+  /** A save is about to go, as number `seq`: the editor notes which ticks it carries. */
+  onSaveStart?: (seq: number) => void;
+  /** Save `seq` landed as a new version (the version line, the decisions). */
+  onSaved?: (version: VersionView, seq: number) => void;
   /**
-   * The server refused a save (a conflict or a 4xx): the editor rolls back
-   * the decision ticks in it and says whether there were any (rule 2).
+   * The server refused save `seq` (a conflict or a 4xx): the editor rolls
+   * back exactly the ticks that save carried and says whether there were
+   * any (rule 2).
    */
-  onRefused?: () => boolean;
+  onRefused?: (seq: number) => boolean;
   /** The server stored other text than it was sent (a foreign image or mention removed): show that. */
   onNormalized?: (bodyMd: string) => void;
 }) {
@@ -69,6 +72,9 @@ export function useAutosave(options: {
   read.current = options.read;
   const onSaved = useRef(options.onSaved);
   onSaved.current = options.onSaved;
+  const onSaveStart = useRef(options.onSaveStart);
+  onSaveStart.current = options.onSaveStart;
+  const sequence = useRef(0);
   const onRefused = useRef(options.onRefused);
   onRefused.current = options.onRefused;
   const onNormalized = useRef(options.onNormalized);
@@ -110,6 +116,8 @@ export function useAutosave(options: {
     inFlight.current = true;
     set({ status: 'saving' });
     const sentOn = base.current;
+    const seq = ++sequence.current;
+    onSaveStart.current?.(seq);
     let response: Response | null = null;
     try {
       response = await fetch(`/api/v1/meetings/${meetingId}/recap`, {
@@ -130,7 +138,7 @@ export function useAutosave(options: {
       base.current = version.id;
       confirmed.current = stored ?? body;
       void deleteDraft(recapId, sentOn).catch(() => {});
-      onSaved.current?.(version);
+      onSaved.current?.(version, seq);
       // Screen and store agree: the stored text replaces the sent one, unless more was typed meanwhile.
       if (stored !== undefined && stored !== body && read.current() === body) {
         onNormalized.current?.(stored);
@@ -154,7 +162,7 @@ export function useAutosave(options: {
       const { current } = (await response.json().catch(() => ({}))) as { current?: VersionView };
       // Network saves stop; the text typed from here on is still kept in this browser.
       stopped.current = true;
-      const undone = onRefused.current?.() ?? false;
+      const undone = onRefused.current?.(seq) ?? false;
       set({ status: 'conflict', conflict: current ?? null, tickUndone: undone });
       return;
     }
@@ -162,7 +170,7 @@ export function useAutosave(options: {
       response === null ? 'offline' : response.status === 413 ? 'too_long' : 'refused';
     // A refusal (not the network, not the server's own failure) undoes the ticks it carried.
     const refused = response !== null && response.status < 500;
-    const undone = refused ? (onRefused.current?.() ?? false) : false;
+    const undone = refused ? (onRefused.current?.(seq) ?? false) : false;
     set({ status: 'unsaved', problem, tickUndone: undone });
     // A network error or the server's own failure: try again; a refusal waits for the next change.
     if (problem === 'offline' || (response && response.status >= 500)) {

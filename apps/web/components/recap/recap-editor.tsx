@@ -59,6 +59,9 @@ import { draftsFor, deleteDraft, type LocalDraft } from '@/lib/recap/local-draft
 import { parseMarkdown, toMarkdown } from '@/lib/recap/markdown';
 import type { VersionView } from '@/lib/recap/view';
 import { FLUSH_SAVE, ROLLBACK, viewOverrides, ViewContext, type Tick } from './node-views';
+
+/** The transaction that takes the server's stored text: kept locally, not saved again. */
+const NORMALIZED = 'recapNormalized';
 import { useAutosave, type SaveState } from './save-state';
 import { createMenu, SuggestionMenu, type MenuItem } from './suggestion-menu';
 
@@ -286,8 +289,14 @@ export function RecapEditor(props: RecapEditorProps) {
     () => (editorRef.current ? toMarkdown(editorRef.current.state.doc) : props.bodyMd),
     [props.bodyMd],
   );
-  /** Decision ticks not yet confirmed by the server, by their place among the decisions. */
-  const pendingTicks = useRef<{ ordinal: number; checked: boolean }[]>([]);
+  /**
+   * Decision ticks the server has not confirmed: their place among the
+   * decisions, and the save that carries them (null until one starts). A
+   * refused save rolls back exactly its own ticks (rule 2).
+   */
+  const pendingTicks = useRef<{ ordinal: number; checked: boolean; carriedBy: number | null }[]>(
+    [],
+  );
   const {
     state: save,
     changed,
@@ -299,26 +308,36 @@ export function RecapEditor(props: RecapEditorProps) {
     initial: props.current,
     initialMd: props.bodyMd,
     read,
-    onSaved: (version) => {
-      pendingTicks.current = [];
+    onSaveStart: (seq) => {
+      for (const tick of pendingTicks.current) tick.carriedBy ??= seq;
+    },
+    onSaved: (version, seq) => {
+      pendingTicks.current = pendingTicks.current.filter((tick) => tick.carriedBy !== seq);
       props.onVersion?.(version);
     },
+    // The stored text differs (a foreign mention or image went): change only what differs,
+    // so the selection maps through the change and the caret stays in the same text.
     onNormalized: (bodyMd) => {
       const e = editorRef.current;
       if (!e) return;
-      const stored = parseMarkdown(bodyMd).toJSON();
-      // Only when the document itself differs (a foreign image or mention went), not its spelling.
-      if (JSON.stringify(stored) === JSON.stringify(e.getJSON())) return;
-      const { from, to } = e.state.selection;
-      e.commands.setContent(stored, { emitUpdate: false });
-      const end = e.state.doc.content.size;
-      e.commands.setTextSelection({ from: Math.min(from, end), to: Math.min(to, end) });
+      const next = e.schema.nodeFromJSON(parseMarkdown(bodyMd).toJSON());
+      const doc = e.state.doc;
+      const start = doc.content.findDiffStart(next.content);
+      if (start === null) return;
+      let { a: endA, b: endB } = doc.content.findDiffEnd(next.content)!;
+      // A repeated run of text can make the ends overlap the start: move both past it.
+      const overlap = start - Math.min(endA, endB);
+      if (overlap > 0) {
+        endA += overlap;
+        endB += overlap;
+      }
+      const tr = e.state.tr.replace(start, endA, next.slice(start, endB));
+      e.view.dispatch(tr.setMeta(NORMALIZED, true).setMeta('addToHistory', false));
     },
-    // A refused save undoes its ticks and keeps every other change (rule 2).
-    onRefused: () => {
+    onRefused: (seq) => {
       const e = editorRef.current;
-      const ticks = pendingTicks.current;
-      pendingTicks.current = [];
+      const ticks = pendingTicks.current.filter((tick) => tick.carriedBy === seq);
+      pendingTicks.current = pendingTicks.current.filter((tick) => tick.carriedBy !== seq);
       if (!e || !ticks.length) return false;
       const items: { pos: number; checked: boolean }[] = [];
       e.state.doc.descendants((n, pos) => {
@@ -578,7 +597,9 @@ export function RecapEditor(props: RecapEditorProps) {
         },
       },
       onUpdate: ({ transaction, editor: e }) => {
-        if (transaction.getMeta(ROLLBACK)) return changed(false, true);
+        if (transaction.getMeta(ROLLBACK) || transaction.getMeta(NORMALIZED)) {
+          return changed(false, true);
+        }
         const tick = transaction.getMeta(FLUSH_SAVE) as Tick | undefined;
         if (tick) {
           let ordinal = 0;
@@ -586,7 +607,7 @@ export function RecapEditor(props: RecapEditorProps) {
             if (n.type.name === 'decisionItem' && pos < tick.pos) ordinal++;
             return n.type.name !== 'decisionItem';
           });
-          pendingTicks.current.push({ ordinal, checked: tick.checked });
+          pendingTicks.current.push({ ordinal, checked: tick.checked, carriedBy: null });
         }
         changed(Boolean(tick));
       },
