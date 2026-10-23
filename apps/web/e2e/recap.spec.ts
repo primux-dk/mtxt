@@ -89,7 +89,7 @@ const status = (page: Page) =>
 
 /** Puts the caret at the end of the document's first heading, on a new line. */
 async function newLineAfterHeading(page: Page) {
-  await editor(page).locator('h1').first().click();
+  await editor(page).locator('h2').first().click();
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
 }
@@ -543,7 +543,7 @@ test('screenshots at 1280 and 390: the editor, the / menu, versions, export; the
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(size.width);
     // The 120-character heading inside the recap, then the 40 decisions.
-    await editor(page).locator('h1').first().scrollIntoViewIfNeeded();
+    await editor(page).locator('h2').first().scrollIntoViewIfNeeded();
     await settle(page);
     await page.screenshot({ path: shot(`recap-long-${name}`) });
     await editor(page).getByRole('heading', { name: 'Beslutninger' }).scrollIntoViewIfNeeded();

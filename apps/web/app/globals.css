@@ -147,21 +147,21 @@
   .recap-body > * + * {
     margin-top: 12px;
   }
-  .recap-body h1 {
+  .recap-body h2 {
     font-size: 24px;
     letter-spacing: -0.035em;
     margin-top: 28px;
   }
-  .recap-body h2 {
+  .recap-body h3 {
     font-size: 20px;
     letter-spacing: -0.03em;
     margin-top: 24px;
   }
-  .recap-body h3 {
+  .recap-body h4 {
     font-size: 16px;
     margin-top: 20px;
   }
-  .recap-body h4 {
+  .recap-body h5 {
     font-size: 15px;
     margin-top: 16px;
   }

@@ -26,5 +26,9 @@
   "path-scurry": {
     "license": "BlueOak-1.0.0",
     "reason": "BlueOak-1.0.0 is a permissive licence, build tooling under Next and OpenNext"
+  },
+  "pako": {
+    "license": "(MIT AND Zlib)",
+    "reason": "zlib in JavaScript under jszip under docx (the recap's Word export); Zlib is a permissive licence"
   }
 }

@@ -14,6 +14,7 @@
 */
 import { mergeAttributes, Node, type AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import Heading from '@tiptap/extension-heading';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import Image from '@tiptap/extension-image';
@@ -128,6 +129,20 @@ export const IMAGE_SRC =
   /^\/api\/v1\/meetings\/[A-Za-z0-9_-]{1,64}\/recap\/images\/[a-f0-9-]{36}\.(png|jpg|gif|webp)$/;
 
 /**
+ * Markdown's `#` is the recap's own top level, but the page already has its
+ * h1 (the meeting's title): a recap heading renders one level down, so the
+ * page keeps one outline. The level in the document and in markdown stays.
+ */
+export const RecapHeading = Heading.extend({
+  parseHTML() {
+    return [1, 2, 3, 4].map((level) => ({ tag: `h${level + 1}`, attrs: { level } }));
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return [`h${Math.min(6, Number(node.attrs.level) + 1)}`, mergeAttributes(HTMLAttributes), 0];
+  },
+}).configure({ levels: [1, 2, 3, 4] });
+
+/**
  * The extensions that define the schema. The client replaces some by name
  * (`overrides`) with node views and its `@` suggestion; the schema stays the same.
  */
@@ -136,7 +151,7 @@ export function recapExtensions(
 ): AnyExtension[] {
   const list: AnyExtension[] = [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3, 4] },
+      heading: false,
       underline: false,
       // No markdown for these two.
       link: {
@@ -147,6 +162,7 @@ export function recapExtensions(
         isAllowedUri: (url) => /^(https?:|mailto:)/i.test(url),
       },
     }),
+    RecapHeading,
     TaskList,
     TaskItem.configure({ nested: true }),
     Table.configure({ resizable: false }),
