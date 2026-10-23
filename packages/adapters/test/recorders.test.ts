@@ -16,6 +16,8 @@ import {
   LAST_USED_EVERY_MS,
   MAX_PENDING_GRANTS,
   newRecorderToken,
+  PAIRING_ALPHABET,
+  pairingCode,
   pollAllowed,
   RECORDER_TOKEN_PATTERN,
   s256,
@@ -29,11 +31,11 @@ const T = Date.UTC(2026, 9, 23, 9);
 const at = (ms: number) => new Date(T + ms);
 
 function setup() {
-  const { db, sqlite } = testDb();
+  const { db, sqlite, statements } = testDb();
   const f = fixtures(sqlite);
   f.user('mette', 'Mette Lund');
   f.user('anne', 'Anne Holm');
-  return { db, sqlite };
+  return { db, sqlite, statements };
 }
 
 /** A verifier and its challenge, as a recorder makes them. */
@@ -87,6 +89,22 @@ describe('S256', () => {
     // Too short for RFC 7636, even when it would hash right.
     expect(await verifierMatches('short', await s256('short'))).toBe(false);
     expect(await verifierMatches(verifier, 'not a challenge')).toBe(false);
+  });
+});
+
+describe('pairing code', () => {
+  it('is six characters of the first 30 bits of SHA-256(challenge), as XXX-XXX', async () => {
+    const challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+    const bytes = createHash('sha256').update(challenge, 'ascii').digest();
+    const bits = bytes.readUInt32BE(0) >>> 2;
+    const expected = [25, 20, 15, 10, 5, 0]
+      .map((s) => PAIRING_ALPHABET[(bits >>> s) & 31])
+      .join('');
+    const code = await pairingCode(challenge);
+    expect(code).toBe(`${expected.slice(0, 3)}-${expected.slice(3)}`);
+    expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{3}-[0-9A-HJKMNP-TV-Z]{3}$/);
+    // The contract's worked example.
+    expect(code).toBe('1MM-SP7');
   });
 });
 
@@ -186,20 +204,59 @@ describe('grants', () => {
     });
   });
 
-  it('let one poll a second through per grant', async () => {
-    const { db } = setup();
+  it('let one poll a second through per approved grant', async () => {
+    const { db, sqlite } = setup();
     const { challenge } = await pair();
-    await denyGrant(db, INSTALL, { challenge, userId: 'mette', deviceName: 'Mac', now: at(0) });
-    expect(await pollGrant(db, INSTALL, { challenge, tokenHash: 'h', now: at(10) })).toEqual({
-      kind: 'denied',
-    });
+    await approveGrant(db, INSTALL, { challenge, userId: 'mette', deviceName: 'Mac', now: at(0) });
+    sqlite.exec(`update recorder_grants set last_poll_at = ${T + 100}`);
     expect(await pollGrant(db, INSTALL, { challenge, tokenHash: 'h', now: at(500) })).toEqual({
       kind: 'rate_limited',
       retryAfter: 1,
     });
-    expect(await pollGrant(db, INSTALL, { challenge, tokenHash: 'h', now: at(1010) })).toEqual({
-      kind: 'denied',
+    expect(rows(sqlite, 'select id from recorder_tokens')).toHaveLength(0);
+    expect(
+      await pollGrant(db, INSTALL, { challenge, tokenHash: 'h', now: at(1100) }),
+    ).toMatchObject({
+      kind: 'token',
     });
+  });
+
+  it('cost one read for no grant, a denied grant and a used grant; write only for an approved one', async () => {
+    const { db, statements } = setup();
+    const { challenge } = await pair();
+    const count = async (now: number) => {
+      statements.length = 0;
+      const result = await pollGrant(db, INSTALL, { challenge, tokenHash: 'h', now: at(now) });
+      return { kind: result.kind, statements: [...statements] };
+    };
+    const unknown = await count(0);
+    expect(unknown.kind).toBe('pending');
+    expect(unknown.statements).toHaveLength(1);
+    expect(unknown.statements[0]).toMatch(/^select /);
+    // Steady state: polling again stays one read each time.
+    expect((await count(10)).statements).toHaveLength(1);
+
+    await approveGrant(db, INSTALL, { challenge, userId: 'mette', deviceName: 'Mac', now: at(20) });
+    const issued = await count(30);
+    expect(issued.kind).toBe('token');
+    expect(issued.statements.filter((q) => /^(update|insert)/.test(q))).toHaveLength(4);
+
+    const used = await count(5000);
+    expect(used).toEqual({ kind: 'expired', statements: [expect.stringMatching(/^select /)] });
+
+    const other = await pair('d');
+    await denyGrant(db, INSTALL, {
+      challenge: other.challenge,
+      userId: 'mette',
+      deviceName: 'Mac',
+      now: at(0),
+    });
+    statements.length = 0;
+    expect(
+      (await pollGrant(db, INSTALL, { challenge: other.challenge, tokenHash: 'h', now: at(10) }))
+        .kind,
+    ).toBe('denied');
+    expect(statements).toHaveLength(1);
   });
 
   it('hold at most 20 pending per user, and forget the expired ones', async () => {

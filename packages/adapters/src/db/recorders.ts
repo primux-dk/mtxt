@@ -103,11 +103,13 @@ export type PollResult =
 
 /**
  * The recorder's poll, after the route has checked the verifier against the
- * challenge. One conditional UPDATE lets at most one poll per second through
- * per grant. An approved grant becomes a token in one batch: the token row,
- * the `recorder_connected` audit row and the grant marked redeemed, each
- * conditional on the grant still being approved and unexpired, so two polls
- * at once never make two tokens.
+ * challenge. The poll is open to anyone, so the common answers cost one read:
+ * no grant (202), and a denied, used or expired grant (410). Only an approved
+ * grant is written to: one conditional UPDATE lets one poll per second
+ * through, then one batch makes the token row, the `recorder_connected`
+ * audit row and marks the grant redeemed, each conditional on the grant
+ * still being approved and unexpired, so two polls at once never make two
+ * tokens.
  */
 export async function pollGrant(
   db: Db,
@@ -115,22 +117,27 @@ export async function pollGrant(
   input: { challenge: string; tokenHash: string; now?: Date },
 ): Promise<PollResult> {
   const now = (input.now ?? new Date()).getTime();
+  const grant = await findGrant(db, installId, input.challenge);
+  if (!grant) return { kind: 'pending' };
+  if (grant.status === 'denied') return { kind: 'denied' };
+  if (grant.status !== 'approved' || grant.expiresAt.getTime() <= now) return { kind: 'expired' };
+
   const mine = and(eq(g.installId, installId), eq(g.challenge, input.challenge));
-  const [grant] = await db
+  const passed = await db
     .update(g)
     .set({ lastPollAt: new Date(now) })
     .where(
-      and(mine, sql`(${g.lastPollAt} is null or ${g.lastPollAt} <= ${now - POLL_INTERVAL_MS})`),
+      and(
+        mine,
+        eq(g.status, 'approved'),
+        sql`(${g.lastPollAt} is null or ${g.lastPollAt} <= ${now - POLL_INTERVAL_MS})`,
+      ),
     )
-    .returning();
-  if (!grant) {
-    const held = await findGrant(db, installId, input.challenge);
-    if (!held) return { kind: 'pending' };
-    const wait = pollAllowed(held.lastPollAt?.getTime() ?? null, now);
+    .returning({ challenge: g.challenge });
+  if (!passed.length) {
+    const wait = pollAllowed(grant.lastPollAt?.getTime() ?? null, now);
     return { kind: 'rate_limited', retryAfter: wait.ok ? 1 : wait.retryAfter };
   }
-  if (grant.status === 'denied') return { kind: 'denied' };
-  if (grant.status !== 'approved' || grant.expiresAt.getTime() <= now) return { kind: 'expired' };
 
   const live = and(mine, eq(g.status, 'approved'), gt(g.expiresAt, new Date(now)));
   const tokenId = crypto.randomUUID();
