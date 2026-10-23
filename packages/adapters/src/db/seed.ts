@@ -2,15 +2,26 @@ import { DEFAULT_SETTINGS } from './defaults.ts';
 
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
 
+/** What a deploy may set on a new install's row instead of the defaults (deploy/install.mjs). */
+export interface SeedOverrides {
+  productName?: string;
+  companyName?: string | null;
+  language?: string;
+  interfaceLanguage?: 'en' | 'da';
+  aiGatewayId?: string | null;
+}
+
 /**
  * SQL that writes the default settings row for an install. Idempotent: a row
- * that exists is left alone, so seeding never undoes an admin's changes.
+ * that exists is left alone, so seeding never undoes an admin's changes. The
+ * overrides apply only to the row this writes, never to one that exists.
  */
-export function seedSql(installId: string): string {
+export function seedSql(installId: string, overrides: SeedOverrides = {}): string {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(installId)) {
     throw new Error(`Install id must be 1-64 letters, digits, _ or -: ${installId}`);
   }
-  const s = DEFAULT_SETTINGS;
+  const given = Object.fromEntries(Object.entries(overrides).filter(([, v]) => v !== undefined));
+  const s = { ...DEFAULT_SETTINGS, ...given };
   const columns: [string, string | number | boolean | null][] = [
     ['install_id', installId],
     ['product_name', s.productName],
@@ -24,6 +35,7 @@ export function seedSql(installId: string): string {
     ['stt_provider', s.sttProvider],
     ['stt_api_key', s.sttApiKey],
     ['stt_region', s.sttRegion],
+    ['ai_gateway_id', s.aiGatewayId],
     ['language', s.language],
     ['interface_language', s.interfaceLanguage],
     ['live_transcript_default', s.liveTranscriptDefault],

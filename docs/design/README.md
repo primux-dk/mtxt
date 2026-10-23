@@ -157,7 +157,7 @@ The recorder confirms only after the server verifies the whole file and its SHA-
 
 Live text is an optional local preview. It is off by default and discarded when the meeting ends. The server transcript is the record. The recorder's model picker offers downloaded Parakeet or Whisper. This user setting is separate from the admin's final STT provider.
 
-The data-flow panel must name the selected provider and the destination of audio. Show R2 EU audio storage and EU upload sessions. Explain that D1 has no jurisdiction setting, Worker placement is best effort without the Enterprise localization add-on, and Workers AI and AI Gateway are not covered by Regional Services. Do not promise EU-only processing. AssemblyAI receives audio and keyterms directly; supported providers and the recap model can use AI Gateway. Retention remains explicit.
+The data-flow panel must name the selected provider and the destination of audio. Show R2 EU audio storage and EU upload sessions. Explain that the install tooling creates D1 and the queues with EU jurisdiction, that Worker placement is best effort without the Enterprise localization add-on, and Workers AI and AI Gateway are not covered by Regional Services. Do not promise EU-only processing. AssemblyAI receives audio and keyterms directly; supported providers and the recap model can use AI Gateway. Retention remains explicit.
 
 ## Icons, motion and accessibility
 

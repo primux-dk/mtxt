@@ -563,7 +563,7 @@
       "step3": "Den valgte sprogmodel skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
       "step4": "Lyd slettes efter {audioDays, plural, one {# dag} other {# dage}}. Transskriptioner og referater slettes efter {textDays, plural, one {# dag} other {# dage}}. Behold forhindrer begge sletninger.",
       "promise": "Det er ikke garanteret, at al behandling sker i EU.",
-      "caveats": "D1 har ingen indstilling for jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
+      "caveats": "Installationsværktøjet opretter D1-databasen og køerne med EU-jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
       "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen.",
       "step2Gateway": "{provider} modtager lyd og nøgleord gennem AI Gateway og sender tekst og talere tilbage.",
       "step2Local": "{provider} kører inde i installationen; lyden sendes ikke til et firma, der laver tale til tekst.",

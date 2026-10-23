@@ -1,0 +1,22 @@
+{
+  "accountId": "0123456789abcdef0123456789abcdef",
+  "hostname": "meetings.example.com",
+  "installId": "example",
+  "secretsFile": "~/.config/mtxt/example.env",
+  "names": {
+    "worker": "mtxt-web",
+    "database": "mtxt-db",
+    "bucket": "mtxt-audio",
+    "queue": "mtxt-jobs",
+    "deadLetterQueue": "mtxt-jobs-dlq",
+    "gateway": "mtxt-gateway"
+  },
+  "settings": {
+    "productName": "Example Meetings",
+    "companyName": "Example A/S",
+    "interfaceLanguage": "en",
+    "language": "auto",
+    "identityProvider": "entra",
+    "sttProvider": "assemblyai"
+  }
+}
