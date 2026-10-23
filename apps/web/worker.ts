@@ -11,7 +11,7 @@ import {
   chunkTooLarge,
   limitChunkBody,
   limitWebhookBody,
-  webhookTooLarge,
+  smallBodyTooLarge,
   type Guarded,
 } from './lib/chunk-guard';
 import { keepEmptyRange } from './lib/http-range';
@@ -35,7 +35,8 @@ export default {
     if (chunk instanceof Response) return chunk;
     const guarded = limitWebhookBody(chunk.request);
     if (guarded instanceof Response) return guarded;
-    const check = () => refused(chunk, chunkTooLarge) ?? refused(guarded, webhookTooLarge);
+    const check = () =>
+      refused(chunk, chunkTooLarge) ?? refused(guarded, () => smallBodyTooLarge(request));
     try {
       const response = await nextHandler.fetch(keepEmptyRange(guarded.request), env, ctx);
       return check() ?? response;

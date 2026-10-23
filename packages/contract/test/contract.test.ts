@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
@@ -22,9 +23,11 @@ describe('contract', () => {
     expect(checkedIn.endsWith(generated)).toBe(true);
   });
 
-  it('declares the four recorder endpoints', async () => {
+  it('declares the recorder endpoints', async () => {
     const spec = parse(await readFile(specUrl, 'utf8'));
     expect(Object.keys(spec.paths).sort()).toEqual([
+      '/recorder/token',
+      '/recorder/tokens/{id}',
       '/recordings',
       '/recordings/{id}',
       '/recordings/{id}/chunks/{n}',
@@ -36,6 +39,38 @@ describe('contract', () => {
     const spec = parse(await readFile(specUrl, 'utf8'));
     expect(spec.components.schemas.RecordingStatus.enum).toEqual([...RECORDING_STATUSES]);
     expect(spec.components.schemas.RecordingSource.enum).toEqual([...RECORDING_SOURCES]);
+  });
+
+  it('asks for a bearer token everywhere but the token poll', async () => {
+    const spec = parse(await readFile(specUrl, 'utf8'));
+    expect(spec.security).toEqual([{ bearerAuth: [] }, { sessionCookie: [] }]);
+    expect(spec.components.securitySchemes.bearerAuth).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+    });
+    expect(spec.paths['/recorder/token'].post.security).toEqual([]);
+    expect(Object.keys(spec.paths['/recorder/token'].post.responses).sort()).toEqual([
+      '200',
+      '202',
+      '400',
+      '410',
+      '413',
+      '429',
+      '500',
+    ]);
+  });
+
+  it('gives a pairing-code example a client can check its derivation against', async () => {
+    const flow = parse(await readFile(specUrl, 'utf8'))['x-recorder-flow'];
+    const { alphabet, example } = flow.pairing_code;
+    const bytes = createHash('sha256').update(example.challenge, 'ascii').digest();
+    expect(bytes.subarray(0, 4).toString('hex')).toBe(example.first_bytes_hex);
+    const bits = bytes.readUInt32BE(0) >>> 2;
+    expect(bits).toBe(example.bits);
+    const code = [25, 20, 15, 10, 5, 0].map((shift) => alphabet[(bits >>> shift) & 31]).join('');
+    expect(`${code.slice(0, 3)}-${code.slice(3)}`).toBe(example.code);
+    expect(alphabet).toHaveLength(32);
+    expect(alphabet).not.toMatch(/[ILOU]/);
   });
 
   it('uses 8 MB chunks', () => {

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0144dc1e-71a6-4999-b0cf-f4bb28857a17",
+  "id": "e94c10f0-7df3-4c5e-b483-43e3325de1ab",
   "prevId": "53339aed-06de-4f17-82b1-32a3c002be2f",
   "tables": {
     "audit_events": {
@@ -141,7 +141,7 @@
       "checkConstraints": {
         "audit_events_action_check": {
           "name": "audit_events_action_check",
-          "value": "\"action\" IN ('opened', 'exported', 'shared', 'visibility_changed', 'deleted', 'mcp_read', 'mcp_write')"
+          "value": "\"action\" IN ('opened', 'exported', 'shared', 'visibility_changed', 'deleted', 'mcp_read', 'mcp_write', 'recorder_connected', 'recorder_disconnected')"
         }
       }
     },
@@ -168,14 +168,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         },
         "text": {
           "name": "text",
@@ -676,14 +668,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "number": {
-          "name": "number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
         "author_id": {
           "name": "author_id",
           "type": "text",
@@ -698,13 +682,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -715,14 +692,6 @@
         }
       },
       "indexes": {
-        "recap_versions_recap_number": {
-          "name": "recap_versions_recap_number",
-          "columns": [
-            "recap_id",
-            "number"
-          ],
-          "isUnique": true
-        },
         "recap_versions_recap_created": {
           "name": "recap_versions_recap_created",
           "columns": [
@@ -823,28 +792,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'ready'"
-        },
-        "failure_reason": {
-          "name": "failure_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "draft_token": {
-          "name": "draft_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -903,6 +850,221 @@
           "tableTo": "recap_versions",
           "columnsFrom": [
             "current_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "recorder_grants": {
+      "name": "recorder_grants",
+      "columns": {
+        "install_id": {
+          "name": "install_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "challenge": {
+          "name": "challenge",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_name": {
+          "name": "device_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast(unixepoch('subsec') * 1000 as integer))"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_poll_at": {
+          "name": "last_poll_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "token_id": {
+          "name": "token_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "recorder_grants_user": {
+          "name": "recorder_grants_user",
+          "columns": [
+            "user_id",
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "recorder_grants_user_id_users_id_fk": {
+          "name": "recorder_grants_user_id_users_id_fk",
+          "tableFrom": "recorder_grants",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "recorder_grants_install_id_challenge_pk": {
+          "columns": [
+            "install_id",
+            "challenge"
+          ],
+          "name": "recorder_grants_install_id_challenge_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "recorder_grants_status_check": {
+          "name": "recorder_grants_status_check",
+          "value": "\"status\" IN ('approved', 'denied', 'redeemed')"
+        }
+      }
+    },
+    "recorder_tokens": {
+      "name": "recorder_tokens",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "install_id": {
+          "name": "install_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_name": {
+          "name": "device_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast(unixepoch('subsec') * 1000 as integer))"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "recorder_tokens_install_hash": {
+          "name": "recorder_tokens_install_hash",
+          "columns": [
+            "install_id",
+            "token_hash"
+          ],
+          "isUnique": true
+        },
+        "recorder_tokens_user": {
+          "name": "recorder_tokens_user",
+          "columns": [
+            "user_id",
+            "install_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "recorder_tokens_user_id_users_id_fk": {
+          "name": "recorder_tokens_user_id_users_id_fk",
+          "tableFrom": "recorder_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -1315,28 +1477,6 @@
         },
         "ai_gateway_id": {
           "name": "ai_gateway_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "recap_provider": {
-          "name": "recap_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'workers-ai'"
-        },
-        "recap_model": {
-          "name": "recap_model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "recap_api_key": {
-          "name": "recap_api_key",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

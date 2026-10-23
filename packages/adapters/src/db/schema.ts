@@ -48,6 +48,8 @@ export const AUDIT_ACTIONS = [
   'deleted',
   'mcp_read',
   'mcp_write',
+  'recorder_connected',
+  'recorder_disconnected',
 ] as const;
 export const IDENTITY_PROVIDERS = ['entra', 'google'] as const;
 export const STT_PROVIDERS = [
@@ -65,6 +67,8 @@ export const RECAP_PROVIDERS = ['workers-ai', 'anthropic', 'openai', 'azure-open
 export const RECAP_STATUSES = ['drafting', 'ready', 'failed'] as const;
 /** A transcript waits for an async provider, holds the result, or records that the provider failed. */
 export const TRANSCRIPT_STATUSES = ['pending', 'done', 'failed'] as const;
+/** A recorder grant: approved on /connect and waiting for the poll, cancelled there, or exchanged for a token. */
+export const RECORDER_GRANT_STATUSES = ['approved', 'denied', 'redeemed'] as const;
 /** The settings page's "Recording sources": where a meeting may come from. */
 export const CAPTURE_SOURCES = ['desktop', 'upload', 'browser', 'teams', 'meet'] as const;
 
@@ -582,6 +586,65 @@ export const storageCleanup = sqliteTable(
   (t) => [index('storage_cleanup_install_attempts').on(t.installId, t.attempts, t.createdAt)],
 );
 
+/**
+ * A desktop recorder's bearer token (docs/spec.md "Recorder connection").
+ * Only the SHA-256 of the token is stored, never the token. Bound to one
+ * user and one device name; revoked by Disconnect or the recorder itself.
+ */
+export const recorderTokens = sqliteTable(
+  'recorder_tokens',
+  {
+    id: id(),
+    installId: installId(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    deviceName: text('device_name').notNull(),
+    /** Lower-case hex SHA-256 of the whole token, `mtxt_` included. */
+    tokenHash: text('token_hash').notNull(),
+    createdAt: createdAt(),
+    /** Written at most once per 5 minutes. */
+    lastUsedAt: timestamp('last_used_at'),
+    expiresAt: timestamp('expires_at').notNull(),
+    revokedAt: timestamp('revoked_at'),
+  },
+  (t) => [
+    uniqueIndex('recorder_tokens_install_hash').on(t.installId, t.tokenHash),
+    index('recorder_tokens_user').on(t.userId, t.installId),
+  ],
+);
+
+/**
+ * One per challenge: Approve on /connect writes it `approved` for 10
+ * minutes, Cancel writes it `denied`, and the recorder's poll exchanges an
+ * approved one for a token (`redeemed`). No row exists before Approve or
+ * Cancel, so a caller without a session never writes one.
+ */
+export const recorderGrants = sqliteTable(
+  'recorder_grants',
+  {
+    installId: installId(),
+    /** base64url SHA-256 of the recorder's code verifier (RFC 7636 S256). */
+    challenge: text('challenge').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    deviceName: text('device_name').notNull(),
+    status: text('status', { enum: RECORDER_GRANT_STATUSES }).notNull(),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at').notNull(),
+    /** The last poll that was let through: one per second per grant. */
+    lastPollAt: timestamp('last_poll_at'),
+    /** The token a redeemed grant became. */
+    tokenId: text('token_id'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.installId, t.challenge] }),
+    index('recorder_grants_user').on(t.userId, t.status),
+    inValues('recorder_grants', 'status', RECORDER_GRANT_STATUSES),
+  ],
+);
+
 export type Settings = typeof settings.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;
@@ -606,3 +669,6 @@ export type RecapVersion = typeof recapVersions.$inferSelect;
 export type RecapStatus = (typeof RECAP_STATUSES)[number];
 export type RecapProvider = (typeof RECAP_PROVIDERS)[number];
 export type Decision = typeof decisions.$inferSelect;
+export type RecorderToken = typeof recorderTokens.$inferSelect;
+export type RecorderGrant = typeof recorderGrants.$inferSelect;
+export type RecorderGrantStatus = (typeof RECORDER_GRANT_STATUSES)[number];

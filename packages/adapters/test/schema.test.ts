@@ -60,6 +60,8 @@ describe('schema', () => {
       'recap_outbox',
       'recap_versions',
       'recaps',
+      'recorder_grants',
+      'recorder_tokens',
       'recordings',
       'segments',
       'settings',
@@ -103,6 +105,24 @@ describe('schema', () => {
       .where(eq(schema.settings.installId, 'test'));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual({ installId: 'test', ...DEFAULT_SETTINGS });
+  });
+
+  it("seeds a deploy's values into a new row and never over an existing one", async () => {
+    const values = {
+      productName: "Acme's Møder",
+      companyName: 'Acme A/S',
+      language: 'da',
+      interfaceLanguage: 'da',
+      aiGatewayId: 'mtxt-gateway',
+    } as const;
+    db.exec(seedSql('deploy', values));
+    db.exec(seedSql('deploy', { productName: 'Something else' }));
+    const orm = proxy(db);
+    const rows = await orm
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.installId, 'deploy'));
+    expect(rows).toEqual([{ installId: 'deploy', ...DEFAULT_SETTINGS, ...values }]);
   });
 
   it('indexes every foreign key by the referencing column first', () => {
@@ -164,7 +184,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0007 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0008 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -176,10 +196,11 @@ describe('schema', () => {
        INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('t1', 't', 'r1', 'p', 'm', 'da', '{}');
        INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('s1', 't', 'm1', 'Speaker 1');
        INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text) VALUES
-         ('g1', 't', 't1', 's1', 0, 1, 'a'), ('g2', 't', 't1', 's1', 1, 2, 'b'), ('g3', 't', 't1', 's1', 2, 3, 'c');`,
+         ('g1', 't', 't1', 's1', 0, 1, 'a'), ('g2', 't', 't1', 's1', 1, 2, 'b'), ('g3', 't', 't1', 's1', 2, 3, 'c');
+       INSERT INTO audit_events (id, install_id, user_id, meeting_id, action, at) VALUES ('a1', 't', 'u1', 'm1', 'opened', 1000);`,
     );
     const counts = () =>
-      ['meetings', 'recordings', 'transcripts', 'speakers', 'segments'].map(
+      ['meetings', 'recordings', 'transcripts', 'speakers', 'segments', 'audit_events'].map(
         (table) => (old.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n,
       );
     const before = counts();
@@ -194,11 +215,12 @@ describe('schema', () => {
       '0004_transcription.sql',
       '0005_transcription_claims.sql',
       '0006_access_retention.sql',
-      '0007_recap.sql',
+      '0007_recorder_connection.sql',
+      '0008_recap.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);
-    expect(before).toEqual([1, 1, 1, 1, 3]);
+    expect(before).toEqual([1, 1, 1, 1, 3, 1]);
     // Packet-1 recordings keep working: a media type from the extension, confirmed at their start.
     expect(
       old.prepare(`SELECT content_type, created_at, confirmed_at FROM recordings`).get(),
@@ -228,8 +250,8 @@ describe('schema', () => {
     ).toEqual([{ meeting_id: 'm1' }]);
   });
 
-  it('only adds to the schema: 0003, 0006 and 0007 drop and rebuild nothing', async () => {
-    for (const file of ['0003_capture.sql', '0006_access_retention.sql', '0007_recap.sql']) {
+  it('only adds to the schema: 0003, 0006 and 0008 drop and rebuild nothing', async () => {
+    for (const file of ['0003_capture.sql', '0006_access_retention.sql', '0008_recap.sql']) {
       const sql = await readFile(new URL(file, migrationsDir), 'utf8');
       expect(sql, file).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
     }

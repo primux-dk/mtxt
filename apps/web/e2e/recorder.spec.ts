@@ -20,7 +20,7 @@ test('records 3 seconds, uploads while recording, and opens the meeting', async 
   await settle(page);
   await page.screenshot({ path: shot('recorder-1280') });
 
-  await page.getByRole('button', { name: 'Record' }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
   const stop = page.getByRole('button', { name: 'Stop' });
   await expect(stop).toBeFocused();
   await expect(page.getByTestId('recording-indicator')).toHaveText('Recording');
@@ -37,7 +37,7 @@ test('records 3 seconds, uploads while recording, and opens the meeting', async 
 test('the recorder on a phone', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await page.goto('/meetings/new');
-  await page.getByRole('button', { name: 'Record' }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
   await expect(page.getByTestId('elapsed')).toHaveText('00:01', { timeout: 10_000 });
   await settle(page);
   await page.screenshot({ path: shot('recorder-390'), fullPage: true });
@@ -70,7 +70,7 @@ for (const failure of failures) {
   test(`${failure.name} says what to do next`, async ({ page }) => {
     await page.addInitScript(failure.script);
     await page.goto('/meetings/new');
-    if (failure.retry) await page.getByRole('button', { name: 'Record' }).click();
+    if (failure.retry) await page.getByRole('button', { name: 'Record', exact: true }).click();
     const alert = page.getByRole('alert').filter({ hasText: failure.title });
     await expect(alert).toBeVisible();
     await expect(alert.getByRole('button', { name: 'Try again' })).toHaveCount(
@@ -83,7 +83,7 @@ for (const failure of failures) {
 async function recordAndStop(page: import('@playwright/test').Page, title: string) {
   await page.goto('/meetings/new');
   await page.getByLabel('Meeting title').fill(title);
-  await page.getByRole('button', { name: 'Record' }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
   await expect(page.getByTestId('elapsed')).toHaveText('00:01', { timeout: 10_000 });
   await page.getByRole('button', { name: 'Stop' }).click();
 }
@@ -208,7 +208,7 @@ test('after Leave, every page warns on unload until the audio is discarded by na
   await expect(discard).toContainText('“Optagelse der skal kasseres”');
   await expect(discard).toContainText('there is no other copy');
   await discard.getByRole('button', { name: 'Discard recording' }).click();
-  await expect(page.getByRole('button', { name: 'Record' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeEnabled();
   await expect(page.getByRole('alert').filter({ hasText: 'not saved yet' })).toHaveCount(0);
 
   // Nothing held: the next reload goes ahead without a question.

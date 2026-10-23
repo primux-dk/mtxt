@@ -20,7 +20,7 @@ const bindable = (value: unknown): SQLInputValue =>
       : (value as SQLInputValue);
 
 /** The part of D1's API that drizzle-orm/d1 calls, on node:sqlite. */
-function fakeD1(sqlite: DatabaseSync) {
+function fakeD1(sqlite: DatabaseSync, log: string[]) {
   class Statement {
     constructor(
       readonly query: string,
@@ -30,6 +30,7 @@ function fakeD1(sqlite: DatabaseSync) {
       return new Statement(this.query, params);
     }
     private prepared() {
+      log.push(this.query);
       return sqlite.prepare(this.query);
     }
     async all() {
@@ -66,7 +67,8 @@ function fakeD1(sqlite: DatabaseSync) {
   };
 }
 
-export function testDb(): { db: Db; sqlite: DatabaseSync } {
+/** `statements` lists every query the database ran, in order, for tests that count them. */
+export function testDb(): { db: Db; sqlite: DatabaseSync; statements: string[] } {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys = ON');
   for (const file of readdirSync(migrationsDir)
@@ -74,8 +76,9 @@ export function testDb(): { db: Db; sqlite: DatabaseSync } {
     .sort()) {
     sqlite.exec(readFileSync(new URL(file, migrationsDir), 'utf8'));
   }
-  const db = drizzle(fakeD1(sqlite) as unknown as D1Database, { schema });
-  return { db, sqlite };
+  const statements: string[] = [];
+  const db = drizzle(fakeD1(sqlite, statements) as unknown as D1Database, { schema });
+  return { db, sqlite, statements };
 }
 
 /** Rows as objects, for assertions. */

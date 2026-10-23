@@ -31,6 +31,12 @@ export async function AuditTable({
   const details = (row: AuditRow) => {
     const d = row.details;
     if (!d) return null;
+    if (
+      (row.action === 'recorder_connected' || row.action === 'recorder_disconnected') &&
+      typeof d.device === 'string'
+    ) {
+      return t('details.device', { device: d.device });
+    }
     if (row.action === 'visibility_changed' && typeof d.before === 'string') {
       const change = t('details.visibility', {
         before: tv(d.before as 'private'),

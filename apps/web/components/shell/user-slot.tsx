@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth';
 import { Avatar } from '@/components/ui/avatar';
+import { RecordersDialog } from './recorders-dialog';
 
 export { Avatar };
 
@@ -16,7 +17,7 @@ async function signOutAction() {
   await signOut({ redirectTo: '/login' });
 }
 
-/** The signed-in user: name, the company line and "Sign out". */
+/** The signed-in user: name, the company line, "Recorders" and "Sign out". */
 export async function UserSlot({
   user,
   companyName,
@@ -40,12 +41,15 @@ export async function UserSlot({
           )}
         </div>
       </div>
-      <form action={signOutAction}>
-        <Button type="submit" variant="quiet" className="w-full justify-start px-2">
-          <LogOut aria-hidden="true" />
-          {t('signOut')}
-        </Button>
-      </form>
+      <div className="grid gap-1">
+        <RecordersDialog />
+        <form action={signOutAction}>
+          <Button type="submit" variant="quiet" className="w-full justify-start px-2">
+            <LogOut aria-hidden="true" />
+            {t('signOut')}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

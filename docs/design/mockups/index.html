@@ -1253,7 +1253,7 @@ ugeplan</textarea>
 <li data-i18n="settings.dataflow.step3">The configured language model writes the recap from the transcript, with requests passing through AI Gateway. Meeting data is stored in D1.</li>
 <li data-i18n="settings.dataflow.step4" data-i18n-args='{"audioDays":30,"textDays":365}'>Audio is deleted after 30 days. Transcripts and recaps are deleted after 365 days. Keep prevents both deletions.</li>
 </ol>
-<p><strong data-i18n="settings.dataflow.promise">Processing is not guaranteed to stay in the EU.</strong> <span data-i18n="settings.dataflow.caveats">D1 has no jurisdiction setting. Worker placement is best effort, normally at the data centre nearest the request; regional restrictions require the Enterprise-only Data Localization Suite. Workers AI and AI Gateway are not covered by Regional Services.</span></p>
+<p><strong data-i18n="settings.dataflow.promise">Processing is not guaranteed to stay in the EU.</strong> <span data-i18n="settings.dataflow.caveats">The install tooling creates the D1 database and the queues with EU jurisdiction. Worker placement is best effort, normally at the data centre nearest the request; regional restrictions require the Enterprise-only Data Localization Suite. Workers AI and AI Gateway are not covered by Regional Services.</span></p>
 <p data-i18n="settings.dataflow.local">A local live transcript stays on the computer and is discarded when the meeting ends. After the server confirms a recording, the recorder keeps the audio locally for 7 days. Without a confirmation it keeps the file and retries.</p>
 </aside>
 <div class="row between savebar">
