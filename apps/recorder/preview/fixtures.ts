@@ -200,6 +200,13 @@ export const review: QueueItem[] = [
     local_error: 'Permission denied (os error 13)',
     can_save: true,
   }),
+  item({ id: 'r7', title: 'Projektmøde', status: 'uploading', needs_review: true, can_save: true }),
+  item({
+    id: 'r8',
+    title: 'Planlægning',
+    status: 'uploading',
+    unsaved: 'No space left on device (os error 28)',
+  }),
   item({
     id: 'r6',
     title: 'Leverancer',

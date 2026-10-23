@@ -18,7 +18,7 @@
 | `main-ask.png` | The 7-day question |
 | `main-mic-only.png` | System audio not allowed: recording the microphone only |
 | `main-model-dialog.png` | The size warning before a model download |
-| `main-review.png`, `main-review-scrolled.png`, `main-review-da.png` | After the Codex review: Connect to another install, Recorded by another user, a recovered recording (Upload as me), a write failure, an unreadable file, transcription failed on the server, a damaged entry; each with its next step |
+| `main-review.png`, `main-review-scrolled.png`, `main-review-da.png` | After the Codex review: Connect to another install, Recorded by another user, a recovered recording (Upload as me), a write failure, an unreadable file, transcription failed on the server, a damaged entry, an interrupted recording (Upload), a change not saved on the Mac (Try again); each with its next step |
 | `main-mic-lost.png` | The microphone was disconnected during a recording; system audio continues |
 | `main-state-save.png` | The queue could not be saved on the Mac, with Try again |
 | `main-figure05-da.png`, `main-figure05-dark.png`, `main-hard-da-dark.png` | Danish and dark |
