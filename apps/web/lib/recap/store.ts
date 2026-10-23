@@ -12,9 +12,9 @@
 
   Plain TypeScript with no Next.js imports: the queue consumer uses it too.
 */
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { schema, syncSearch, type Db } from '@mtxt/adapters';
-import { decisionRows, type DecisionRow } from './decisions';
+import { decisionRows, keepKnownMentions, mentionedIds, type DecisionRow } from './decisions';
 import { parseMarkdown, plainText, toMarkdown } from './markdown';
 
 const c = schema.recaps;
@@ -159,7 +159,8 @@ export async function speakerUsers(db: Db, installId: string, meetingId: string)
 }
 
 export type WriteResult =
-  | { ok: true; version: VersionInfo }
+  /** `bodyMd` is what was stored: the save's text through the schema, foreign images and mentions removed. */
+  | { ok: true; version: VersionInfo; bodyMd: string }
   | { ok: false; reason: 'conflict'; current: VersionInfo | null }
   | { ok: false; reason: 'superseded' | 'not_found' };
 
@@ -187,12 +188,26 @@ export async function writeVersion(
   installId: string,
   input: WriteInput,
 ): Promise<WriteResult> {
-  const doc = parseMarkdown(input.bodyMd);
+  // Images of other meetings become their alt text.
+  const parsed = parseMarkdown(input.bodyMd, { meetingId: input.meetingId });
+  // Mentions of people outside this install or this meeting become plain names.
+  const ids = mentionedIds(parsed);
+  const speakers = await speakerUsers(db, installId, input.meetingId);
+  const users = ids.users.size
+    ? await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(and(eq(schema.users.installId, installId), inArray(schema.users.id, [...ids.users])))
+    : [];
+  const doc = keepKnownMentions(parsed, {
+    users: new Set(users.map((u) => u.id)),
+    speakers: new Set(speakers.keys()),
+  });
   const bodyMd = toMarkdown(doc);
   if (new TextEncoder().encode(bodyMd).byteLength > MAX_BODY_BYTES) {
     throw new Error('The recap is too long to store.');
   }
-  const rows: DecisionRow[] = decisionRows(doc, await speakerUsers(db, installId, input.meetingId));
+  const rows: DecisionRow[] = decisionRows(doc, speakers);
   const id = crypto.randomUUID();
   const at = (input.now ?? new Date()).getTime();
   const guard =
@@ -250,7 +265,7 @@ export async function writeVersion(
     recap: { id: input.recapId, bodyMd: plainText(doc) },
   }).catch((error) => console.error('Could not index the recap', (error as Error).name));
   const version = await versionInfo(db, installId, id);
-  return { ok: true, version: version! };
+  return { ok: true, version: version!, bodyMd };
 }
 
 /**

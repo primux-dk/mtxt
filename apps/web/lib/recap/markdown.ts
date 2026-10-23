@@ -29,7 +29,7 @@ import {
   type MarkdownSerializerState,
   defaultMarkdownSerializer,
 } from 'prosemirror-markdown';
-import { IMAGE_SRC, MENTION_ID, recapExtensions } from './extensions';
+import { allowedImage, MENTION_ID, recapExtensions } from './extensions';
 
 let cachedSchema: Schema | null = null;
 /** The recap schema, built once. */
@@ -143,7 +143,7 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
           openDetails(inline[1]!);
           const before = out.length;
           const body = inline[2]!.trim();
-          if (body) out.push(...md.parse(body, {}));
+          if (body) out.push(...md.parse(body, state.env));
           if (out.length === before) out.push(...literal(state, ''));
           closeDetails();
           break;
@@ -353,7 +353,7 @@ function rewriteInline(state: StateCore, children: Token[]): Token[] {
       out.push(text);
       continue;
     }
-    if (t.type === 'image' && !IMAGE_SRC.test(t.attrGet('src') ?? '')) {
+    if (t.type === 'image' && !allowedImage(t.attrGet('src'), (state.env as ParseEnv).meetingId)) {
       const text = tok(state, 'text', '', 0);
       text.content = (t.children ?? []).map((c) => c.content).join('');
       if (text.content) out.push(text);
@@ -432,11 +432,20 @@ function parser(): MarkdownParser {
   return cachedParser;
 }
 
-/** The markdown as a recap document. Never throws on odd input: what it cannot place becomes text. */
-export function parseMarkdown(markdown: string): PmNode {
+interface ParseEnv {
+  /** When set, an image is kept only when it is this meeting's own. */
+  meetingId?: string;
+}
+
+/**
+ * The markdown as a recap document. Never throws on odd input: what it
+ * cannot place becomes text. With `meetingId`, images of other meetings
+ * become their alt text too.
+ */
+export function parseMarkdown(markdown: string, env: ParseEnv = {}): PmNode {
   const schema = recapSchema();
   try {
-    const doc = parser().parse(markdown.replace(/\r\n?/g, '\n'));
+    const doc = parser().parse(markdown.replace(/\r\n?/g, '\n'), { ...env });
     doc.check();
     return doc;
   } catch {

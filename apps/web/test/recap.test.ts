@@ -472,3 +472,54 @@ describe('the recap model', () => {
     ).rejects.toMatchObject({ reason: 'unauthorised' });
   });
 });
+
+describe('decision owners stay inside the install (packet 5 review)', () => {
+  it('turns a mention of a user of another install, or of nobody, into a plain name with no owner', async () => {
+    const { db, raw } = await testDb();
+    seedTranscript(raw);
+    raw.exec(`INSERT INTO users (id, install_id, oidc_subject, email, name) VALUES
+      ('foreign-user', 'other-install', 'f', 'f@example.com', 'Fremmed')`);
+    const started = (await beginDraft(db, INSTALL, 'meet-1', null))!;
+    const body =
+      '<!-- decisions -->\n- [ ] Fremmed ejer [@Fremmed](mtxt:user/foreign-user)\n' +
+      '- [ ] Ukendt ejer [@Ingen](mtxt:user/no-such-user)\n' +
+      '- [ ] Fremmed taler [@Speaker 9](mtxt:speaker/other-meeting-speaker)\n' +
+      '- [ ] Rigtig ejer [@Anne Holm](mtxt:user/u-anne)\n<!-- /decisions -->\n';
+    const written = await writeVersion(db, INSTALL, {
+      recapId: started.recapId,
+      meetingId: 'meet-1',
+      bodyMd: body,
+      authorId: null,
+      draftToken: started.token,
+    });
+    if (!written.ok) throw new Error('not written');
+    expect(written.bodyMd).toContain('Fremmed ejer @Fremmed');
+    expect(written.bodyMd).toContain('Ukendt ejer @Ingen');
+    expect(written.bodyMd).toContain('Fremmed taler @Speaker 9');
+    expect(written.bodyMd).not.toContain('foreign-user');
+    expect(written.bodyMd).toContain('[@Anne Holm](mtxt:user/u-anne)');
+    expect((await listDecisions(db, INSTALL, started.recapId)).map((d) => d.ownerUserId)).toEqual([
+      null,
+      null,
+      null,
+      'u-anne',
+    ]);
+  });
+
+  it('keeps images of this meeting only', async () => {
+    const { db, raw } = await testDb();
+    seedTranscript(raw);
+    const started = (await beginDraft(db, INSTALL, 'meet-1', null))!;
+    const own = '/api/v1/meetings/meet-1/recap/images/0b3f2c1e-7a5d-4c8e-9f10-2a3b4c5d6e7f.png';
+    const other = '/api/v1/meetings/meet-2/recap/images/0b3f2c1e-7a5d-4c8e-9f10-2a3b4c5d6e7f.png';
+    const written = await writeVersion(db, INSTALL, {
+      recapId: started.recapId,
+      meetingId: 'meet-1',
+      bodyMd: `![Egen](${own})\n\n![Andet møde](${other})\n\n![Fjern](https://example.com/x.png)\n`,
+      authorId: null,
+      draftToken: started.token,
+    });
+    if (!written.ok) throw new Error('not written');
+    expect(written.bodyMd).toBe(`![Egen](${own})\n\nAndet møde\n\nFjern\n`);
+  });
+});

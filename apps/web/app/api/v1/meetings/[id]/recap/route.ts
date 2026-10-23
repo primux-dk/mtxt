@@ -33,7 +33,8 @@ export async function PUT(request: Request, { params }: Params) {
       authorId: user.id,
       base: { versionId: base },
     });
-    if (result.ok) return json({ version: versionView(result.version) });
+    // The stored text: the editor takes it when it differs from what it sent.
+    if (result.ok) return json({ version: versionView(result.version), body_md: result.bodyMd });
     if (result.reason === 'conflict') {
       return json(
         {

@@ -176,3 +176,54 @@ export function decisionRows(
   });
   return rows;
 }
+
+/**
+ * Mentions of people this install does not have become plain `@Name` text:
+ * a user id must be a user of this install, a speaker id a speaker of this
+ * meeting. Run on every body before it is stored, so a forged or stale id can
+ * neither own a decision nor reach the database (packet 5 review).
+ */
+export function keepKnownMentions(
+  doc: PmNode,
+  known: { users: ReadonlySet<string>; speakers: ReadonlySet<string> },
+): PmNode {
+  const schema = recapSchema();
+  const map = (node: PmNode): PmNode => {
+    if (node.isLeaf) return node;
+    let changed = false;
+    const children: PmNode[] = [];
+    node.forEach((child) => {
+      if (child.type.name === 'mention') {
+        const match = MENTION_ID.exec(String(child.attrs.id ?? ''));
+        const ok =
+          match &&
+          (match[1] === 'user' ? known.users.has(match[2]!) : known.speakers.has(match[2]!));
+        if (!ok) {
+          changed = true;
+          const label = String(child.attrs.label ?? '').trim();
+          if (label) children.push(schema.text(`@${label}`, child.marks));
+          return;
+        }
+      }
+      const next = map(child);
+      if (next !== child) changed = true;
+      children.push(next);
+    });
+    return changed ? node.copy(Fragment.from(children)) : node;
+  };
+  return map(doc);
+}
+
+/** The user and speaker ids a body mentions, to look up before it is stored. */
+export function mentionedIds(doc: PmNode) {
+  const users = new Set<string>();
+  const speakers = new Set<string>();
+  doc.descendants((node) => {
+    const match =
+      node.type.name === 'mention' ? MENTION_ID.exec(String(node.attrs.id ?? '')) : null;
+    if (match?.[1] === 'user') users.add(match[2]!);
+    if (match?.[1] === 'speaker') speakers.add(match[2]!);
+    return true;
+  });
+  return { users, speakers };
+}

@@ -126,7 +126,13 @@ export function recapMention(suggestion?: MentionOptions['suggestion']) {
 
 /** Image sources the recap may show: the meeting's own permission-checked image route, nothing remote. */
 export const IMAGE_SRC =
-  /^\/api\/v1\/meetings\/[A-Za-z0-9_-]{1,64}\/recap\/images\/[a-f0-9-]{36}\.(png|jpg|gif|webp)$/;
+  /^\/api\/v1\/meetings\/([A-Za-z0-9_-]{1,64})\/recap\/images\/[a-f0-9-]{36}\.(png|jpg|gif|webp)$/;
+
+/** Whether `src` is an image of this meeting (or of any meeting, when none is named). */
+export function allowedImage(src: unknown, meetingId?: string): boolean {
+  const match = IMAGE_SRC.exec(typeof src === 'string' ? src : '');
+  return Boolean(match && (!meetingId || match[1] === meetingId));
+}
 
 /**
  * Markdown's `#` is the recap's own top level, but the page already has its
