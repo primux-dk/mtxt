@@ -3,6 +3,7 @@
 export type Permission = 'granted' | 'denied' | 'not_determined' | 'unsupported';
 export type Status =
   | 'failed_local'
+  | 'discarding'
   | 'unreadable'
   | 'recording'
   | 'uploading'

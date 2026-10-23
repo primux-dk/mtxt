@@ -441,6 +441,8 @@ export function statusOf(q: QueueItem): StatusView {
       };
     case 'deleted':
       return { icon: 'check', cls: 'muted', text: t('recorder.queue.deleted') };
+    case 'discarding':
+      return { icon: 'warning', cls: 'muted', text: t('recorder.queue.discarding') };
     case 'saved_elsewhere':
       return { icon: 'check', cls: 'muted', text: t('recorder.queue.savedElsewhere') };
   }

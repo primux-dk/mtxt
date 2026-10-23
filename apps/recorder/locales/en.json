@@ -148,5 +148,7 @@
   "recorder.delete.busy": "The recording is still recording or uploading · Try again when it is done",
   "recorder.delete.noFile": "The audio is no longer on this Mac",
   "recorder.delete.needsConfirm": "Confirm the deletion first",
-  "recorder.menu.more": "More actions"
+  "recorder.menu.more": "More actions",
+  "recorder.queue.discarding": "Deleting from this Mac",
+  "recorder.delete.failed": "Could not delete the files on this Mac · Try again"
 }

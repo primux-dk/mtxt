@@ -148,5 +148,7 @@
   "recorder.delete.busy": "Optagelsen optager eller overføres stadig · Prøv igen, når den er færdig",
   "recorder.delete.noFile": "Lyden ligger ikke længere på denne Mac",
   "recorder.delete.needsConfirm": "Bekræft sletningen først",
-  "recorder.menu.more": "Flere handlinger"
+  "recorder.menu.more": "Flere handlinger",
+  "recorder.queue.discarding": "Sletter fra denne Mac",
+  "recorder.delete.failed": "Filerne kunne ikke slettes på denne Mac · Prøv igen"
 }

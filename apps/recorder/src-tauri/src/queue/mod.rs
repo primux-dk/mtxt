@@ -24,6 +24,35 @@ pub trait Persist: Send + Sync {
     fn save(&self, rec: &RecordingState) -> std::io::Result<()>;
 }
 
+/// The file side of a deletion: the store, or a test double that fails on purpose.
+pub trait Files {
+    fn remove_state(&self, id: &str) -> std::io::Result<()>;
+    fn delete_audio(&self, id: &str) -> std::io::Result<()>;
+}
+
+impl Files for store::Store {
+    fn remove_state(&self, id: &str) -> std::io::Result<()> {
+        store::Store::remove_state(self, id)
+    }
+    fn delete_audio(&self, id: &str) -> std::io::Result<()> {
+        store::Store::delete_audio(self, id)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DiscardError {
+    /// Still recording or uploading.
+    Busy,
+    /// Its latest state is not on the disk yet.
+    Unsaved,
+    /// Nothing to delete here, or not a recording the library lacks.
+    NotDiscardable,
+    /// The state write failed: both files are as they were.
+    NotSaved(String),
+    /// A file could not be removed after Discarding was written.
+    Files(String),
+}
+
 impl Persist for store::Store {
     fn save(&self, rec: &RecordingState) -> std::io::Result<()> {
         store::Store::save(self, rec)
@@ -152,6 +181,41 @@ impl Queue {
         first.map_or(Ok(()), Err)
     }
 
+    /// "Delete from this Mac" for a recording the library does not have:
+    /// write Discarding (the same guarded write as every transition), then
+    /// remove the state file, then the audio, then the entry. A failed state
+    /// write leaves both files; a failure after it leaves Discarding on disk,
+    /// which `finish_discards` completes at the next start.
+    pub fn discard(&mut self, p: &dyn Persist, f: &dyn Files, id: &str, active: bool, now: DateTime<Utc>) -> Result<(), DiscardError> {
+        let rec = self.get(id).ok_or(DiscardError::NotDiscardable)?;
+        if active || matches!(rec.status, Status::Recording | Status::Uploading) {
+            return Err(DiscardError::Busy);
+        }
+        if !self.is_saved(id) {
+            return Err(DiscardError::Unsaved);
+        }
+        if rec.status != Status::Discarding {
+            if !rec.can_save_elsewhere() {
+                return Err(DiscardError::NotDiscardable);
+            }
+            self.apply(p, id, Event::Discard, now, OnFail::Revert).map_err(DiscardError::NotSaved)?;
+        }
+        f.remove_state(id).map_err(|e| DiscardError::Files(e.to_string()))?;
+        f.delete_audio(id).map_err(|e| DiscardError::Files(e.to_string()))?;
+        self.items.retain(|r| r.id != id);
+        Ok(())
+    }
+
+    /// Finish deletions a crash interrupted (entries still Discarding).
+    pub fn finish_discards(&mut self, p: &dyn Persist, f: &dyn Files, now: DateTime<Utc>) {
+        let ids: Vec<String> = self.items.iter().filter(|r| r.status == Status::Discarding).map(|r| r.id.clone()).collect();
+        for id in ids {
+            if let Err(e) = self.discard(p, f, &id, false, now) {
+                log::warn!("{id}: the interrupted deletion did not finish: {e:?}");
+            }
+        }
+    }
+
     /// The next upload for a connection: due, of this install and user, and saved.
     pub fn next_upload(&self, c: &select::Connection, now: DateTime<Utc>) -> Option<&RecordingState> {
         self.items
@@ -239,6 +303,82 @@ mod tests {
         p.fail.store(false, Ordering::SeqCst);
         q.retry(&p).unwrap();
         assert_eq!(p.store.read("r").unwrap().status, Status::FailedLocal);
+    }
+
+    /// Files that refuse to remove the state file.
+    struct StuckState<'a>(&'a store::Store);
+    impl Files for StuckState<'_> {
+        fn remove_state(&self, _: &str) -> std::io::Result<()> {
+            Err(std::io::Error::from_raw_os_error(13))
+        }
+        fn delete_audio(&self, id: &str) -> std::io::Result<()> {
+            self.0.delete_audio(id)
+        }
+    }
+
+    fn waiting(p: &Flaky, id: &str) -> RecordingState {
+        let mut rec = RecordingState::new(id.into(), "h".into(), "t".into(), Utc::now());
+        rec.owner = Some(owner());
+        rec.apply(Event::Stopped { at: Utc::now(), duration_s: 1, sha256: "a".into(), size_bytes: 1 }, Utc::now());
+        // Waiting for the network: not uploading now, not in the library.
+        rec.apply(Event::AttemptFailed { reason: PendingReason::Network, retry_at: None }, Utc::now());
+        p.save(&rec).unwrap();
+        std::fs::write(p.store.audio_path(id), b"the only copy").unwrap();
+        rec
+    }
+
+    #[test]
+    fn an_unsaved_entry_is_not_deleted() {
+        // The reviewer's sequence: the entry's latest change is not on the disk.
+        let tmp = tempfile::tempdir().unwrap();
+        let p = Flaky { store: store::Store::new(tmp.path()).unwrap(), fail: AtomicBool::new(false) };
+        let rec = waiting(&p, "r");
+        let mut q = Queue::new(vec![rec]);
+        p.fail.store(true, Ordering::SeqCst);
+        let _ = q.apply(&p, "r", Event::TryNow, Utc::now(), OnFail::Keep);
+        assert!(!q.is_saved("r"));
+        assert_eq!(q.discard(&p, &p.store, "r", false, Utc::now()), Err(DiscardError::Unsaved));
+        assert!(p.store.audio_path("r").exists(), "the only copy was deleted");
+    }
+
+    #[test]
+    fn a_failed_state_write_leaves_both_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = Flaky { store: store::Store::new(tmp.path()).unwrap(), fail: AtomicBool::new(false) };
+        let mut q = Queue::new(vec![waiting(&p, "r")]);
+        p.fail.store(true, Ordering::SeqCst);
+        assert!(matches!(q.discard(&p, &p.store, "r", false, Utc::now()), Err(DiscardError::NotSaved(_))));
+        assert!(p.store.audio_path("r").exists());
+        assert_eq!(p.store.read("r").unwrap().status, Status::Pending);
+        assert_eq!(q.get("r").unwrap().status, Status::Pending);
+    }
+
+    #[test]
+    fn a_state_file_that_will_not_go_keeps_the_audio_and_finishes_later() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = Flaky { store: store::Store::new(tmp.path()).unwrap(), fail: AtomicBool::new(false) };
+        let mut q = Queue::new(vec![waiting(&p, "r")]);
+        assert!(matches!(q.discard(&p, &StuckState(&p.store), "r", false, Utc::now()), Err(DiscardError::Files(_))));
+        assert!(p.store.audio_path("r").exists(), "the audio went before the metadata");
+        assert_eq!(p.store.read("r").unwrap().status, Status::Discarding);
+        // Next start: the deletion the user asked for completes.
+        let mut q2 = Queue::new(p.store.load_all().recordings);
+        q2.finish_discards(&p, &p.store, Utc::now());
+        assert!(q2.items.is_empty());
+        assert!(!p.store.audio_path("r").exists());
+        assert!(p.store.read("r").is_err());
+    }
+
+    #[test]
+    fn busy_and_uploaded_recordings_are_not_discarded() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = Flaky { store: store::Store::new(tmp.path()).unwrap(), fail: AtomicBool::new(false) };
+        let rec = waiting(&p, "r");
+        let mut q = Queue::new(vec![rec]);
+        assert_eq!(q.discard(&p, &p.store, "r", true, Utc::now()), Err(DiscardError::Busy));
+        q.items[0].status = Status::Confirmed;
+        assert_eq!(q.discard(&p, &p.store, "r", false, Utc::now()), Err(DiscardError::NotDiscardable));
+        assert!(p.store.audio_path("r").exists());
     }
 
     #[test]

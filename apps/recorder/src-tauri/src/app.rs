@@ -240,6 +240,11 @@ impl App {
             wake: Notify::new(),
             live_feed: Arc::new(LiveFeed::default()),
         });
+        // Deletions a crash interrupted finish first; their audio is not an orphan.
+        {
+            let mut inner = app.lock();
+            inner.queue.finish_discards(&app.store, &app.store, Utc::now());
+        }
         app.recover_interrupted();
         app.adopt_orphans(loaded.orphans);
         Ok(app)
@@ -1276,13 +1281,16 @@ impl App {
     /// entirely, and only with `confirmed` from the window's named question.
     /// Never while it records or uploads.
     pub fn delete_local(&self, id: &str, confirmed: bool) -> Result<(), String> {
-        let (status, uploading) = {
+        let (status, active, saved) = {
             let inner = self.lock();
             let r = inner.queue.get(id).ok_or("no such recording")?;
-            (r.status, inner.uploading.as_deref() == Some(id))
+            (r.status, inner.uploading.as_deref() == Some(id), inner.queue.is_saved(id))
         };
-        if uploading || matches!(status, Status::Recording | Status::Uploading) {
+        if active || matches!(status, Status::Recording | Status::Uploading) {
             return Err("recorder.delete.busy".into());
+        }
+        if !saved {
+            return Err("recorder.error.stateSave".into());
         }
         match status {
             Status::Confirmed => {
@@ -1292,11 +1300,23 @@ impl App {
             Status::Deleted | Status::SavedElsewhere => return Err("recorder.delete.noFile".into()),
             _ if !confirmed => return Err("recorder.delete.needsConfirm".into()),
             _ => {
-                self.store.forget(id).map_err(|e| e.to_string())?;
-                let mut inner = self.lock();
-                inner.queue.items.retain(|r| r.id != id);
-                if inner.ask.as_deref() == Some(id) {
-                    inner.ask = None;
+                let result = {
+                    let mut inner = self.lock();
+                    let r = inner.queue.discard(&self.store, &self.store, id, false, Utc::now());
+                    if r.is_ok() && inner.ask.as_deref() == Some(id) {
+                        inner.ask = None;
+                    }
+                    r
+                };
+                if let Err(e) = result {
+                    log::warn!("{id}: delete from this Mac: {e:?}");
+                    self.changed();
+                    return Err(match e {
+                        crate::queue::DiscardError::Busy => "recorder.delete.busy",
+                        crate::queue::DiscardError::NotSaved(_) | crate::queue::DiscardError::Unsaved => "recorder.error.stateSave",
+                        _ => "recorder.delete.failed",
+                    }
+                    .into());
                 }
             }
         }
