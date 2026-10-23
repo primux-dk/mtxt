@@ -88,7 +88,7 @@ fn every_struct_matches_its_schema() {
                 token_id: "i".into(),
                 expires_at: "e".into(),
                 device_name: "d".into(),
-                user: RecorderUser { name: "n".into() },
+                user: RecorderUser { id: "u".into(), name: "n".into(), email: "e".into() },
                 install: RecorderInstall {
                     product_name: "p".into(),
                     theme_accent: "#000000".into(),

@@ -26,7 +26,9 @@ pub struct RecorderToken {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RecorderUser {
+    pub id: String,
     pub name: String,
+    pub email: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

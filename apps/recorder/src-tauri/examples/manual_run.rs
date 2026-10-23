@@ -66,7 +66,8 @@ async fn main() {
             peak = (peak.0.max(m), peak.1.max(s));
         }
         println!("peak meter: microphone {:.2}, system {:.2}", peak.0, peak.1);
-        rec.finish().expect("finish");
+        let done = rec.finish().expect("finish");
+        println!("gaps {:?}", done.gaps);
     } else {
         let wav = std::fs::read(flag("--wav").expect("--wav or --capture")).unwrap();
         let samples: Vec<f32> = wav[44..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();

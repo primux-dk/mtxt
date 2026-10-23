@@ -148,6 +148,47 @@ pub fn duration_of(path: &Path) -> std::io::Result<f64> {
     Ok(granule.saturating_sub(pre_skip) as f64 / f64::from(RATE))
 }
 
+/// What a full read of a recording file found.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Inspection {
+    /// Opus packets after the two headers.
+    pub audio_packets: u64,
+    pub duration_s: f64,
+}
+
+/// Read the whole file through an Ogg reader. An I/O error is an error: the
+/// caller keeps the file and says it could not be read. A damaged page at the
+/// end (a crash in the middle of a write) ends the count without an error.
+pub fn inspect(path: &Path) -> std::io::Result<Inspection> {
+    let file = File::open(path)?;
+    let mut reader = ogg::PacketReader::new(std::io::BufReader::new(file));
+    let mut packets = 0u64;
+    let mut pre_skip = 0u64;
+    let mut granule = 0u64;
+    loop {
+        match reader.read_packet() {
+            Ok(Some(p)) => {
+                if packets == 0 && p.data.starts_with(b"OpusHead") && p.data.len() >= 12 {
+                    pre_skip = u16::from_le_bytes([p.data[10], p.data[11]]) as u64;
+                }
+                if p.absgp_page() != u64::MAX {
+                    granule = granule.max(p.absgp_page());
+                }
+                packets += 1;
+            }
+            Ok(None) => break,
+            // A torn last page reads as an early end of file, not as a failed read.
+            Err(ogg::OggReadError::ReadError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(ogg::OggReadError::ReadError(e)) => return Err(e),
+            Err(e) => {
+                log::warn!("{}: the Ogg stream ends in a damaged page: {e}", path.display());
+                break;
+            }
+        }
+    }
+    Ok(Inspection { audio_packets: packets.saturating_sub(2), duration_s: granule.saturating_sub(pre_skip) as f64 / f64::from(RATE) })
+}
+
 fn find(hay: &[u8], needle: &[u8]) -> Option<usize> {
     hay.windows(needle.len()).position(|w| w == needle)
 }
@@ -209,5 +250,17 @@ mod tests {
         }
         // Two full pages of 50 packets reached the disk.
         assert!((duration_of(&path).unwrap() - 2.0).abs() < 1e-6);
+        let seen = inspect(&path).unwrap();
+        assert_eq!(seen.audio_packets, 100);
+        assert!((seen.duration_s - 2.0).abs() < 1e-6);
+        // Half a page torn off the end still reads up to the damage.
+        let len = std::fs::metadata(&path).unwrap().len();
+        std::fs::OpenOptions::new().write(true).open(&path).unwrap().set_len(len - 100).unwrap();
+        assert_eq!(inspect(&path).unwrap().audio_packets, 50);
+        // Headers only: no audio.
+        let empty = dir.path().join("empty.ogg");
+        OggOpusWriter::create(&empty).unwrap().sync().unwrap();
+        assert_eq!(inspect(&empty).unwrap().audio_packets, 0);
+        assert!(inspect(&dir.path().join("missing.ogg")).is_err());
     }
 }

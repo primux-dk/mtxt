@@ -33,6 +33,11 @@ pub struct Connection {
     pub token_id: String,
     pub expires_at: String,
     pub device_name: String,
+    /// The library user's id and address: the owner of what this connection records.
+    #[serde(default)]
+    pub user_id: String,
+    #[serde(default)]
+    pub user_email: String,
     pub user_name: String,
     pub product_name: String,
     pub theme_accent: String,
@@ -67,6 +72,13 @@ impl Profile {
             .unwrap_or_else(|| self.connection.as_ref().map(|c| c.live_transcript_default).unwrap_or(false))
     }
 
+    /// The owner a new recording gets: the connected user.
+    pub fn owner(&self) -> Option<crate::queue::state::Owner> {
+        let c = self.connection.as_ref()?;
+        (!c.user_id.is_empty())
+            .then(|| crate::queue::state::Owner { user_id: c.user_id.clone(), email: c.user_email.clone() })
+    }
+
     pub fn product_name(&self) -> String {
         self.connection.as_ref().map(|c| c.product_name.clone()).unwrap_or_else(|| "mtxt Recorder".into())
     }
@@ -81,6 +93,8 @@ mod tests {
             token_id: "t".into(),
             expires_at: "2027-04-21T00:00:00Z".into(),
             device_name: "Mac".into(),
+            user_id: "u1".into(),
+            user_email: "mette.lund@example.com".into(),
             user_name: "Mette Lund".into(),
             product_name: "Primux Møder".into(),
             theme_accent: "#566b45".into(),

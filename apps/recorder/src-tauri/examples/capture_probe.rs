@@ -21,6 +21,6 @@ fn main() {
         peak = (peak.0.max(m), peak.1.max(s));
     }
     println!("peak meter: microphone {:.2}, system {:.2}", peak.0, peak.1);
-    let duration = rec.finish().expect("finish");
+    let duration = rec.finish().expect("finish").duration_s;
     println!("wrote {path}: {duration:.2} s");
 }

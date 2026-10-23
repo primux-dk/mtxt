@@ -11,8 +11,9 @@ use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use mtxt_recorder::api::{Api, PollResult};
 use mtxt_recorder::connect::Pkce;
-use mtxt_recorder::queue::state::{Event, PendingReason, RecordingState, Status};
-use mtxt_recorder::queue::uploader::{attempt, Outcome};
+use mtxt_recorder::queue::state::{Event, Owner, PendingReason, RecordingState, Status};
+use mtxt_recorder::queue::select::{next_upload, status_targets, Connection};
+use mtxt_recorder::queue::uploader::{attempt, refresh_server_status, Outcome};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
@@ -52,6 +53,8 @@ struct Mock {
     pending_polls: u32,
     polls: u32,
     deleted_tokens: Vec<String>,
+    /// Every request this install received.
+    requests: u32,
 }
 
 type S = Arc<Mutex<Mock>>;
@@ -76,6 +79,7 @@ fn recording_json(id: &str, r: &Rec) -> Value {
 
 async fn create(State(s): State<S>, h: HeaderMap, Json(body): Json<Value>) -> Response {
     let mut m = s.lock().unwrap();
+    m.requests += 1;
     if !authed(&h, &m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
@@ -100,6 +104,7 @@ async fn create(State(s): State<S>, h: HeaderMap, Json(body): Json<Value>) -> Re
 
 async fn chunk(State(s): State<S>, h: HeaderMap, Path((id, n)): Path<(String, u64)>, body: Bytes) -> Response {
     let mut m = s.lock().unwrap();
+    m.requests += 1;
     if !authed(&h, &m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
@@ -126,6 +131,7 @@ async fn chunk(State(s): State<S>, h: HeaderMap, Path((id, n)): Path<(String, u6
 
 async fn complete(State(s): State<S>, h: HeaderMap, Path(id): Path<String>, Json(body): Json<Value>) -> Response {
     let mut m = s.lock().unwrap();
+    m.requests += 1;
     if !authed(&h, &m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
@@ -160,7 +166,8 @@ async fn complete(State(s): State<S>, h: HeaderMap, Path(id): Path<String>, Json
 }
 
 async fn get_rec(State(s): State<S>, h: HeaderMap, Path(id): Path<String>) -> Response {
-    let m = s.lock().unwrap();
+    let mut m = s.lock().unwrap();
+    m.requests += 1;
     if !authed(&h, &m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
@@ -172,6 +179,7 @@ async fn get_rec(State(s): State<S>, h: HeaderMap, Path(id): Path<String>) -> Re
 
 async fn token(State(s): State<S>, Json(body): Json<Value>) -> Response {
     let mut m = s.lock().unwrap();
+    m.requests += 1;
     let challenge = body["challenge"].as_str().unwrap_or("");
     let verifier = body["verifier"].as_str().unwrap_or("");
     if mtxt_recorder::connect::challenge_for(verifier) != challenge {
@@ -186,7 +194,7 @@ async fn token(State(s): State<S>, Json(body): Json<Value>) -> Response {
     }
     Json(json!({
         "token": TOKEN, "token_id": "tok1", "expires_at": "2027-04-21T09:00:00Z", "device_name": "Mettes Mac",
-        "user": { "name": "Mette Lund" },
+        "user": { "id": "u1", "name": "Mette Lund", "email": "mette.lund@example.com" },
         "install": { "product_name": "Primux Møder", "theme_accent": "#566b45", "theme_primary": "#111111",
                      "interface_language": "da", "live_transcript_default": true }
     }))
@@ -195,6 +203,7 @@ async fn token(State(s): State<S>, Json(body): Json<Value>) -> Response {
 
 async fn revoke(State(s): State<S>, h: HeaderMap, Path(id): Path<String>) -> Response {
     let mut m = s.lock().unwrap();
+    m.requests += 1;
     if !authed(&h, &m) {
         return error(StatusCode::UNAUTHORIZED, "unauthorized");
     }
@@ -229,6 +238,7 @@ fn recording(origin: &str) -> (tempfile::TempDir, std::path::PathBuf, RecordingS
     std::fs::File::create(&path).unwrap().write_all(&data).unwrap();
     let (sha256, size) = mtxt_recorder::queue::chunks::hash_file(&path).unwrap();
     let mut rec = RecordingState::new("local1".into(), origin.into(), "Produktionsmøde".into(), chrono::Utc::now());
+    rec.owner = Some(Owner { user_id: "u1".into(), email: "mette.lund@example.com".into() });
     rec.apply(Event::Stopped { at: chrono::Utc::now(), duration_s: 60, sha256, size_bytes: size }, chrono::Utc::now());
     (dir, path, rec)
 }
@@ -368,4 +378,89 @@ async fn the_token_poll_waits_then_gets_the_token_once_and_disconnect_revokes_it
     api.revoke(&token.token, &token.token_id).await.unwrap();
     assert!(api.revoke(&token.token, "someone-else").await.is_err());
     assert_eq!(state.lock().unwrap().deleted_tokens, vec!["tok1"]);
+}
+
+/// What the app's uploader loop and status poll do, for a few rounds, with
+/// one connection: choose through `select`, send only to the connection's host.
+async fn run_queue(queue: &mut [RecordingState], host: &str, user: &Owner, files: &std::collections::HashMap<String, std::path::PathBuf>) {
+    let api = Api::new(host).unwrap();
+    for _ in 0..10 {
+        let c = Connection { host, user };
+        let Some(id) = next_upload(queue, &c, chrono::Utc::now()).map(|r| r.id.clone()) else { break };
+        let rec = queue.iter_mut().find(|r| r.id == id).unwrap();
+        attempt(rec, &api, TOKEN, &files[&id], &mut |_: &RecordingState| {}).await;
+    }
+    let since = chrono::Utc::now() - chrono::Duration::hours(24);
+    let c = Connection { host, user };
+    let ids: Vec<String> = status_targets(queue, &c, since).iter().map(|r| r.id.clone()).collect();
+    for id in ids {
+        let rec = queue.iter_mut().find(|r| r.id == id).unwrap();
+        refresh_server_status(rec, &api, TOKEN).await.unwrap();
+    }
+}
+
+fn queued(id: &str, host: &str, user: &Owner, dir: &std::path::Path) -> (RecordingState, std::path::PathBuf) {
+    let path = dir.join(format!("{id}.ogg"));
+    std::fs::write(&path, vec![3u8; 1_200_000]).unwrap();
+    let (sha256, size) = mtxt_recorder::queue::chunks::hash_file(&path).unwrap();
+    let mut rec = RecordingState::new(id.into(), host.into(), id.into(), chrono::Utc::now());
+    rec.owner = Some(user.clone());
+    rec.apply(Event::Stopped { at: chrono::Utc::now(), duration_s: 60, sha256, size_bytes: size }, chrono::Utc::now());
+    (rec, path)
+}
+
+#[tokio::test]
+async fn one_token_reaches_only_its_own_install() {
+    let (a, a_state) = serve(Mock::default()).await;
+    let (b, b_state) = serve(Mock::default()).await;
+    let dir = tempfile::tempdir().unwrap();
+    let me = Owner { user_id: "u1".into(), email: "mette.lund@example.com".into() };
+    let (ra, pa) = queued("for-a", &a, &me, dir.path());
+    let (mut rb, pb) = queued("for-b", &b, &me, dir.path());
+    // B's recording was confirmed earlier: a status poll would contact B.
+    rb.apply(Event::Confirmed { at: chrono::Utc::now() }, chrono::Utc::now());
+    rb.server_recording_id = Some("rec1".into());
+    let files = [("for-a".to_string(), pa), ("for-b".to_string(), pb)].into_iter().collect();
+    let mut queue = vec![ra, rb];
+    run_queue(&mut queue, &a, &me, &files).await;
+    assert_eq!(queue[0].status, Status::Confirmed);
+    assert!(a_state.lock().unwrap().requests > 0);
+    assert_eq!(b_state.lock().unwrap().requests, 0, "install B received a request with A's token");
+    assert_eq!(queue[1].server_status, None);
+}
+
+#[tokio::test]
+async fn one_users_token_never_uploads_another_users_recording() {
+    let (a, a_state) = serve(Mock::default()).await;
+    let dir = tempfile::tempdir().unwrap();
+    let mette = Owner { user_id: "u1".into(), email: "mette.lund@example.com".into() };
+    let anne = Owner { user_id: "u2".into(), email: "anne.holm@example.com".into() };
+    let (rm, pm) = queued("mettes", &a, &mette, dir.path());
+    let (ra, pa) = queued("annes", &a, &anne, dir.path());
+    let files = [("mettes".to_string(), pm), ("annes".to_string(), pa)].into_iter().collect();
+    let mut queue = vec![rm, ra];
+    // Anne is connected now; Mette's recording must stay on the Mac.
+    run_queue(&mut queue, &a, &anne, &files).await;
+    assert_eq!(queue[1].status, Status::Confirmed);
+    assert_eq!(queue[0].status, Status::Uploading, "Mette's recording was touched");
+    assert_eq!(queue[0].server_recording_id, None);
+    assert_eq!(a_state.lock().unwrap().creates, 1);
+}
+
+#[tokio::test]
+async fn a_confirmed_recording_whose_transcription_failed_is_not_sent_again() {
+    let (origin, state) = serve(Mock::default()).await;
+    let (_dir, path, mut rec) = recording(&origin);
+    assert_eq!(run(&mut rec, &origin, &path).await.0, Outcome::Confirmed);
+    // The confirm reply was lost, and the server's transcription failed.
+    {
+        let mut m = state.lock().unwrap();
+        m.recordings.get_mut("rec1").unwrap().status = "failed".into();
+    }
+    rec.status = Status::Uploading;
+    rec.confirmed_at = None;
+    let (out, _) = run(&mut rec, &origin, &path).await;
+    assert_eq!(out, Outcome::Confirmed);
+    assert_eq!(rec.server_status.as_deref(), Some("failed"));
+    assert_eq!(state.lock().unwrap().creates, 1, "a second meeting was created");
 }

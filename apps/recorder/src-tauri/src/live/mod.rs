@@ -15,7 +15,7 @@ use segmenter::{Cut, Segmenter};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -44,12 +44,19 @@ pub fn load_engine(models_dir: &std::path::Path, id: &str) -> Result<Box<dyn Eng
 /// What the live window shows.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct LiveUpdate {
-    /// `loading`, `listening`, `paused`, `needs_model` or `error`.
+    /// `loading`, `listening`, `paused`, `needs_model`, `error`, or `stopped` (clear everything).
     pub state: &'static str,
     /// Finished lines, oldest first; the window shows the last two.
     pub lines: Vec<String>,
     /// The utterance in progress.
     pub partial: String,
+}
+
+impl LiveUpdate {
+    /// The session ended: the window clears its text.
+    pub fn stopped() -> LiveUpdate {
+        LiveUpdate { state: "stopped", lines: Vec::new(), partial: String::new() }
+    }
 }
 
 const KEEP_LINES: usize = 20;
@@ -58,8 +65,13 @@ pub struct LiveSession {
     stop: Arc<AtomicBool>,
     pub paused: Arc<AtomicBool>,
     feed: Arc<LiveFeed>,
+    /// True while the session may emit. `halt` sets it false under the lock,
+    /// so no update can leave the worker after `stop` returns.
+    alive: Arc<Mutex<bool>>,
     thread: Option<JoinHandle<()>>,
 }
+
+type Loader = Box<dyn FnOnce() -> Result<Box<dyn Engine>, String> + Send>;
 
 impl LiveSession {
     pub fn start(
@@ -68,6 +80,19 @@ impl LiveSession {
         feed: Arc<LiveFeed>,
         emit: impl Fn(LiveUpdate) + Send + 'static,
     ) -> LiveSession {
+        let name = model.clone();
+        Self::spawn(name, Box::new(move || load_engine(&models_dir, &model)), feed, emit)
+    }
+
+    fn spawn(model: String, load: Loader, feed: Arc<LiveFeed>, emit: impl Fn(LiveUpdate) + Send + 'static) -> LiveSession {
+        let alive = Arc::new(Mutex::new(true));
+        let alive2 = alive.clone();
+        let emit = move |u: LiveUpdate| {
+            let guard = alive2.lock().unwrap_or_else(|p| p.into_inner());
+            if *guard {
+                emit(u);
+            }
+        };
         let stop = Arc::new(AtomicBool::new(false));
         let paused = Arc::new(AtomicBool::new(false));
         let (tx, mut rx) = rtrb::RingBuffer::<f32>::new(segmenter::RATE * 60);
@@ -79,7 +104,7 @@ impl LiveSession {
             .spawn(move || {
                 let mut update = LiveUpdate { state: "loading", lines: Vec::new(), partial: String::new() };
                 emit(update.clone());
-                let mut engine = match load_engine(&models_dir, &model) {
+                let mut engine = match load() {
                     Ok(e) => e,
                     Err(e) => {
                         log::warn!("live model {model}: {e}");
@@ -143,7 +168,7 @@ impl LiveSession {
                 }
             })
             .expect("live thread");
-        LiveSession { stop, paused, feed, thread: Some(thread) }
+        LiveSession { stop, paused, feed, alive, thread: Some(thread) }
     }
 
     /// Stop and drop the text. The model is unloaded with the thread.
@@ -152,6 +177,7 @@ impl LiveSession {
     }
 
     fn halt(&mut self) {
+        *self.alive.lock().unwrap_or_else(|p| p.into_inner()) = false;
         self.feed.enabled.store(false, Ordering::SeqCst);
         *self.feed.sink.lock().unwrap() = None;
         self.stop.store(true, Ordering::SeqCst);
@@ -167,5 +193,49 @@ impl LiveSession {
 impl Drop for LiveSession {
     fn drop(&mut self) {
         self.halt();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    /// Takes 300 ms per decode and always hears the same words.
+    struct Slow;
+    impl Engine for Slow {
+        fn transcribe(&mut self, _: &[f32]) -> Result<String, String> {
+            std::thread::sleep(Duration::from_millis(300));
+            Ok("Vi mangler stadig at teste det nye skift.".into())
+        }
+    }
+
+    #[test]
+    fn nothing_is_emitted_after_stop_and_nothing_is_kept() {
+        let feed = Arc::new(LiveFeed::default());
+        let seen: Arc<Mutex<Vec<LiveUpdate>>> = Arc::default();
+        let seen2 = seen.clone();
+        let session = LiveSession::spawn("fake".into(), Box::new(|| Ok(Box::new(Slow) as Box<dyn Engine>)), feed.clone(), move |u| {
+            seen2.lock().unwrap().push(u)
+        });
+        // Speech, then stop while a decode runs.
+        let tone: Vec<f32> = (0..segmenter::RATE * 3).map(|i| (i as f32 * 0.07).sin() * 0.2).collect();
+        {
+            let mut sink = feed.sink.lock().unwrap();
+            for s in &tone {
+                let _ = sink.as_mut().unwrap().push(*s);
+            }
+        }
+        let t = Instant::now();
+        while seen.lock().unwrap().iter().all(|u| u.partial.is_empty()) && t.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(seen.lock().unwrap().iter().any(|u| !u.partial.is_empty()), "the fake engine was heard");
+        session.stop();
+        let count = seen.lock().unwrap().len();
+        assert!(!feed.enabled.load(Ordering::SeqCst));
+        assert!(feed.sink.lock().unwrap().is_none());
+        std::thread::sleep(Duration::from_millis(800));
+        assert_eq!(seen.lock().unwrap().len(), count, "a late decode reached the window");
     }
 }

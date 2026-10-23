@@ -98,13 +98,18 @@ async fn run(
     // Resume: ask the server what it holds.
     if let Some(id) = rec.server_recording_id.clone() {
         match api.get(token, &id).await {
+            // `confirmed_at` first: a recording the server verified is never
+            // sent again, even when its transcription failed afterwards.
+            Ok(r) if r.confirmed_at.is_some() => {
+                return Ok(confirmed(rec, r.confirmed_at.as_deref(), &r.status, changed));
+            }
             Ok(r) => match r.status.as_str() {
                 contract::status::UPLOADING => {
                     rec.apply(Event::ChunksReceived(r.chunks_received), Utc::now());
                     changed(rec);
                 }
                 contract::status::FAILED => return Ok(restart(rec, changed)),
-                _ => return Ok(confirmed(rec, r.confirmed_at.as_deref(), &r.status, changed)),
+                _ => return Ok(confirmed(rec, None, &r.status, changed)),
             },
             Err(ApiError::Status { status: 404, .. }) => return Ok(restart(rec, changed)),
             Err(e) => return Err(e.into()),
@@ -116,7 +121,7 @@ async fn run(
             return Err(Stop::Api(ApiError::Status { status: 413, code: "too_large".into() }));
         }
         let body = CreateRecordingRequest {
-            meeting: NewMeeting { title: meeting_title(&rec.title), started_at: rec.started_at.to_rfc3339() },
+            meeting: NewMeeting { title: meeting_title(&rec.title, rec.started_at), started_at: rec.started_at.to_rfc3339() },
             duration_s: rec.duration_s,
             sha256: sha256.clone(),
             size_bytes: size,
@@ -251,11 +256,13 @@ pub async fn refresh_server_status(
     Ok(changed)
 }
 
-/// The title the server gets: trimmed, at most 500 characters, never empty.
-pub fn meeting_title(title: &str) -> String {
+/// The title the server gets: trimmed, at most 500 characters. The window
+/// always sends a title in the user's language; an empty one (a state file
+/// edited by hand) becomes the start time, which needs no translation.
+pub fn meeting_title(title: &str, started_at: DateTime<Utc>) -> String {
     let t: String = title.trim().chars().take(contract::MAX_TITLE_CHARS).collect();
     if t.trim().is_empty() {
-        "Meeting".into()
+        started_at.format("%Y-%m-%d %H:%M UTC").to_string()
     } else {
         t.trim_end().to_string()
     }
@@ -267,10 +274,11 @@ mod tests {
 
     #[test]
     fn titles_are_trimmed_and_capped() {
-        assert_eq!(meeting_title("  Plan  "), "Plan");
-        assert_eq!(meeting_title("   "), "Meeting");
+        let at = DateTime::parse_from_rfc3339("2026-10-23T09:00:00Z").unwrap().with_timezone(&Utc);
+        assert_eq!(meeting_title("  Plan  ", at), "Plan");
+        assert_eq!(meeting_title("   ", at), "2026-10-23 09:00 UTC");
         let long = "æ".repeat(600);
-        assert_eq!(meeting_title(&long).chars().count(), 500);
+        assert_eq!(meeting_title(&long, at).chars().count(), 500);
     }
 
     #[test]

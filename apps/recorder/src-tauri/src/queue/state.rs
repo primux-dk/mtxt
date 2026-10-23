@@ -1,23 +1,36 @@
 //! One recording's local state and the rules that move it, per docs/spec.md
 //! "How a recording reaches the library": Recording, Uploading, Pending (no
 //! network), Warn (24 h), AskUser (7 d), Confirmed, Deleted (7 d after confirm).
+//! Two local states keep a file the recorder could not finish or read:
+//! FailedLocal (a write failed during capture) and Unreadable (recovery could
+//! not read it). Neither is uploaded or deleted without the user.
 //!
 //! Everything here is pure: the uploader and the clock feed it events, and the
 //! queue writes the result to the recording's JSON file after every change.
+//!
+//! Time rules are conservative about the clock. A step that waits for days
+//! (the 24-hour warning, the 7-day question, the deletion 7 days after the
+//! confirm) needs both the wall-clock time and as many calendar days on which
+//! the app ran (`days_seen`). A clock that moves backwards advances nothing.
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
-/// Warn after this long without a confirm.
+/// Warn after this long without a confirm, and at least one more calendar day seen.
 pub const WARN_AFTER: Duration = Duration::hours(24);
-/// Ask the user after this long without a confirm.
+pub const WARN_DAYS: u32 = 1;
+/// Ask the user after this long without a confirm, and 7 calendar days seen.
 pub const ASK_AFTER: Duration = Duration::days(7);
-/// Delete the local file this long after the confirm.
+pub const ASK_DAYS: u32 = 7;
+/// Delete the local file this long after the confirm, and 7 calendar days seen.
 pub const KEEP_AFTER_CONFIRM: Duration = Duration::days(7);
-/// After "Keep trying", the question comes back after this long.
+pub const KEEP_DAYS: u32 = 7;
+/// After "Keep trying", the question comes back after this long (and as many days).
 pub const ASK_AGAIN_AFTER: Duration = Duration::days(7);
 /// A file that fails the server's hash or size check this often is refused.
 pub const MAX_RESTARTS: u32 = 3;
+/// A retry time further ahead than this means the clock went back; retry now.
+pub const MAX_RETRY_AHEAD: Duration = Duration::minutes(10);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,8 +49,12 @@ pub enum Status {
     Confirmed,
     /// The local file was deleted 7 days after the confirm.
     Deleted,
-    /// The user saved the file elsewhere after the 7-day question; the queue's copy is gone.
+    /// The user saved the file elsewhere; the queue's copy is gone.
     SavedElsewhere,
+    /// Writing the file failed during capture (`local_error`). The partial file is kept.
+    FailedLocal,
+    /// The file could not be read back (`local_error`). Both files are kept.
+    Unreadable,
 }
 
 /// Why the last attempt did not finish.
@@ -54,6 +71,24 @@ pub enum PendingReason {
     Rejected { code: String },
 }
 
+/// The library user the recording belongs to: who was connected when it was
+/// recorded. Only that user's token uploads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Owner {
+    pub user_id: String,
+    pub email: String,
+}
+
+/// A stretch where a source delivered nothing (device unplugged, lost), in
+/// seconds from the start. The file has silence there.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Gap {
+    /// `microphone` or `system_audio`.
+    pub source: String,
+    pub from_s: f64,
+    pub to_s: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecordingState {
     /// Local id; also the file name, `<id>.ogg`.
@@ -62,6 +97,10 @@ pub struct RecordingState {
     pub host: String,
     pub title: String,
     pub started_at: DateTime<Utc>,
+    /// None for a recording found on disk without its state (recovered): the
+    /// user uploads it as themselves, or saves it elsewhere.
+    #[serde(default)]
+    pub owner: Option<Owner>,
     #[serde(default)]
     pub stopped_at: Option<DateTime<Utc>>,
     /// Seconds of audio.
@@ -75,6 +114,14 @@ pub struct RecordingState {
     pub status: Status,
     #[serde(default)]
     pub pending_reason: Option<PendingReason>,
+    /// The OS error for FailedLocal and Unreadable.
+    #[serde(default)]
+    pub local_error: Option<String>,
+    /// Found on disk without a state file.
+    #[serde(default)]
+    pub recovered: bool,
+    #[serde(default)]
+    pub gaps: Vec<Gap>,
     /// The server's recording id once `POST /recordings` answered.
     #[serde(default)]
     pub server_recording_id: Option<String>,
@@ -106,6 +153,15 @@ pub struct RecordingState {
     pub restarts: u32,
     #[serde(default)]
     pub ask_snoozed_until: Option<DateTime<Utc>>,
+    /// `days_seen` when the user chose "Keep trying".
+    #[serde(default)]
+    pub days_at_snooze: Option<u32>,
+    /// Calendar days the app ran since the stop, or since the confirm once confirmed.
+    #[serde(default)]
+    pub days_seen: u32,
+    /// The latest clock reading the rules accepted.
+    #[serde(default)]
+    pub last_tick: Option<DateTime<Utc>>,
     #[serde(default)]
     pub saved_to: Option<String>,
     #[serde(default)]
@@ -115,8 +171,16 @@ pub struct RecordingState {
 /// What happened, from the capture, the uploader, the user or the clock.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    /// The capture stopped; the file is finished and hashed.
+    /// The capture stopped (or recovery read the file); it is finished and hashed.
     Stopped { at: DateTime<Utc>, duration_s: u64, sha256: String, size_bytes: u64 },
+    /// A write failed during capture: the partial file stays, nothing is uploaded.
+    FailedLocal { at: DateTime<Utc>, error: String, duration_s: u64 },
+    /// Recovery could not read the file; both files stay.
+    Unreadable { error: String },
+    /// Silence where a source was lost.
+    Gaps(Vec<Gap>),
+    /// The user uploads a recovered recording as the connected user.
+    Claim(Owner),
     /// `POST /recordings` answered.
     Created {
         recording_id: String,
@@ -140,7 +204,7 @@ pub enum Event {
     TryNow,
     /// The 7-day question: "Keep trying".
     KeepTrying,
-    /// The 7-day question: the file was copied to `path` and checked.
+    /// The file was copied to `path`, synced and checked.
     SavedElsewhere { path: String },
     /// The local file was deleted after the 7 days.
     FileDeleted,
@@ -162,12 +226,16 @@ impl RecordingState {
             host,
             title,
             started_at,
+            owner: None,
             stopped_at: None,
             duration_s: 0,
             sha256: None,
             size_bytes: None,
             status: Status::Recording,
             pending_reason: None,
+            local_error: None,
+            recovered: false,
+            gaps: Vec::new(),
             server_recording_id: None,
             server_meeting_id: None,
             chunk_size_bytes: None,
@@ -180,6 +248,9 @@ impl RecordingState {
             next_attempt_at: None,
             restarts: 0,
             ask_snoozed_until: None,
+            days_at_snooze: None,
+            days_seen: 0,
+            last_tick: None,
             saved_to: None,
             deleted_at: None,
         }
@@ -190,19 +261,23 @@ impl RecordingState {
         matches!(self.status, Status::Uploading | Status::Pending | Status::Warn | Status::AskUser)
     }
 
-    /// The uploader may start an attempt now.
+    /// The local file is still here and not in the library: the user may save it elsewhere.
+    pub fn can_save_elsewhere(&self) -> bool {
+        self.is_unconfirmed() || matches!(self.status, Status::FailedLocal | Status::Unreadable)
+    }
+
+    /// The uploader may start an attempt now. The caller checks the owner and the host.
     pub fn due(&self, now: DateTime<Utc>) -> bool {
-        if !self.is_unconfirmed() || self.stopped_at.is_none() {
+        if !self.is_unconfirmed() || self.stopped_at.is_none() || self.owner.is_none() {
             return false;
         }
         match &self.pending_reason {
             Some(PendingReason::Rejected { .. }) | Some(PendingReason::SignedOut) => return false,
             _ => {}
         }
-        self.next_attempt_at.is_none_or(|at| at <= now)
+        self.next_attempt_at.is_none_or(|at| at <= now || at - now > MAX_RETRY_AHEAD)
     }
 
-    /// Time since the recording stopped (or started, for one that never stopped cleanly).
     fn age(&self, now: DateTime<Utc>) -> Duration {
         now - self.stopped_at.unwrap_or(self.started_at)
     }
@@ -210,28 +285,61 @@ impl RecordingState {
     /// The unconfirmed status for the recording's age: Pending, Warn or AskUser.
     fn waiting_status(&self, now: DateTime<Utc>) -> Status {
         let age = self.age(now);
-        let snoozed = self.ask_snoozed_until.is_some_and(|until| now < until);
-        if age >= ASK_AFTER && !snoozed {
+        let snoozed = self.ask_snoozed_until.is_some_and(|until| now < until)
+            || self.days_at_snooze.is_some_and(|d| self.days_seen < d + ASK_DAYS);
+        if age >= ASK_AFTER && self.days_seen >= ASK_DAYS && !snoozed {
             Status::AskUser
-        } else if age >= WARN_AFTER {
+        } else if age >= WARN_AFTER && self.days_seen >= WARN_DAYS {
             Status::Warn
         } else {
             Status::Pending
         }
     }
 
+    /// Start counting days from `at`.
+    fn restart_days(&mut self, at: DateTime<Utc>) {
+        self.days_seen = 0;
+        self.days_at_snooze = None;
+        self.last_tick = Some(at);
+    }
+
     pub fn apply(&mut self, event: Event, now: DateTime<Utc>) {
         match event {
             Event::Stopped { at, duration_s, sha256, size_bytes } => {
-                if self.status != Status::Recording {
+                if !matches!(self.status, Status::Recording | Status::Unreadable) {
                     return;
                 }
                 self.stopped_at = Some(at);
                 self.duration_s = duration_s;
                 self.sha256 = Some(sha256);
                 self.size_bytes = Some(size_bytes);
+                self.local_error = None;
                 self.status = Status::Uploading;
                 self.next_attempt_at = None;
+                self.restart_days(at);
+            }
+            Event::FailedLocal { at, error, duration_s } => {
+                if self.status != Status::Recording {
+                    return;
+                }
+                self.stopped_at = Some(at);
+                self.duration_s = duration_s;
+                self.local_error = Some(error);
+                self.status = Status::FailedLocal;
+            }
+            Event::Unreadable { error } => {
+                if matches!(self.status, Status::Deleted | Status::SavedElsewhere | Status::Confirmed) {
+                    return;
+                }
+                self.local_error = Some(error);
+                self.status = Status::Unreadable;
+            }
+            Event::Gaps(gaps) => self.gaps.extend(gaps),
+            Event::Claim(owner) => {
+                if self.owner.is_none() {
+                    self.owner = Some(owner);
+                    self.next_attempt_at = None;
+                }
             }
             Event::Created { recording_id, meeting_id, chunk_size_bytes, chunk_count, upload_url } => {
                 self.server_recording_id = Some(recording_id);
@@ -281,8 +389,11 @@ impl RecordingState {
                 }
             }
             Event::Confirmed { at } => {
-                if matches!(self.status, Status::Recording | Status::Deleted | Status::SavedElsewhere) {
+                if !self.is_unconfirmed() && self.status != Status::Confirmed {
                     return;
+                }
+                if self.status != Status::Confirmed {
+                    self.restart_days(now);
                 }
                 self.status = Status::Confirmed;
                 self.confirmed_at.get_or_insert(at);
@@ -316,11 +427,12 @@ impl RecordingState {
             Event::KeepTrying => {
                 if self.status == Status::AskUser {
                     self.ask_snoozed_until = Some(now + ASK_AGAIN_AFTER);
+                    self.days_at_snooze = Some(self.days_seen);
                     self.status = self.waiting_status(now);
                 }
             }
             Event::SavedElsewhere { path } => {
-                if self.is_unconfirmed() {
+                if self.can_save_elsewhere() {
                     self.saved_to = Some(path);
                     self.status = Status::SavedElsewhere;
                     self.next_attempt_at = None;
@@ -335,10 +447,24 @@ impl RecordingState {
         }
     }
 
-    /// The clock: Pending turns into Warn at 24 hours and AskUser at 7 days; a
-    /// confirmed file is due for deletion 7 days after its confirm.
+    /// The clock. A reading earlier than the last accepted one changes
+    /// nothing. A reading on a new calendar day counts one day seen. Then
+    /// Pending turns into Warn and AskUser, and a confirmed file becomes due
+    /// for deletion, when both the wall clock and the days seen allow it.
     pub fn tick(&mut self, now: DateTime<Utc>) -> TickOutcome {
         let mut out = TickOutcome::default();
+        if self.status == Status::Recording {
+            return out;
+        }
+        match self.last_tick {
+            Some(last) if now < last => return out,
+            Some(last) if now.date_naive() > last.date_naive() => {
+                self.days_seen = self.days_seen.saturating_add(1);
+                self.last_tick = Some(now);
+            }
+            Some(_) => self.last_tick = Some(now),
+            None => self.last_tick = Some(now),
+        }
         match self.status {
             Status::Pending | Status::Warn | Status::AskUser => {
                 let next = self.waiting_status(now);
@@ -347,7 +473,7 @@ impl RecordingState {
             }
             Status::Confirmed => {
                 if let Some(at) = self.confirmed_at {
-                    out.delete_file = now - at >= KEEP_AFTER_CONFIRM;
+                    out.delete_file = now - at >= KEEP_AFTER_CONFIRM && self.days_seen >= KEEP_DAYS;
                 }
             }
             _ => {}
@@ -373,8 +499,13 @@ mod tests {
         Utc.with_ymd_and_hms(2026, 10, 23, 9, 0, 0).unwrap()
     }
 
+    fn owner() -> Owner {
+        Owner { user_id: "u1".into(), email: "mette.lund@example.com".into() }
+    }
+
     fn stopped() -> RecordingState {
         let mut r = RecordingState::new("r1".into(), "https://h.io".into(), "Plan".into(), t0());
+        r.owner = Some(owner());
         r.apply(
             Event::Stopped { at: t0() + Duration::hours(1), duration_s: 3600, sha256: "ab".into(), size_bytes: 20_000_000 },
             t0(),
@@ -384,6 +515,11 @@ mod tests {
 
     fn network_failure(r: &mut RecordingState, now: DateTime<Utc>) {
         r.apply(Event::AttemptFailed { reason: PendingReason::Network, retry_at: Some(now + Duration::seconds(2)) }, now);
+    }
+
+    /// The app runs once an hour from `from` for `hours` hours.
+    fn run_hourly(r: &mut RecordingState, from: DateTime<Utc>, hours: i64) -> Vec<TickOutcome> {
+        (0..=hours).map(|h| r.tick(from + Duration::hours(h))).collect()
     }
 
     #[test]
@@ -402,6 +538,18 @@ mod tests {
     }
 
     #[test]
+    fn a_recording_without_an_owner_waits_for_a_claim() {
+        let mut r = stopped();
+        r.owner = None;
+        assert!(!r.due(t0()));
+        r.apply(Event::Claim(owner()), t0());
+        assert!(r.due(t0()));
+        // A claim never replaces an owner.
+        r.apply(Event::Claim(Owner { user_id: "u2".into(), email: "x@example.com".into() }), t0());
+        assert_eq!(r.owner, Some(owner()));
+    }
+
+    #[test]
     fn a_failure_waits_for_the_retry_time() {
         let mut r = stopped();
         let now = t0() + Duration::hours(2);
@@ -415,25 +563,60 @@ mod tests {
     }
 
     #[test]
-    fn pending_turns_into_warn_after_24_hours_and_ask_after_7_days() {
+    fn a_retry_time_far_ahead_means_the_clock_went_back() {
+        let mut r = stopped();
+        let now = t0() + Duration::hours(2);
+        network_failure(&mut r, now);
+        // The clock goes back a day: the 2-second retry is now a day away.
+        assert!(r.due(now - Duration::days(1)));
+    }
+
+    #[test]
+    fn pending_turns_into_warn_and_ask_with_wall_time_and_days_seen() {
         let mut r = stopped();
         let stop = r.stopped_at.unwrap();
         network_failure(&mut r, stop);
-        assert_eq!(r.tick(stop + Duration::hours(23)), TickOutcome::default());
+        run_hourly(&mut r, stop, 23);
         assert_eq!(r.status, Status::Pending);
-        r.tick(stop + Duration::hours(24));
+        run_hourly(&mut r, stop + Duration::hours(23), 1);
         assert_eq!(r.status, Status::Warn);
-        let out = r.tick(stop + Duration::days(7));
+        let outs = run_hourly(&mut r, stop + Duration::hours(24), 6 * 24);
         assert_eq!(r.status, Status::AskUser);
-        assert!(out.ask);
-        // The question opens once, not on every tick.
-        assert!(!r.tick(stop + Duration::days(7) + Duration::minutes(1)).ask);
+        assert_eq!(outs.iter().filter(|o| o.ask).count(), 1, "the question opens once");
+    }
+
+    #[test]
+    fn a_clock_jump_forward_does_not_warn_ask_or_delete() {
+        let mut r = stopped();
+        let stop = r.stopped_at.unwrap();
+        network_failure(&mut r, stop);
+        // The clock jumps 30 days ahead: one new calendar day, not seven.
+        let out = r.tick(stop + Duration::days(30));
+        assert!(!out.ask);
+        assert_eq!(r.status, Status::Warn);
+        let mut c = stopped();
+        c.apply(Event::Confirmed { at: t0() + Duration::hours(2) }, t0() + Duration::hours(2));
+        assert!(!c.tick(t0() + Duration::days(30)).delete_file);
+        assert_eq!(c.status, Status::Confirmed);
+    }
+
+    #[test]
+    fn a_clock_jump_backwards_advances_nothing() {
+        let mut r = stopped();
+        let stop = r.stopped_at.unwrap();
+        network_failure(&mut r, stop);
+        run_hourly(&mut r, stop, 48);
+        let before = r.clone();
+        assert_eq!(r.tick(stop - Duration::days(3)), TickOutcome::default());
+        assert_eq!(r, before);
     }
 
     #[test]
     fn a_failure_after_24_hours_lands_in_warn_directly() {
         let mut r = stopped();
-        let later = r.stopped_at.unwrap() + Duration::hours(30);
+        let stop = r.stopped_at.unwrap();
+        run_hourly(&mut r, stop, 30);
+        let later = stop + Duration::hours(30);
         r.apply(Event::AttemptStarted, later);
         assert_eq!(r.status, Status::Uploading);
         network_failure(&mut r, later);
@@ -443,15 +626,18 @@ mod tests {
     #[test]
     fn keep_trying_snoozes_the_question_for_7_days_and_retries_go_on() {
         let mut r = stopped();
-        let ask = r.stopped_at.unwrap() + Duration::days(7);
-        network_failure(&mut r, ask);
+        let stop = r.stopped_at.unwrap();
+        network_failure(&mut r, stop);
+        run_hourly(&mut r, stop, 7 * 24);
         assert_eq!(r.status, Status::AskUser);
+        let ask = stop + Duration::days(7);
         r.apply(Event::KeepTrying, ask);
         assert_eq!(r.status, Status::Warn);
         assert!(r.due(ask + Duration::seconds(5)));
-        r.tick(ask + Duration::days(6));
+        run_hourly(&mut r, ask, 6 * 24);
         assert_eq!(r.status, Status::Warn);
-        assert!(r.tick(ask + Duration::days(7)).ask);
+        let outs = run_hourly(&mut r, ask + Duration::days(6), 24);
+        assert!(outs.iter().any(|o| o.ask));
         assert_eq!(r.status, Status::AskUser);
     }
 
@@ -459,12 +645,10 @@ mod tests {
     fn nothing_is_deleted_without_a_confirm() {
         let mut r = stopped();
         network_failure(&mut r, t0());
-        for days in [1, 7, 30, 365] {
-            let out = r.tick(t0() + Duration::days(days));
+        for out in run_hourly(&mut r, t0(), 400 * 24 / 10) {
             assert!(!out.delete_file);
-            assert!(r.is_unconfirmed());
         }
-        // FileDeleted is ignored for an unconfirmed recording.
+        assert!(r.is_unconfirmed());
         r.apply(Event::FileDeleted, t0());
         assert!(r.is_unconfirmed());
     }
@@ -478,18 +662,27 @@ mod tests {
     }
 
     #[test]
-    fn a_confirmed_file_is_deleted_7_days_after_the_confirm() {
+    fn a_confirmed_file_is_deleted_after_7_days_and_7_days_seen() {
         let mut r = stopped();
-        r.apply(Event::Created { recording_id: "s1".into(), meeting_id: "m1".into(), chunk_size_bytes: 8_388_608, chunk_count: Some(3), upload_url: "/u".into() }, t0());
+        r.apply(
+            Event::Created {
+                recording_id: "s1".into(),
+                meeting_id: "m1".into(),
+                chunk_size_bytes: 8_388_608,
+                chunk_count: Some(3),
+                upload_url: "/u".into(),
+            },
+            t0(),
+        );
         let at = t0() + Duration::hours(2);
         r.apply(Event::Confirmed { at }, at);
         assert_eq!(r.status, Status::Confirmed);
         assert_eq!(r.progress(), (3, 3));
-        assert!(!r.tick(at + Duration::days(6)).delete_file);
+        let outs = run_hourly(&mut r, at, 7 * 24 - 1);
+        assert!(outs.iter().all(|o| !o.delete_file));
         assert!(r.tick(at + Duration::days(7)).delete_file);
         r.apply(Event::FileDeleted, at + Duration::days(7));
         assert_eq!(r.status, Status::Deleted);
-        assert_eq!(r.deleted_at, Some(at + Duration::days(7)));
     }
 
     #[test]
@@ -523,7 +716,16 @@ mod tests {
     fn restarts_clear_the_session_and_stop_after_three() {
         let mut r = stopped();
         for n in 1..=MAX_RESTARTS {
-            r.apply(Event::Created { recording_id: format!("s{n}"), meeting_id: "m".into(), chunk_size_bytes: 8_388_608, chunk_count: Some(3), upload_url: "/u".into() }, t0());
+            r.apply(
+                Event::Created {
+                    recording_id: format!("s{n}"),
+                    meeting_id: "m".into(),
+                    chunk_size_bytes: 8_388_608,
+                    chunk_count: Some(3),
+                    upload_url: "/u".into(),
+                },
+                t0(),
+            );
             r.apply(Event::ChunksReceived(vec![2, 1, 1]), t0());
             assert_eq!(r.chunks_received, vec![1, 2]);
             r.apply(Event::Restart, t0());
@@ -535,15 +737,41 @@ mod tests {
     }
 
     #[test]
-    fn the_state_file_round_trips() {
+    fn a_local_write_failure_keeps_the_file_and_never_uploads() {
+        let mut r = RecordingState::new("r".into(), "h".into(), "t".into(), t0());
+        r.owner = Some(owner());
+        r.apply(Event::FailedLocal { at: t0(), error: "No space left on device (os error 28)".into(), duration_s: 600 }, t0());
+        assert_eq!(r.status, Status::FailedLocal);
+        assert!(!r.due(t0()) && r.can_save_elsewhere());
+        assert!(!r.tick(t0() + Duration::days(30)).delete_file);
+        r.apply(Event::SavedElsewhere { path: "/x.ogg".into() }, t0());
+        assert_eq!(r.status, Status::SavedElsewhere);
+    }
+
+    #[test]
+    fn an_unreadable_file_waits_and_can_be_read_again() {
+        let mut r = RecordingState::new("r".into(), "h".into(), "t".into(), t0());
+        r.owner = Some(owner());
+        r.apply(Event::Unreadable { error: "Permission denied (os error 13)".into() }, t0());
+        assert_eq!(r.status, Status::Unreadable);
+        assert!(!r.due(t0()) && r.can_save_elsewhere());
+        r.apply(Event::Stopped { at: t0(), duration_s: 60, sha256: "aa".into(), size_bytes: 10 }, t0());
+        assert_eq!(r.status, Status::Uploading);
+        assert_eq!(r.local_error, None);
+    }
+
+    #[test]
+    fn the_state_file_round_trips_and_old_files_still_read() {
         let mut r = stopped();
-        r.apply(Event::Created { recording_id: "s1".into(), meeting_id: "m1".into(), chunk_size_bytes: 8_388_608, chunk_count: Some(3), upload_url: "/u".into() }, t0());
-        r.apply(Event::ChunksReceived(vec![1]), t0());
+        r.apply(Event::Gaps(vec![Gap { source: "microphone".into(), from_s: 61.0, to_s: 64.5 }]), t0());
         network_failure(&mut r, t0());
         let json = serde_json::to_string_pretty(&r).unwrap();
         assert!(json.contains("\"status\": \"pending\""));
         assert!(json.contains("\"kind\": \"network\""));
         let back: RecordingState = serde_json::from_str(&json).unwrap();
         assert_eq!(back, r);
+        let old = r#"{"id":"a","host":"h","title":"t","started_at":"2026-10-23T09:00:00Z","status":"uploading"}"#;
+        let old: RecordingState = serde_json::from_str(old).unwrap();
+        assert_eq!(old.owner, None);
     }
 }

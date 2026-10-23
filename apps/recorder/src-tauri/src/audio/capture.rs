@@ -4,16 +4,59 @@
 //! macOS: the microphone through cpal, system audio through a Core Audio
 //! process tap (`macos_tap`). Windows (packet 10) adds WASAPI loopback as a
 //! second `Capture` behind `system_audio()`; nothing else changes.
+//!
+//! A source follows the device under it. The microphone reopens on the new
+//! default input when the user switches it or when the device disappears;
+//! while no device works, the source is `Lost`, the window says so, and the
+//! mixer writes silence and notes the gap.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 /// A running source. Dropping it stops the capture.
 pub trait Capture: Send {
-    /// Samples per second of what goes into the ring.
-    fn rate(&self) -> u32;
+    fn shared(&self) -> Arc<SourceShared>;
     fn stop(&mut self);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceState {
+    On,
+    Lost,
+}
+
+/// What a source tells the mixer and the window while it runs.
+#[derive(Debug)]
+pub struct SourceShared {
+    rate: AtomicU32,
+    lost: AtomicBool,
+}
+
+impl SourceShared {
+    pub fn new(rate: u32) -> Arc<SourceShared> {
+        Arc::new(SourceShared { rate: AtomicU32::new(rate), lost: AtomicBool::new(false) })
+    }
+    /// Samples per second of what goes into the ring now.
+    pub fn rate(&self) -> u32 {
+        self.rate.load(Ordering::Relaxed)
+    }
+    pub fn set_rate(&self, rate: u32) {
+        self.rate.store(rate, Ordering::Relaxed)
+    }
+    pub fn state(&self) -> SourceState {
+        if self.lost.load(Ordering::Relaxed) {
+            SourceState::Lost
+        } else {
+            SourceState::On
+        }
+    }
+    pub fn set_state(&self, s: SourceState) {
+        self.lost.store(s == SourceState::Lost, Ordering::Relaxed)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -29,62 +72,108 @@ pub enum CaptureError {
 }
 
 pub type Sink = rtrb::Producer<f32>;
+/// The ring's write end, shared by the streams a source opens one after another.
+pub type SharedSink = Arc<Mutex<Sink>>;
 
 /// Ring size per source: 10 s at 48 kHz. The mixer drains it every 10 ms.
 pub const RING_SAMPLES: usize = 480_000;
+/// How often a source checks its device.
+pub const WATCH_EVERY: Duration = Duration::from_millis(1000);
 
-/// The default input device, through cpal. The stream lives on its own
-/// thread, because a cpal stream may not move between threads.
+/// The default input device, through cpal, followed across device changes.
+/// The streams live on one thread, because a cpal stream may not move
+/// between threads.
 pub fn microphone(sink: Sink) -> Result<Box<dyn Capture>, CaptureError> {
-    let (ready_tx, ready_rx) = mpsc::channel::<Result<u32, CaptureError>>();
+    let sink: SharedSink = Arc::new(Mutex::new(sink));
+    let (ready_tx, ready_rx) = mpsc::channel::<Result<Arc<SourceShared>, CaptureError>>();
     let (stop_tx, stop_rx) = mpsc::channel::<()>();
     let thread = std::thread::Builder::new()
         .name("mic".into())
         .spawn(move || {
-            let stream = match open_mic(sink) {
-                Ok((stream, rate)) => {
-                    let _ = ready_tx.send(Ok(rate));
-                    stream
+            let host = cpal::default_host();
+            let failed = Arc::new(AtomicBool::new(false));
+            let (mut stream, shared, mut device_id) = match open_default(&host, sink.clone(), failed.clone()) {
+                Ok((s, rate, id)) => {
+                    let shared = SourceShared::new(rate);
+                    let _ = ready_tx.send(Ok(shared.clone()));
+                    (Some(s), shared, id)
                 }
                 Err(e) => {
                     let _ = ready_tx.send(Err(e));
                     return;
                 }
             };
-            let _ = stop_rx.recv();
+            while let Err(mpsc::RecvTimeoutError::Timeout) = stop_rx.recv_timeout(WATCH_EVERY) {
+                let default_id = host.default_input_device().and_then(|d| d.id().ok()).map(|i| i.to_string());
+                let switched = default_id.is_some() && default_id != device_id;
+                if stream.is_some() && !switched && !failed.load(Ordering::Relaxed) {
+                    continue;
+                }
+                drop(stream.take());
+                failed.store(false, Ordering::Relaxed);
+                match open_default(&host, sink.clone(), failed.clone()) {
+                    Ok((s, rate, id)) => {
+                        log::info!("microphone: now on {id:?} at {rate} Hz");
+                        shared.set_rate(rate);
+                        shared.set_state(SourceState::On);
+                        device_id = id;
+                        stream = Some(s);
+                    }
+                    Err(e) => {
+                        if shared.state() == SourceState::On {
+                            log::warn!("microphone lost: {e}");
+                        }
+                        shared.set_state(SourceState::Lost);
+                        device_id = None;
+                    }
+                }
+            }
             drop(stream);
         })
         .map_err(|e| CaptureError::Other(e.to_string()))?;
-    let rate = ready_rx.recv().map_err(|_| CaptureError::Other("mic thread ended".into()))??;
-    Ok(Box::new(ThreadCapture { rate, stop: Some(stop_tx), thread: Some(thread) }))
+    let shared = ready_rx.recv().map_err(|_| CaptureError::Other("mic thread ended".into()))??;
+    Ok(Box::new(ThreadCapture { shared, stop: Some(stop_tx), thread: Some(thread) }))
 }
 
-fn open_mic(mut sink: Sink) -> Result<(cpal::Stream, u32), CaptureError> {
-    let host = cpal::default_host();
+fn open_default(
+    host: &cpal::Host,
+    sink: SharedSink,
+    failed: Arc<AtomicBool>,
+) -> Result<(cpal::Stream, u32, Option<String>), CaptureError> {
     let device = host.default_input_device().ok_or(CaptureError::NoDevice)?;
+    let id = device.id().ok().map(|i| i.to_string());
+    let (stream, rate) = open_mic(&device, sink, failed)?;
+    Ok((stream, rate, id))
+}
+
+fn open_mic(device: &cpal::Device, sink: SharedSink, failed: Arc<AtomicBool>) -> Result<(cpal::Stream, u32), CaptureError> {
     let config = device.default_input_config().map_err(|e| CaptureError::Other(e.to_string()))?;
     let rate = config.sample_rate();
     let channels = usize::from(config.channels()).max(1);
-    let err = |e: cpal::Error| log::warn!("microphone stream: {e}");
+    let err = move |e: cpal::Error| {
+        log::warn!("microphone stream: {e}");
+        failed.store(true, Ordering::Relaxed);
+    };
+    macro_rules! build {
+        ($t:ty, $conv:expr) => {{
+            let sink = sink.clone();
+            device.build_input_stream(
+                config.clone().into(),
+                move |data: &[$t], _| {
+                    // Uncontended: one stream at a time writes.
+                    if let Ok(mut s) = sink.try_lock() {
+                        push_mono(&mut s, data, channels, $conv);
+                    }
+                },
+                err,
+                None,
+            )
+        }};
+    }
     let stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => device.build_input_stream(
-            config.clone().into(),
-            move |data: &[f32], _| push_mono(&mut sink, data, channels, |s| s),
-            err,
-            None,
-        ),
-        cpal::SampleFormat::I16 => device.build_input_stream(
-            config.clone().into(),
-            move |data: &[i16], _| push_mono(&mut sink, data, channels, |s| f32::from(s) / 32768.0),
-            err,
-            None,
-        ),
-        cpal::SampleFormat::I32 => device.build_input_stream(
-            config.clone().into(),
-            move |data: &[i32], _| push_mono(&mut sink, data, channels, |s| s as f32 / 2_147_483_648.0),
-            err,
-            None,
-        ),
+        cpal::SampleFormat::F32 => build!(f32, |s| s),
+        cpal::SampleFormat::I16 => build!(i16, |s| f32::from(s) / 32768.0),
+        cpal::SampleFormat::I32 => build!(i32, |s| s as f32 / 2_147_483_648.0),
         other => return Err(CaptureError::Other(format!("sample format {other:?}"))),
     }
     .map_err(|e| match e.kind() {
@@ -116,15 +205,16 @@ pub fn push_mono<T: Copy>(sink: &mut Sink, data: &[T], channels: usize, to_f32: 
     }
 }
 
-struct ThreadCapture {
-    rate: u32,
-    stop: Option<mpsc::Sender<()>>,
-    thread: Option<JoinHandle<()>>,
+/// A source whose device work runs on its own thread until `stop`.
+pub struct ThreadCapture {
+    pub shared: Arc<SourceShared>,
+    pub stop: Option<mpsc::Sender<()>>,
+    pub thread: Option<JoinHandle<()>>,
 }
 
 impl Capture for ThreadCapture {
-    fn rate(&self) -> u32 {
-        self.rate
+    fn shared(&self) -> Arc<SourceShared> {
+        self.shared.clone()
     }
     fn stop(&mut self) {
         if let Some(tx) = self.stop.take() {
@@ -169,5 +259,14 @@ mod tests {
         // A full ring takes what fits and drops the rest.
         push_mono(&mut p, &[1i16; 10], 1, |s| f32::from(s));
         assert_eq!(c.slots(), 4);
+    }
+
+    #[test]
+    fn shared_state_and_rate() {
+        let s = SourceShared::new(48_000);
+        assert_eq!(s.state(), SourceState::On);
+        s.set_state(SourceState::Lost);
+        s.set_rate(16_000);
+        assert_eq!((s.state(), s.rate()), (SourceState::Lost, 16_000));
     }
 }

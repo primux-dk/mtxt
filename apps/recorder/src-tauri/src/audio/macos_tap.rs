@@ -7,7 +7,9 @@
 //! mono into the ring. Without the user's permission the tap delivers
 //! silence, so `permissions::system_audio()` is asked first.
 
-use super::capture::{push_mono, Capture, CaptureError, Sink};
+use super::capture::{push_mono, Capture, CaptureError, SharedSink, Sink, SourceShared, SourceState, ThreadCapture, WATCH_EVERY};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::AnyThread;
@@ -19,12 +21,15 @@ use std::ffi::c_void;
 use std::ptr::NonNull;
 
 struct Context {
-    sink: Sink,
+    sink: SharedSink,
     channels: usize,
     interleaved: bool,
+    /// Counts IO callbacks, so the supervisor sees a tap that stopped delivering.
+    calls: Arc<AtomicU64>,
 }
 
-pub struct Tap {
+struct Tap {
+    output: AudioObjectID,
     tap: AudioObjectID,
     aggregate: AudioObjectID,
     proc_id: AudioDeviceIOProcID,
@@ -86,14 +91,66 @@ fn cfstr_to_ns(s: &CFString) -> Retained<NSString> {
     unsafe { Retained::retain(ptr).expect("non-null") }
 }
 
+/// Open the tap, then watch it: a new default output device, or an IO proc
+/// that stopped being called, rebuilds the tap; while that fails the source
+/// is Lost and the mixer writes silence.
 pub fn start(sink: Sink) -> Result<Box<dyn Capture>, CaptureError> {
     if !super::super::permissions::macos_supports_taps() {
         return Err(CaptureError::Unsupported);
     }
-    unsafe { start_tap(sink) }.map(|t| Box::new(t) as Box<dyn Capture>)
+    let sink: SharedSink = Arc::new(Mutex::new(sink));
+    let calls = Arc::new(AtomicU64::new(0));
+    let first = unsafe { start_tap(sink.clone(), calls.clone()) }?;
+    let shared = SourceShared::new(first.rate);
+    let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let shared2 = shared.clone();
+    let thread = std::thread::Builder::new()
+        .name("system-audio".into())
+        .spawn(move || {
+            let mut tap = Some(first);
+            let mut last_calls = calls.load(Ordering::Relaxed);
+            let mut stalled = 0;
+            while let Err(mpsc::RecvTimeoutError::Timeout) = stop_rx.recv_timeout(WATCH_EVERY) {
+                let now_calls = calls.load(Ordering::Relaxed);
+                stalled = if now_calls == last_calls { stalled + 1 } else { 0 };
+                last_calls = now_calls;
+                let output = default_output();
+                let moved = tap.as_ref().is_some_and(|t| output.is_some_and(|o| o != t.output));
+                if tap.is_some() && !moved && stalled < 3 {
+                    continue;
+                }
+                if let Some(mut t) = tap.take() {
+                    t.stop();
+                }
+                match unsafe { start_tap(sink.clone(), calls.clone()) } {
+                    Ok(t) => {
+                        log::info!("system audio: tap rebuilt at {} Hz", t.rate);
+                        shared2.set_rate(t.rate);
+                        shared2.set_state(SourceState::On);
+                        stalled = 0;
+                        tap = Some(t);
+                    }
+                    Err(e) => {
+                        if shared2.state() == SourceState::On {
+                            log::warn!("system audio lost: {e}");
+                        }
+                        shared2.set_state(SourceState::Lost);
+                    }
+                }
+            }
+            if let Some(mut t) = tap {
+                t.stop();
+            }
+        })
+        .map_err(|e| CaptureError::Other(e.to_string()))?;
+    Ok(Box::new(ThreadCapture { shared, stop: Some(stop_tx), thread: Some(thread) }))
 }
 
-unsafe fn start_tap(sink: Sink) -> Result<Tap, CaptureError> {
+fn default_output() -> Option<AudioObjectID> {
+    unsafe { get(kAudioObjectSystemObject as AudioObjectID, kAudioHardwarePropertyDefaultSystemOutputDevice, None).ok() }
+}
+
+unsafe fn start_tap(sink: SharedSink, calls: Arc<AtomicU64>) -> Result<Tap, CaptureError> {
     // Leave this process out of the tap.
     let pid = std::process::id() as i32;
     let own: AudioObjectID = get::<AudioObjectID>(
@@ -172,6 +229,7 @@ unsafe fn start_tap(sink: Sink) -> Result<Tap, CaptureError> {
             sink,
             channels: (format.mChannelsPerFrame as usize).max(1),
             interleaved: format.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0,
+            calls,
         }));
         let mut proc_id: AudioDeviceIOProcID = None;
         let status = AudioDeviceCreateIOProcID(aggregate, Some(io_proc), context as *mut c_void, NonNull::from(&mut proc_id));
@@ -193,7 +251,7 @@ unsafe fn start_tap(sink: Sink) -> Result<Tap, CaptureError> {
             format.mChannelsPerFrame,
             (*context).interleaved
         );
-        Ok(Tap { tap, aggregate, proc_id, rate: format.mSampleRate as u32, context, stopped: false })
+        Ok(Tap { output, tap, aggregate, proc_id, rate: format.mSampleRate as u32, context, stopped: false })
     })();
     if result.is_err() {
         AudioHardwareDestroyProcessTap(tap);
@@ -212,6 +270,9 @@ unsafe extern "C-unwind" fn io_proc(
     client: *mut c_void,
 ) -> i32 {
     let ctx = &mut *(client as *mut Context);
+    ctx.calls.fetch_add(1, Ordering::Relaxed);
+    // Uncontended: one tap at a time writes.
+    let Ok(mut sink) = ctx.sink.try_lock() else { return 0 };
     let list = input.as_ref();
     let count = list.mNumberBuffers as usize;
     if count == 0 {
@@ -225,7 +286,7 @@ unsafe extern "C-unwind" fn io_proc(
         }
         let ch = (b.mNumberChannels as usize).max(1);
         let samples = std::slice::from_raw_parts(b.mData as *const f32, b.mDataByteSize as usize / 4);
-        push_mono(&mut ctx.sink, samples, ch, |s| s);
+        push_mono(&mut sink, samples, ch, |s| s);
     } else {
         // Planar: one buffer per channel. Average into a small stack block.
         let frames = buffers[0].mDataByteSize as usize / 4;
@@ -245,18 +306,14 @@ unsafe extern "C-unwind" fn io_proc(
                     block[i] += plane[done + i] / ctx.channels as f32;
                 }
             }
-            push_mono(&mut ctx.sink, &block[..n], 1, |s| s);
+            push_mono(&mut sink, &block[..n], 1, |s| s);
             done += n;
         }
     }
     0
 }
 
-impl Capture for Tap {
-    fn rate(&self) -> u32 {
-        self.rate
-    }
-
+impl Tap {
     fn stop(&mut self) {
         if self.stopped {
             return;

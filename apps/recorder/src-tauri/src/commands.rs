@@ -78,8 +78,9 @@ pub fn keep_trying(app: AppState, id: String) {
     app.keep_trying(&id)
 }
 
+/// The save dialog, then the export. `damaged` saves a damaged entry's audio.
 #[tauri::command]
-pub async fn save_elsewhere(app: AppState<'_>, id: String, title: String, dialog_title: String) -> Result<bool, String> {
+pub async fn save_elsewhere(app: AppState<'_>, id: String, title: String, dialog_title: String, damaged: Option<bool>) -> Result<bool, String> {
     use tauri_plugin_dialog::DialogExt;
     let safe: String = title.chars().map(|c| if "/\\:*?\"<>|".contains(c) { '-' } else { c }).collect();
     let name = format!("{}.ogg", safe.trim().chars().take(100).collect::<String>());
@@ -90,8 +91,37 @@ pub async fn save_elsewhere(app: AppState<'_>, id: String, title: String, dialog
     .await
     .map_err(|e| e.to_string())?;
     let Some(path) = picked.and_then(|p| p.into_path().ok()) else { return Ok(false) };
-    app.save_elsewhere(&id, path)?;
+    let app = app.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if damaged == Some(true) {
+            app.save_damaged_elsewhere(&id, path)
+        } else {
+            app.save_elsewhere(&id, path)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())??;
     Ok(true)
+}
+
+#[tauri::command]
+pub fn claim(app: AppState, id: String) -> Result<(), String> {
+    app.claim(&id)
+}
+
+#[tauri::command]
+pub fn retry_unreadable(app: AppState, id: String) {
+    app.retry_unreadable(&id)
+}
+
+#[tauri::command]
+pub fn retry_damaged(app: AppState, id: String) {
+    app.retry_damaged(&id)
+}
+
+#[tauri::command]
+pub fn retry_save(app: AppState) {
+    app.retry_save()
 }
 
 #[tauri::command]

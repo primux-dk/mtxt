@@ -3,6 +3,8 @@
 
 pub mod backoff;
 pub mod chunks;
+pub mod recovery;
+pub mod select;
 pub mod state;
 pub mod store;
 pub mod uploader;
