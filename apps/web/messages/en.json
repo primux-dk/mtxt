@@ -724,7 +724,7 @@
         "not_eligible": "The meeting may no longer be sent",
         "meeting_gone": "The meeting is gone",
         "endpoint_disabled": "The endpoint is disabled",
-        "short_ttl": "Refused: the host's DNS answer may change within a minute"
+        "short_ttl": "Refused: the host's DNS answer has a TTL under a minute and changed on a second look"
       },
       "dialog": {
         "title": "Add endpoint",
@@ -769,7 +769,7 @@
         },
         "empty": {
           "title": "No deliveries yet",
-          "body": "Events to this endpoint show here. Send a test event to check the connection."
+          "body": "Events to this endpoint show here. Use Send test event above to check the connection."
         },
         "failed": {
           "title": "Could not load the delivery log",

@@ -724,7 +724,7 @@
         "not_eligible": "Mødet må ikke længere sendes",
         "meeting_gone": "Mødet findes ikke længere",
         "endpoint_disabled": "Endpointet er slået fra",
-        "short_ttl": "Afvist: værtens DNS-svar kan skifte inden for et minut"
+        "short_ttl": "Afvist: værtens DNS-svar har en TTL under et minut og skiftede ved andet opslag"
       },
       "dialog": {
         "title": "Tilføj endpoint",
@@ -769,7 +769,7 @@
         },
         "empty": {
           "title": "Ingen leveringer endnu",
-          "body": "Hændelser til dette endpoint vises her. Send en testhændelse for at tjekke forbindelsen."
+          "body": "Hændelser til dette endpoint vises her. Brug Send testhændelse ovenfor for at tjekke forbindelsen."
         },
         "failed": {
           "title": "Leveringsloggen kunne ikke hentes",

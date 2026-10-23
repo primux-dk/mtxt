@@ -14,7 +14,7 @@ export type UrlProblem =
   'invalid' | 'not_https' | 'port' | 'credentials' | 'too_long' | 'private_host';
 export type TargetProblem = 'private_address' | 'dns' | 'short_ttl';
 
-/** An answer that may change sooner than this is refused: it leaves the check too little time to hold. */
+/** An answer that may change sooner than this is looked up a second time before it is trusted. */
 export const MIN_TTL_S = 60;
 
 const LOCAL_TEST_HOSTS = new Set(['localhost', '127.0.0.1']);
@@ -56,7 +56,9 @@ const isIpLiteral = (host: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || ho
 
 /**
  * Resolves the URL's host, at each attempt, and refuses it when any address
- * is private, when it has none, or when the answer's TTL is under a minute.
+ * is private or when it has none. An answer with a TTL under a minute is
+ * looked up once more at once, and refused (`short_ttl`) unless the second
+ * answer is public too and names the same addresses.
  * Null means the request may go. Best effort on Cloudflare: the Worker's
  * fetch resolves the name again and cannot be pinned to the checked address
  * (docs/decisions.md, packet 13 review).
@@ -71,16 +73,31 @@ export async function checkTarget(
   if (!checked.ok) return 'private_address';
   const host = hostOf(url);
   if (isIpLiteral(host)) return isPrivateAddress(host) ? 'private_address' : null;
-  let answers: { address: string; ttl: number }[];
-  try {
-    answers = await resolver.resolve(host);
-  } catch {
-    return 'dns';
-  }
-  if (answers.length === 0) return 'dns';
-  if (answers.some((a) => isPrivateAddress(a.address))) return 'private_address';
-  return answers.some((a) => !(a.ttl >= MIN_TTL_S)) ? 'short_ttl' : null;
+  const lookup = async () => {
+    try {
+      const answers = await resolver.resolve(host);
+      if (answers.length === 0) return 'dns' as const;
+      if (answers.some((a) => isPrivateAddress(a.address))) return 'private_address' as const;
+      return answers;
+    } catch {
+      return 'dns' as const;
+    }
+  };
+  const first = await lookup();
+  if (typeof first === 'string') return first;
+  if (first.every((a) => a.ttl >= MIN_TTL_S)) return null;
+  // A short TTL is often only a cache near its end. One more lookup at once: the host passes
+  // when that answer is public too and names the same addresses; anything else is refused.
+  const second = await lookup();
+  if (typeof second === 'string') return second;
+  return sameAddresses(first, second) ? null : 'short_ttl';
 }
+
+const sameAddresses = (a: { address: string }[], b: { address: string }[]) => {
+  const set = (list: { address: string }[]) =>
+    [...new Set(list.map((x) => x.address.toLowerCase()))].sort().join(',');
+  return set(a) === set(b);
+};
 
 /** IPv4 as four numbers, or null. */
 function v4(text: string): number[] | null {

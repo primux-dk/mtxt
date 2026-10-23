@@ -149,6 +149,50 @@ describe('outbound addresses', () => {
     }
   });
 
+  it('looks a short TTL up once more, and refuses it when the second answer differs or is private', async () => {
+    const sequence = (
+      ...answers: { address: string; ttl: number }[][]
+    ): HostResolver & {
+      calls: number;
+    } => {
+      const r = {
+        calls: 0,
+        async resolve() {
+          return answers[Math.min(r.calls++, answers.length - 1)]!;
+        },
+      };
+      return r;
+    };
+    const target = (r: HostResolver) => checkTarget(new URL('https://alex.example.com/hook'), r);
+    const long = sequence([{ address: '93.184.216.34', ttl: 300 }]);
+    expect(await target(long)).toBeNull();
+    expect(long.calls).toBe(1);
+    const cached = sequence(
+      [{ address: '93.184.216.34', ttl: 4 }],
+      [{ address: '93.184.216.34', ttl: 3 }],
+    );
+    expect(await target(cached)).toBeNull();
+    expect(cached.calls).toBe(2);
+    const moved = sequence(
+      [{ address: '93.184.216.34', ttl: 4 }],
+      [{ address: '93.184.216.35', ttl: 4 }],
+    );
+    expect(await target(moved)).toBe('short_ttl');
+    const rebind = sequence(
+      [{ address: '93.184.216.34', ttl: 1 }],
+      [{ address: '10.0.0.8', ttl: 1 }],
+    );
+    expect(await target(rebind)).toBe('private_address');
+    const shrunk = sequence(
+      [
+        { address: '93.184.216.34', ttl: 4 },
+        { address: '93.184.216.36', ttl: 4 },
+      ],
+      [{ address: '93.184.216.34', ttl: 4 }],
+    );
+    expect(await target(shrunk)).toBe('short_ttl');
+  });
+
   it('lets the e2e receiver through only when allowed', () => {
     const url = 'http://localhost:8788/api/test/webhook-receiver';
     expect(checkEndpointUrl(url).ok).toBe(false);
@@ -216,7 +260,8 @@ describe('outbound addresses', () => {
     });
     const target = (host: string) => checkTarget(new URL(`https://${host}/hook`), r);
     expect(await target('alex.example.com')).toBeNull();
-    expect(await target('fast.example.com')).toBe('short_ttl');
+    // A short TTL with the same public answer on the second look passes.
+    expect(await target('fast.example.com')).toBeNull();
     expect(await target('sixty.example.com')).toBeNull();
     expect(await target('rebind.example.com')).toBe('private_address');
     expect(await target('six.example.com')).toBe('private_address');
