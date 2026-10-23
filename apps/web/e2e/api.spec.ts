@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { test } from './contract';
@@ -84,7 +85,7 @@ async function openApiTokens(page: Page) {
 async function makeToken(page: Page, name: string, scope: 'Read only' | 'Read and write') {
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'New token' }).click();
-  await dialog.getByLabel('Name').fill(name);
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill(name);
   await dialog.getByRole('radio', { name: new RegExp(`^${scope}`) }).check();
   await dialog.getByRole('button', { name: 'Create token' }).click();
   const value = dialog.getByLabel('Token', { exact: true });
@@ -144,11 +145,13 @@ test('make a token in the dialog: the field says what is wrong, the token shows 
   await expect(dialog.getByRole('heading', { name: 'New API token' })).toBeFocused();
   await dialog.getByRole('button', { name: 'Create token' }).click();
   await expect(dialog.getByText('Give the token a name.')).toBeVisible();
-  await expect(dialog.getByLabel('Name')).toBeFocused();
-  await dialog.getByLabel('Name').fill('x'.repeat(65));
+  await expect(dialog.getByRole('textbox', { name: 'Name', exact: true })).toBeFocused();
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('x'.repeat(65));
   await dialog.getByRole('button', { name: 'Create token' }).click();
   await expect(dialog.getByText('The name is at most 64 characters. Shorten it.')).toBeVisible();
-  await expect(dialog.getByLabel('Name')).toHaveValue('x'.repeat(65));
+  await expect(dialog.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(
+    'x'.repeat(65),
+  );
   await dialog.getByRole('button', { name: 'Cancel' }).click();
 
   readToken = await makeToken(page, 'Alex læser', 'Read only');
@@ -165,7 +168,7 @@ test('make a token in the dialog: the field says what is wrong, the token shows 
 
   // Copy puts the token on the clipboard.
   await dialog.getByRole('button', { name: 'New token' }).click();
-  await dialog.getByLabel('Name').fill('Alex skriver');
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Alex skriver');
   await dialog.getByRole('radio', { name: /^Read and write/ }).check();
   await dialog.getByLabel('Expires after').selectOption('90');
   await dialog.getByRole('button', { name: 'Create token' }).click();
@@ -175,7 +178,7 @@ test('make a token in the dialog: the field says what is wrong, the token shows 
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(writeToken);
   await dialog.getByRole('button', { name: 'Done' }).click();
   await expect(dialog.getByRole('heading', { name: '2 tokens' })).toBeVisible();
-  await expect(dialog.getByText('Read and write')).toBeVisible();
+  await expect(dialog.getByTestId('api-tokens-list').getByText('Read and write')).toBeVisible();
   const [expiry] = d1<{ days: number }>(
     `select round((expires_at - created_at) / 86400000.0) as days from recorder_tokens where device_name = 'Alex skriver'`,
   );
@@ -565,14 +568,17 @@ test('keyboard walk of API tokens: menu, dialog, make, copy, done, Escape return
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'API tokens' })).toBeFocused();
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'API tokens' });
+  // The dialog's name follows its step's title, so it is found by role alone.
+  const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'API tokens', exact: true })).toBeFocused();
-  await page.keyboard.press('Tab');
   const create = dialog.getByRole('button', { name: 'New token' });
+  await expect(create).toBeVisible();
+  await page.keyboard.press('Tab');
   await expectFocusRing(create);
   await page.keyboard.press('Enter');
+  await expect(dialog.getByRole('heading', { name: 'New API token' })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(dialog.getByLabel('Name')).toBeFocused();
+  await expect(dialog.getByRole('textbox', { name: 'Name', exact: true })).toBeFocused();
   await page.keyboard.type('Tastatur');
   await page.keyboard.press('Enter');
   await expect(dialog.getByLabel('Token', { exact: true })).toBeFocused();
@@ -609,6 +615,14 @@ test('API tokens shows its three states: none, failed with Try again, and a list
   // The admin has none of their own and sees no one else's.
   await expect(dialog.getByText('No API tokens')).toBeVisible();
   await expect(dialog.getByText('Alex skriver')).toHaveCount(0);
+});
+
+test('no token reaches the Worker log', () => {
+  const log = readFileSync('.wrangler/e2e-worker.log', 'utf8');
+  for (const token of [readToken, writeToken, oleToken]) {
+    expect(token).toMatch(/^mtxt_/);
+    expect(log).not.toContain(token);
+  }
 });
 
 test.describe('25 tokens with a 64-character name (rule 13)', () => {
@@ -657,7 +671,9 @@ test.describe('25 tokens with a 64-character name (rule 13)', () => {
         .click();
       await expect(dialog.getByRole('heading', { name: '24 tokens' })).toBeVisible();
       await dialog.getByRole('button', { name: 'New token' }).click();
-      await dialog.getByLabel('Name').fill(`Skærmbillede ${viewport.width}`);
+      await dialog
+        .getByRole('textbox', { name: 'Name', exact: true })
+        .fill(`Skærmbillede ${viewport.width}`);
       await settle(page);
       await page.screenshot({ path: shot(`api-tokens-new-${viewport.width}`) });
       await dialog.getByRole('button', { name: 'Create token' }).click();
