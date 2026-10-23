@@ -145,9 +145,16 @@ impl Store {
         }
     }
 
-    /// Remove both files; only for a recording established as empty, or whose audio is gone.
+    /// Remove both files: the state first, then the audio. If the audio
+    /// cannot go, it stays as an orphan, which the next start lists; nothing
+    /// is lost by a failure half-way.
     pub fn forget(&self, id: &str) -> std::io::Result<()> {
-        self.delete_audio(id)?;
+        self.remove_state(id)?;
+        self.delete_audio(id)
+    }
+
+    /// Remove the state file and make the removal durable.
+    pub fn remove_state(&self, id: &str) -> std::io::Result<()> {
         match fs::remove_file(self.state_path(id)) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             other => other.and_then(|_| sync_dir(&self.dir)),

@@ -62,9 +62,20 @@
           <svg class="icon" aria-hidden="true"><use href="#i-hide"></use></svg>
         </button>
       </div>
-      <div class="live-copy" id="copy" aria-live="polite">
-        <p class="prev" id="prev"></p>
-        <p class="current" id="current"></p>
+      <div class="live-body">
+        <div
+          class="live-copy"
+          id="copy"
+          tabindex="0"
+          role="log"
+          aria-live="polite"
+          data-i18n-attr="aria-label:live.lines"
+        >
+          <ol class="live-lines" id="lines"></ol>
+          <p class="live-partial" id="partial" hidden></p>
+          <p class="live-status" id="status" hidden></p>
+        </div>
+        <button type="button" class="live-jump" id="jump" hidden data-i18n="live.jump"></button>
       </div>
       <div class="live-foot" data-i18n="live.foot">
         Local preview · Recording continues when you hide the text.

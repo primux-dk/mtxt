@@ -32,7 +32,11 @@ const label = location.pathname.includes('live') ? 'live' : 'main';
       case 'snapshot':
         return snapshot(state, lang);
       case 'live_state':
-        return live[liveState] ?? null;
+        return {
+          session: 1,
+          seq: 1,
+          ...(live[liveState] ?? { state: '', reason: null, lines: [], partial: null }),
+        };
       default:
         return null;
     }

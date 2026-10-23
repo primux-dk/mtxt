@@ -3,7 +3,7 @@
 //! as a new snapshot.
 
 use crate::app::{App, Snapshot};
-use crate::live::LiveUpdate;
+use crate::live::LiveTranscript;
 use crate::permissions::Permissions;
 use std::sync::Arc;
 use tauri::State;
@@ -104,6 +104,28 @@ pub async fn save_elsewhere(app: AppState<'_>, id: String, title: String, dialog
     Ok(true)
 }
 
+/// "Save audio to…": the save dialog with `default_name`, then a checked copy.
+#[tauri::command]
+pub async fn export_audio(app: AppState<'_>, id: String, default_name: String, dialog_title: String) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let safe: String = default_name.chars().map(|c| if "/\\:*?\"<>|".contains(c) { '-' } else { c }).collect();
+    let handle = app.handle.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        handle.dialog().file().set_title(dialog_title).set_file_name(safe).add_filter("Ogg Opus", &["ogg"]).blocking_save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let Some(path) = picked.and_then(|p| p.into_path().ok()) else { return Ok(false) };
+    let app = app.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || app.export_audio(&id, path)).await.map_err(|e| e.to_string())??;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn delete_local(app: AppState, id: String, confirmed: bool) -> Result<(), String> {
+    app.delete_local(&id, confirmed)
+}
+
 #[tauri::command]
 pub fn claim(app: AppState, id: String) -> Result<(), String> {
     app.claim(&id)
@@ -164,7 +186,7 @@ pub fn pause_live(app: AppState, paused: bool) {
 }
 
 #[tauri::command]
-pub fn live_state(app: AppState) -> Option<LiveUpdate> {
+pub fn live_state(app: AppState) -> LiveTranscript {
     app.live_state()
 }
 

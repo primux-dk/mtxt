@@ -6,7 +6,7 @@
 use crate::api::{Api, ApiError, PollResult};
 use crate::audio::recorder::{self, LiveFeed, Recording, Wanted};
 use crate::connect::{self, Pkce};
-use crate::live::{models, LiveSession, LiveUpdate};
+use crate::live::{models, LiveSession, LiveTranscript, LiveUpdate};
 use crate::permissions::{self, Permission, Permissions};
 use crate::profile::Profile;
 use crate::queue::recovery::{inspect_file, FileCheck};
@@ -47,7 +47,10 @@ pub struct Inner {
     pub online: bool,
     pub downloads: HashMap<String, Download>,
     pub live: Option<LiveSession>,
-    pub live_update: Option<LiveUpdate>,
+    /// The running recording's live transcript, in memory only.
+    pub live_text: LiveTranscript,
+    /// Live sessions started so far; the next one gets the next number.
+    pub live_sessions: u64,
     pub live_hidden: bool,
     /// The recording whose 7-day question is open.
     pub ask: Option<String>,
@@ -175,6 +178,8 @@ pub struct QueueItem {
     pub blocked: Option<Blocked>,
     pub local_error: Option<String>,
     pub can_save: bool,
+    /// The audio is on this Mac.
+    pub has_file: bool,
     pub recovered: bool,
     /// Finished by recovery; uploads after the user says so.
     pub needs_review: bool,
@@ -227,7 +232,8 @@ impl App {
                 online: true,
                 downloads: HashMap::new(),
                 live: None,
-                live_update: None,
+                live_text: LiveTranscript::default(),
+                live_sessions: 0,
                 live_hidden: false,
                 ask: None,
                 notice: None,
@@ -237,6 +243,11 @@ impl App {
             wake: Notify::new(),
             live_feed: Arc::new(LiveFeed::default()),
         });
+        // Deletions a crash interrupted finish first; their audio is not an orphan.
+        {
+            let mut inner = app.lock();
+            inner.queue.finish_discards(&app.store, &app.store, Utc::now());
+        }
         app.recover_interrupted();
         app.adopt_orphans(loaded.orphans);
         Ok(app)
@@ -426,6 +437,7 @@ impl App {
             },
             local_error: r.local_error.clone(),
             can_save: r.can_save_elsewhere() && self.store.audio_path(&r.id).exists(),
+            has_file: self.store.audio_path(&r.id).exists(),
             recovered: r.recovered,
             needs_review: r.needs_review,
             unsaved: inner.queue.unsaved_error(&r.id).map(str::to_string),
@@ -1256,6 +1268,65 @@ impl App {
         Ok(())
     }
 
+    /// "Save audio to…": a checked copy elsewhere; the entry does not change.
+    pub fn export_audio(&self, id: &str, dest: PathBuf) -> Result<(), String> {
+        let expected = self.lock().queue.get(id).and_then(|r| {
+            (r.status != Status::FailedLocal).then(|| r.sha256.clone()).flatten()
+        });
+        self.store.export(id, &dest, expected.as_deref()).map(|_| ()).map_err(|e| match e {
+            ExportError::InsideQueue => "recorder.ask.insideQueue".to_string(),
+            _ => "recorder.ask.saveFailed".to_string(),
+        })
+    }
+
+    /// "Delete from this Mac": the local copy only. A confirmed recording
+    /// becomes Deleted (the library has it); an unconfirmed one is removed
+    /// entirely, and only with `confirmed` from the window's named question.
+    /// Never while it records or uploads.
+    pub fn delete_local(&self, id: &str, confirmed: bool) -> Result<(), String> {
+        let (status, active, saved) = {
+            let inner = self.lock();
+            let r = inner.queue.get(id).ok_or("no such recording")?;
+            (r.status, inner.uploading.as_deref() == Some(id), inner.queue.is_saved(id))
+        };
+        if active || matches!(status, Status::Recording | Status::Uploading) {
+            return Err("recorder.delete.busy".into());
+        }
+        if !saved {
+            return Err("recorder.error.stateSave".into());
+        }
+        match status {
+            Status::Confirmed => {
+                self.apply_with(id, Event::FileDeleted, OnFail::Revert).map_err(|_| "recorder.error.stateSave".to_string())?;
+                self.store.delete_audio(id).map_err(|e| e.to_string())?;
+            }
+            Status::Deleted | Status::SavedElsewhere => return Err("recorder.delete.noFile".into()),
+            _ if !confirmed => return Err("recorder.delete.needsConfirm".into()),
+            _ => {
+                let result = {
+                    let mut inner = self.lock();
+                    let r = inner.queue.discard(&self.store, &self.store, id, false, Utc::now());
+                    if r.is_ok() && inner.ask.as_deref() == Some(id) {
+                        inner.ask = None;
+                    }
+                    r
+                };
+                if let Err(e) = result {
+                    log::warn!("{id}: delete from this Mac: {e:?}");
+                    self.changed();
+                    return Err(match e {
+                        crate::queue::DiscardError::Busy => "recorder.delete.busy",
+                        crate::queue::DiscardError::NotSaved(_) | crate::queue::DiscardError::Unsaved => "recorder.error.stateSave",
+                        _ => "recorder.delete.failed",
+                    }
+                    .into());
+                }
+            }
+        }
+        self.changed();
+        Ok(())
+    }
+
     /// "Upload" on a recording recovery finished: the user says it may go.
     pub fn review(&self, id: &str) -> Result<(), String> {
         self.apply_with(id, Event::Review, OnFail::Revert).map_err(|_| "recorder.error.stateSave".to_string())?;
@@ -1286,13 +1357,24 @@ impl App {
                 return;
             }
             inner.live_hidden = false;
-            inner.live_update = None;
+            inner.live_text = LiveTranscript::default();
             models::usable(&inner.profile.model).to_string()
         };
+        let offset_s = self
+            .lock()
+            .active
+            .as_ref()
+            .map(|a| a.started.elapsed().as_secs_f64())
+            .unwrap_or(0.0);
         let app = self.clone();
-        let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), move |update| {
+        let id = {
+            let mut inner = self.lock();
+            inner.live_sessions += 1;
+            inner.live_sessions
+        };
+        let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), offset_s, id, move |update| {
             // Runs only while the session is alive (`LiveSession` guards it).
-            app.lock().live_update = Some(update.clone());
+            app.lock().live_text.apply(&update);
             let _ = app.handle.emit_to("live", "live", &update);
         });
         self.lock().live = Some(session);
@@ -1303,11 +1385,17 @@ impl App {
     /// which gets an empty `stopped` update. Nothing of it is kept.
     pub fn stop_live(&self) {
         let session = self.lock().live.take();
-        if let Some(s) = session {
-            s.stop();
-        }
-        self.lock().live_update = None;
-        let _ = self.handle.emit_to("live", "live", LiveUpdate::stopped());
+        // The stopped update is numbered after the session's last one, and the
+        // kept state says stopped too, so a window that opens now agrees.
+        let stopped = match session {
+            Some(s) => s.stop(),
+            None => {
+                let t = &self.lock().live_text;
+                LiveUpdate::stopped(t.session, t.seq + 1)
+            }
+        };
+        self.lock().live_text.apply(&stopped);
+        let _ = self.handle.emit_to("live", "live", &stopped);
         crate::windows::hide_live(&self.handle);
     }
 
@@ -1361,8 +1449,8 @@ impl App {
         }
     }
 
-    pub fn live_state(&self) -> Option<LiveUpdate> {
-        self.lock().live_update.clone()
+    pub fn live_state(&self) -> LiveTranscript {
+        self.lock().live_text.clone()
     }
 
     pub fn set_model(self: &Arc<App>, id: &str) {
@@ -1411,7 +1499,7 @@ impl App {
                         let inner = app.lock();
                         inner.live.is_some()
                             && inner.profile.model == spec.id
-                            && inner.live_update.as_ref().is_some_and(|u| u.state == "needs_model")
+                            && inner.live_text.state == "needs_model"
                     };
                     if waiting {
                         app.stop_live();

@@ -192,6 +192,17 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 .queue-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .queue-status{white-space:nowrap;font-size:10px;display:flex;align-items:center;gap:5px}
 .queue-status .icon{width:12px;height:12px}
+/* Row menu (figure 05) and the live transcript list (figure 06). */
+.queue-row{position:relative;padding-right:24px}
+.row-more{position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;background:transparent;color:var(--muted-foreground);border-radius:var(--radius-control)}
+.row-more .icon{width:14px;height:14px;stroke-width:2.5}
+.row-menu{position:absolute;right:0;top:calc(100% - 2px);z-index:2;min-width:150px;display:grid;padding:3px;background:var(--popover);border:1px solid var(--border);border-radius:var(--radius-card);box-shadow:var(--floating-shadow)}
+.row-menu button{text-align:left;background:transparent;padding:6px 8px;font-size:11px;font-weight:450;border-radius:var(--radius-control)}
+.row-menu button:first-child{background:var(--secondary)}
+.live-lines{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.live-lines li{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:baseline}
+.live-time{font-size:10px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.live-partial{color:var(--muted-foreground);margin-left:38px}
 .queue-action{background:transparent;padding:0;font-size:10px;color:inherit;text-decoration:underline;text-underline-offset:3px}
 .recorder-footer{margin-top:auto;padding:10px 20px;border-top:1px solid var(--line-subtle);font-size:11px}
 .recorder-footer .avatar{width:24px;height:24px;font-size:9px}
@@ -378,6 +389,9 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <symbol id="i-info" viewBox="0 0 24 24">
 <circle cx="12" cy="12" r="9"/>
 <path d="M12 11v6m0-10v.1"/>
+</symbol>
+<symbol id="i-more" viewBox="0 0 24 24">
+<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>
 </symbol>
 <symbol id="i-mic" viewBox="0 0 24 24">
 <rect x="9" y="2" width="6" height="12" rx="3"/>
@@ -873,22 +887,32 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <div class="queue-heading">
 <span data-i18n="recorder.queue.heading">Recent recordings</span>
 <span data-i18n="recorder.queue.count" data-i18n-args='{"count":4}'>4 files</span>
+<button type="button" class="row-more" data-i18n-attr="aria-label:recorder.menu.more" aria-label="More actions"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg></button>
 </div>
 <div class="queue-row">
 <span class="queue-title" lang="da">Produktionsmøde</span>
 <span class="queue-status "><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="recorder.queue.uploading" data-i18n-args='{"done":2,"total":5}'>Uploading 2/5</span></span>
+<button type="button" class="row-more" data-i18n-attr="aria-label:recorder.menu.more" aria-label="More actions"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg></button>
 </div>
 <div class="queue-row">
 <span class="queue-title" lang="da">Leverancer</span>
 <span class="queue-status accent-fg"><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="recorder.queue.confirmed">Confirmed</span></span>
+<button type="button" class="row-more" data-i18n-attr="aria-label:recorder.menu.more" aria-label="More actions" aria-expanded="true"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg></button>
+<div class="row-menu" role="menu">
+<button type="button" role="menuitem" data-i18n="recorder.menu.save">Save audio to…</button>
+<button type="button" role="menuitem" data-i18n="recorder.menu.open">Open in library</button>
+<button type="button" role="menuitem" class="warn" data-i18n="recorder.menu.delete">Delete from this Mac</button>
+</div>
 </div>
 <div class="queue-row">
 <span class="queue-title" lang="da">Plan for november</span>
 <span class="queue-status muted"><svg class="icon" aria-hidden="true"><use href="#i-network"></use></svg><span data-i18n="recorder.queue.pendingNetwork">Waiting for network · Retrying</span></span>
+<button type="button" class="row-more" data-i18n-attr="aria-label:recorder.menu.more" aria-label="More actions"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg></button>
 </div>
 <div class="queue-row">
 <span class="queue-title" lang="da">Opfølgning, linje 2</span>
 <span class="queue-status warn"><svg class="icon" aria-hidden="true"><use href="#i-warning"></use></svg><button type="button" class="queue-action"><span data-i18n="recorder.queue.warn24h">Warning: not uploaded for 24 hours · Try now</span></button></span>
+<button type="button" class="row-more" data-i18n-attr="aria-label:recorder.menu.more" aria-label="More actions"><svg class="icon" aria-hidden="true"><use href="#i-more"></use></svg></button>
 </div>
 </div>
 </div>
@@ -909,7 +933,7 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 05. Desktop recorder, 1280 px canvas, window 360 × 520 px. Recording and the upload queue. macOS title bar for reference.</figcaption>
+<figcaption class="caption" lang="en">Figure 05. Desktop recorder, 1280 px canvas, window 360 × 520 px. Recording and the upload queue, with the row menu open on a confirmed recording. macOS title bar for reference.</figcaption>
 </figure>
 </section>
 <section id="live" aria-labelledby="label-live">
@@ -940,16 +964,19 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <button type="button" class="btn quiet" data-i18n-attr="aria-label:live.pause" aria-label="Pause live text"><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg></button>
 <button type="button" class="btn quiet" data-i18n-attr="aria-label:live.hide" aria-label="Hide live text"><svg class="icon" aria-hidden="true"><use href="#i-hide"></use></svg></button>
 </div>
-<div class="live-copy" lang="da">
-<p>Jonas: Vi mangler stadig at teste det nye skift.</p>
-<p>Søren: Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi starte mandag.</p>
+<div class="live-copy" lang="da" role="log">
+<ol class="live-lines">
+<li><time class="live-time">18:12</time><span>Jonas: Vi mangler stadig at teste det nye skift.</span></li>
+<li><time class="live-time">18:26</time><span>Søren: Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi starte mandag.</span></li>
+</ol>
+<p class="live-partial">Anne: Så skal vi have</p>
 </div>
 <div data-i18n="live.foot" class="live-foot">Local preview · Recording continues when you hide the text.</div>
 </div>
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 06. Live transcript, 1280 px canvas, floating window 420 × 200 px. Always on top, over a blurred example Teams meeting.</figcaption>
+<figcaption class="caption" lang="en">Figure 06. Live transcript, 1280 px canvas, floating window 420 × 200 px. Always on top, over a blurred example Teams meeting. Every finished line with its time, the line in progress muted; it follows while at the end.</figcaption>
 </figure>
 </section>
 <section id="settings" aria-labelledby="label-settings">

@@ -37,6 +37,11 @@
       <symbol id="i-download" viewBox="0 0 24 24">
         <path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4" />
       </symbol>
+      <symbol id="i-more" viewBox="0 0 24 24">
+        <circle cx="5" cy="12" r="1.2" />
+        <circle cx="12" cy="12" r="1.2" />
+        <circle cx="19" cy="12" r="1.2" />
+      </symbol>
       <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /></symbol>
     </svg>
     <main class="recorder" id="app">
@@ -236,6 +241,26 @@
             class="btn quiet"
             type="button"
             id="disconnect-cancel"
+            data-i18n="common.cancel"
+          ></button>
+        </div>
+      </dialog>
+
+      <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-body">
+        <h2 id="delete-title"></h2>
+        <p id="delete-body" data-i18n="recorder.delete.body"></p>
+        <p id="delete-error" class="error-text" role="alert" hidden></p>
+        <div class="actions">
+          <button
+            class="btn danger"
+            type="button"
+            id="delete-confirm"
+            data-i18n="recorder.menu.delete"
+          ></button>
+          <button
+            class="btn primary"
+            type="button"
+            id="delete-cancel"
             data-i18n="common.cancel"
           ></button>
         </div>

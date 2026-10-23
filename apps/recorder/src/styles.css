@@ -300,6 +300,11 @@ input::placeholder {
   width: 100%;
   height: 8px;
   accent-color: var(--accent-strong);
+  /* Without this WebKit draws its own green meter and ignores the rules below. */
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--muted);
+  border-radius: 4px;
 }
 .meter-row .meter-off {
   font-size: 11px;
@@ -310,7 +315,9 @@ meter::-webkit-meter-bar {
   border-radius: 4px;
   height: 8px;
 }
-meter::-webkit-meter-optimum-value {
+meter::-webkit-meter-optimum-value,
+meter::-webkit-meter-suboptimum-value,
+meter::-webkit-meter-even-less-good-value {
   background: var(--accent-strong);
   border-radius: 4px;
   transition: none;
@@ -655,39 +662,67 @@ dialog .actions .btn {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.live-copy {
-  padding: 12px 20px;
-  overflow: hidden;
-  font-size: 15px;
-  line-height: 1.6;
+.live-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+}
+.live-copy {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 20px 8px;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-user-select: text;
   user-select: text;
+  overscroll-behavior: contain;
 }
-.live-copy p {
+.live-copy:focus-visible {
+  outline-offset: -2px;
+}
+.live-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.live-lines li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: baseline;
   overflow-wrap: anywhere;
 }
-.live-copy .prev {
+.live-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+}
+.live-partial {
   color: var(--muted-foreground);
-  margin-bottom: 6px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin: 4px 0 0 calc(3.2em + 10px);
+  overflow-wrap: anywhere;
 }
-.live-copy .current {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.live-copy .status {
+.live-status {
   color: var(--muted-foreground);
   font-size: 13px;
+  margin-top: 6px;
+}
+.live-jump {
+  position: absolute;
+  right: 16px;
+  bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  box-shadow: var(--floating-shadow);
+  padding: 4px 12px;
+  font-size: 12px;
+  min-height: 28px;
 }
 .live-foot {
   font-size: 10px;
@@ -714,4 +749,68 @@ dialog .actions .btn {
 .queue-row.stacked .queue-action {
   white-space: normal;
   overflow: visible;
+}
+
+/* The three-dot menu on a row: a 44 px target that does not grow the row. */
+.queue-row {
+  position: relative;
+  padding-right: 30px;
+}
+.row-more {
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-control);
+}
+.row-more:hover {
+  color: var(--foreground);
+}
+.row-more .icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+.row-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% - 4px);
+  z-index: 10;
+  min-width: 190px;
+  display: grid;
+  padding: 4px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--floating-shadow);
+}
+.row-menu-item {
+  text-align: left;
+  background: transparent;
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 450;
+  border-radius: var(--radius-control);
+}
+.row-menu-item:hover:not([aria-disabled='true']),
+.row-menu-item:focus-visible {
+  background: var(--secondary);
+}
+.row-menu-item[aria-disabled='true'] {
+  color: var(--text-muted);
+  cursor: default;
+}
+.btn.danger {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--destructive);
+  border-radius: var(--radius-pill);
 }

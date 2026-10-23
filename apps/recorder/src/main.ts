@@ -7,6 +7,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { clock, dateTime, duration, initials, size } from './format';
 import { setLanguage, t, translate, type Args } from './locale';
+import { defaultFileName, menuFor, type MenuItem } from './rowMenu';
 import { applyTheme } from './theme';
 import type { Notice, QueueItem, Snapshot } from './types';
 
@@ -440,6 +441,8 @@ export function statusOf(q: QueueItem): StatusView {
       };
     case 'deleted':
       return { icon: 'check', cls: 'muted', text: t('recorder.queue.deleted') };
+    case 'discarding':
+      return { icon: 'warning', cls: 'muted', text: t('recorder.queue.discarding') };
     case 'saved_elsewhere':
       return { icon: 'check', cls: 'muted', text: t('recorder.queue.savedElsewhere') };
   }
@@ -513,8 +516,11 @@ function renderQueue(s: Snapshot): void {
       titleNode,
       statusNode(v, q.id),
     );
+    row.append(moreButton(q));
     list.append(row);
+    if (openMenu?.id === q.id) showMenu(row, q, openMenu.index);
   }
+  if (openMenu && !s.queue.some((q) => q.id === openMenu!.id)) openMenu = null;
   const damaged = $('damaged-list');
   damaged.replaceChildren();
   for (const d of s.damaged) {
@@ -540,7 +546,133 @@ function renderQueue(s: Snapshot): void {
   const count = s.queue.length + s.damaged.length;
   $('queue-count').textContent = count ? t('recorder.queue.count', { count }) : '';
   $('queue-empty').hidden = count > 0;
-  if (focusKey) $('app').querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
+  if (focusKey && !openMenu)
+    $('app').querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
+}
+
+// ---------- the row menu ----------
+
+/** The open menu survives the re-render a snapshot causes: row and item. */
+let openMenu: { id: string; index: number } | null = null;
+
+const MENU_LABEL: Record<MenuItem['id'], string> = {
+  save: 'recorder.menu.save',
+  open: 'recorder.menu.open',
+  delete: 'recorder.menu.delete',
+};
+
+function moreButton(q: QueueItem): HTMLButtonElement {
+  const b = el('button', { type: 'button', className: 'row-more' }, icon('more'));
+  b.setAttribute('aria-label', t('recorder.menu.label', { title: q.title }));
+  b.setAttribute('aria-haspopup', 'menu');
+  b.setAttribute('aria-expanded', String(openMenu?.id === q.id));
+  b.dataset.focusKey = `more-${q.id}`;
+  b.addEventListener('click', () => {
+    if (openMenu?.id === q.id) closeMenu();
+    else {
+      openMenu = { id: q.id, index: firstEnabled(q) };
+      showMenu(b.closest('li')!, q, openMenu.index);
+    }
+  });
+  b.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      openMenu = { id: q.id, index: firstEnabled(q) };
+      showMenu(b.closest('li')!, q, openMenu.index);
+    }
+  });
+  return b;
+}
+
+function firstEnabled(q: QueueItem): number {
+  return Math.max(
+    0,
+    menuFor(q).findIndex((m) => m.enabled),
+  );
+}
+
+function showMenu(row: HTMLElement, q: QueueItem, index: number): void {
+  document.querySelectorAll('.row-menu').forEach((m) => m.remove());
+  const items = menuFor(q);
+  const menu = el('div', { className: 'row-menu' });
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', t('recorder.menu.label', { title: q.title }));
+  const buttons = items.map((m, i) => {
+    const b = el('button', {
+      type: 'button',
+      className: 'row-menu-item',
+      textContent: t(MENU_LABEL[m.id]),
+    });
+    b.setAttribute('role', 'menuitem');
+    b.tabIndex = i === index ? 0 : -1;
+    if (!m.enabled) b.setAttribute('aria-disabled', 'true');
+    if (m.id === 'delete') b.classList.add('warn');
+    b.addEventListener('click', () => {
+      if (m.enabled) runMenu(q, m);
+    });
+    return b;
+  });
+  const enabled = buttons.map((_, i) => i).filter((i) => items[i]!.enabled);
+  menu.addEventListener('keydown', (e) => {
+    const at = enabled.indexOf(openMenu?.index ?? 0);
+    let next: number | null = null;
+    if (e.key === 'ArrowDown') next = enabled[(at + 1) % enabled.length] ?? null;
+    if (e.key === 'ArrowUp') next = enabled[(at - 1 + enabled.length) % enabled.length] ?? null;
+    if (e.key === 'Home') next = enabled[0] ?? null;
+    if (e.key === 'End') next = enabled[enabled.length - 1] ?? null;
+    if (e.key === 'Escape' || e.key === 'Tab') {
+      e.preventDefault();
+      closeMenu();
+      return;
+    }
+    if (next !== null) {
+      e.preventDefault();
+      if (openMenu) openMenu.index = next;
+      buttons.forEach((b, i) => (b.tabIndex = i === next ? 0 : -1));
+      buttons[next]!.focus({ preventScroll: true });
+    }
+  });
+  menu.append(...buttons);
+  document.body.append(menu);
+  // Over everything, under the dots; upwards when the window has no room below.
+  const dots = row.querySelector<HTMLElement>('.row-more')!.getBoundingClientRect();
+  const box = menu.getBoundingClientRect();
+  const below = window.innerHeight - dots.bottom;
+  menu.style.top = `${below >= box.height + 8 ? dots.bottom - 6 : Math.max(8, dots.top - box.height + 6)}px`;
+  menu.style.left = `${Math.max(8, Math.min(dots.right - box.width - 6, window.innerWidth - box.width - 8))}px`;
+  row.querySelector('.row-more')?.setAttribute('aria-expanded', 'true');
+  buttons[index]?.focus({ preventScroll: true });
+}
+
+/** Close the menu and give focus back to its dots (rule 11). */
+function closeMenu(focusDots = true): void {
+  const id = openMenu?.id;
+  openMenu = null;
+  document.querySelectorAll('.row-menu').forEach((m) => m.remove());
+  document.querySelectorAll('.row-more').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  if (id && focusDots)
+    $('app').querySelector<HTMLElement>(`[data-focus-key="more-${id}"]`)?.focus();
+}
+
+function runMenu(q: QueueItem, m: MenuItem): void {
+  closeMenu();
+  if (m.id === 'save') {
+    invoke<boolean>('export_audio', {
+      id: q.id,
+      defaultName: defaultFileName(q),
+      dialogTitle: t('recorder.ask.saveTitle'),
+    }).catch(showError);
+  } else if (m.id === 'open' && q.meeting_url) {
+    invoke('open_url', { url: q.meeting_url });
+  } else if (m.id === 'delete' && m.confirm) {
+    const d = $<HTMLDialogElement>('delete-dialog');
+    d.dataset.id = q.id;
+    $('delete-title').textContent = t('recorder.delete.title', { title: q.title });
+    $('delete-error').hidden = true;
+    openDialog(d, $('delete-cancel'));
+  } else if (m.id === 'delete') {
+    invoke('delete_local', { id: q.id, confirmed: false }).catch(showError);
+  }
 }
 
 function renderFooter(s: Snapshot): void {
@@ -762,6 +894,22 @@ function wire(): void {
   $('ask-dialog').addEventListener('close', () => {
     const id = $('ask-dialog').dataset.id;
     if (id) askDismissed.add(id);
+  });
+  $('delete-confirm').addEventListener('click', async () => {
+    const d = $<HTMLDialogElement>('delete-dialog');
+    try {
+      await invoke('delete_local', { id: d.dataset.id, confirmed: true });
+      d.close();
+    } catch (e) {
+      const err = $('delete-error');
+      err.textContent = t(String(e));
+      err.hidden = false;
+    }
+  });
+  $('delete-cancel').addEventListener('click', () => $<HTMLDialogElement>('delete-dialog').close());
+  // A click outside an open row menu closes it.
+  document.addEventListener('mousedown', (e) => {
+    if (openMenu && !(e.target as HTMLElement).closest('.row-menu, .row-more')) closeMenu(false);
   });
   $('disconnect-confirm').addEventListener('click', () => disconnect(false));
   $('disconnect-local').addEventListener('click', () => disconnect(true));

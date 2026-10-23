@@ -3,6 +3,7 @@
 export type Permission = 'granted' | 'denied' | 'not_determined' | 'unsupported';
 export type Status =
   | 'failed_local'
+  | 'discarding'
   | 'unreadable'
   | 'recording'
   | 'uploading'
@@ -39,6 +40,7 @@ export interface QueueItem {
   blocked: Blocked | null;
   local_error: string | null;
   can_save: boolean;
+  has_file: boolean;
   recovered: boolean;
   needs_review: boolean;
   unsaved: string | null;
@@ -99,8 +101,27 @@ export interface Snapshot {
   version: string;
 }
 
+export interface LiveLine {
+  at_s: number;
+  text: string;
+}
+
 export interface LiveUpdate {
   state: 'loading' | 'listening' | 'paused' | 'needs_model' | 'error' | 'stopped';
-  lines: string[];
-  partial: string;
+  reason: string | null;
+  append: LiveLine[];
+  partial: LiveLine | null;
+  reset: boolean;
+  session: number;
+  seq: number;
+}
+
+export interface LiveTranscript {
+  state: LiveUpdate['state'] | '';
+  reason: string | null;
+  lines: LiveLine[];
+  partial: LiveLine | null;
+  /** The session and the last update applied. */
+  session: number;
+  seq: number;
 }

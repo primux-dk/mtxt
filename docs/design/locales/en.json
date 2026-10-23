@@ -1,19 +1,15 @@
 {
   "locale.intl": "en-GB",
   "locale.name": "English",
-
   "format.durationMinutes": "{minutes} min",
   "format.others": "{count, plural, one {# other} other {# others}}",
   "format.rate": "{rate}×",
-
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.close": "Close",
-
   "language.da": "Danish",
   "language.en": "English",
   "language.option": "{code} · {name}",
-
   "nav.main.label": "Main navigation",
   "nav.mobile.label": "Mobile navigation",
   "nav.open": "Open navigation",
@@ -22,16 +18,13 @@
   "nav.sharedWithMe": "Shared with me",
   "nav.wholeCompany": "Whole company",
   "nav.settings": "Settings",
-
   "login.signInWith": "Sign in with {provider}",
   "login.footer": "An installation for {company}",
-
   "visibility.private": "Private",
   "visibility.shared": "Shared",
   "visibility.company": "Company",
   "status.ready": "Ready",
   "status.transcribing": "Transcribing",
-
   "library.search.placeholder": "Search meetings and transcripts",
   "library.search.label": "Search the meetings you can see",
   "library.uploadAudio": "Upload audio",
@@ -56,7 +49,6 @@
   "library.empty.failed.title": "Could not load meetings",
   "library.empty.failed.body": "The library did not load. Check the connection and try again.",
   "library.empty.failed.retry": "Try again",
-
   "meeting.back": "All meetings",
   "meeting.speakers": "{count, plural, one {# speaker} other {# speakers}}",
   "meeting.visibility.label": "Visibility, only the owner can change it",
@@ -70,17 +62,14 @@
   "meeting.tabs.label": "Meeting content",
   "meeting.tabs.recap": "Recap",
   "meeting.tabs.transcript": "Transcript",
-
   "transcript.head": "{language} · {count, plural, one {# speaker} other {# speakers}} · Click a speaker to rename",
   "transcript.headShort": "{language} · {count, plural, one {# speaker} other {# speakers}}",
   "transcript.speaker.rename": "{name}, rename or link to a colleague",
   "transcript.speaker.unnamed": "Speaker {number}",
   "transcript.position": "Showing {position} of {duration}",
-
   "speaker.rename.title": "Rename speaker",
   "speaker.rename.field": "Name",
   "speaker.rename.help": "The new name applies to every line from this speaker in this meeting.",
-
   "recap.template.heading": "Recap template",
   "recap.template.label": "Choose recap template",
   "recap.versions": "AI draft v1, edited by {name} v{version}",
@@ -96,7 +85,6 @@
   "recap.toolbar.undo": "Undo",
   "recap.decision.markDone": "Mark as done: {task}",
   "recap.editorHint": "Type / for blocks. Use @ for colleagues.",
-
   "recorder.meetingTitle": "Meeting title",
   "recorder.stop": "Stop recording",
   "recorder.capturing": "Recording microphone and system audio",
@@ -114,12 +102,10 @@
   "recorder.model.label": "Local model",
   "recorder.model.downloaded": "{model} · Downloaded",
   "recorder.model.download": "{model} · Download model",
-
   "live.label": "Live",
   "live.pause": "Pause live text",
   "live.hide": "Hide live text",
   "live.foot": "Local preview · Recording continues when you hide the text.",
-
   "settings.title": "Settings",
   "settings.subheading": "The company's setup. Admins only.",
   "settings.adminBadge": "Admin",
@@ -199,5 +185,10 @@
   "settings.dataflow.caveats": "The install tooling creates the D1 database and the queues with EU jurisdiction. Worker placement is best effort, normally at the data centre nearest the request; regional restrictions require the Enterprise-only Data Localization Suite. Workers AI and AI Gateway are not covered by Regional Services.",
   "settings.dataflow.local": "A local live transcript stays on the computer and is discarded when the meeting ends. After the server confirms a recording, the recorder keeps the audio locally for 7 days. Without a confirmation it keeps the file and retries.",
   "settings.footer": "Changes apply to this installation.",
-  "settings.save": "Save settings"
+  "settings.save": "Save settings",
+  "recorder.menu.more": "More actions",
+  "recorder.menu.save": "Save audio to…",
+  "recorder.menu.open": "Open in library",
+  "recorder.menu.delete": "Delete from this Mac",
+  "live.jump": "Jump to latest"
 }

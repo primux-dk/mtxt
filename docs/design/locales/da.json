@@ -1,19 +1,15 @@
 {
   "locale.intl": "da-DK",
   "locale.name": "Dansk",
-
   "format.durationMinutes": "{minutes} min.",
   "format.others": "{count, plural, one {# anden} other {# andre}}",
   "format.rate": "{rate}×",
-
   "common.save": "Gem",
   "common.cancel": "Annuller",
   "common.close": "Luk",
-
   "language.da": "Dansk",
   "language.en": "Engelsk",
   "language.option": "{code} · {name}",
-
   "nav.main.label": "Hovednavigation",
   "nav.mobile.label": "Mobilnavigation",
   "nav.open": "Åbn navigation",
@@ -22,16 +18,13 @@
   "nav.sharedWithMe": "Delt med mig",
   "nav.wholeCompany": "Hele virksomheden",
   "nav.settings": "Indstillinger",
-
   "login.signInWith": "Log ind med {provider}",
   "login.footer": "En installation hos {company}",
-
   "visibility.private": "Privat",
   "visibility.shared": "Delt",
   "visibility.company": "Virksomhed",
   "status.ready": "Klar",
   "status.transcribing": "Transskriberer",
-
   "library.search.placeholder": "Søg i møder og transskriptioner",
   "library.search.label": "Søg i de møder, du har adgang til",
   "library.uploadAudio": "Overfør lyd",
@@ -56,7 +49,6 @@
   "library.empty.failed.title": "Kunne ikke hente møder",
   "library.empty.failed.body": "Biblioteket blev ikke hentet. Tjek forbindelsen, og prøv igen.",
   "library.empty.failed.retry": "Prøv igen",
-
   "meeting.back": "Alle møder",
   "meeting.speakers": "{count, plural, one {# taler} other {# talere}}",
   "meeting.visibility.label": "Synlighed. Kun ejeren kan ændre den.",
@@ -70,17 +62,14 @@
   "meeting.tabs.label": "Mødeindhold",
   "meeting.tabs.recap": "Referat",
   "meeting.tabs.transcript": "Transskription",
-
   "transcript.head": "{language} · {count, plural, one {# taler} other {# talere}} · Klik på en taler for at omdøbe",
   "transcript.headShort": "{language} · {count, plural, one {# taler} other {# talere}}",
   "transcript.speaker.rename": "{name}, omdøb eller tilknyt kollega",
   "transcript.speaker.unnamed": "Taler {number}",
   "transcript.position": "Viser {position} af {duration}",
-
   "speaker.rename.title": "Omdøb taler",
   "speaker.rename.field": "Navn",
   "speaker.rename.help": "Det nye navn gælder alle linjer fra denne taler i dette møde.",
-
   "recap.template.heading": "Referatskabelon",
   "recap.template.label": "Vælg referatskabelon",
   "recap.versions": "AI-udkast v1, redigeret af {name} v{version}",
@@ -96,7 +85,6 @@
   "recap.toolbar.undo": "Fortryd",
   "recap.decision.markDone": "Markér som færdig: {task}",
   "recap.editorHint": "Skriv / for blokke. Brug @ til kolleger.",
-
   "recorder.meetingTitle": "Mødetitel",
   "recorder.stop": "Stop optagelse",
   "recorder.capturing": "Optager mikrofon og systemlyd",
@@ -114,12 +102,10 @@
   "recorder.model.label": "Lokal model",
   "recorder.model.downloaded": "{model} · Hentet",
   "recorder.model.download": "{model} · Hent model",
-
   "live.label": "Live",
   "live.pause": "Sæt teksten på pause",
   "live.hide": "Skjul teksten",
   "live.foot": "Lokal forhåndsvisning · Optagelsen fortsætter, når du skjuler teksten.",
-
   "settings.title": "Indstillinger",
   "settings.subheading": "Virksomhedens opsætning. Kun for administratorer.",
   "settings.adminBadge": "Administrator",
@@ -199,5 +185,10 @@
   "settings.dataflow.caveats": "Installationsværktøjet opretter D1-databasen og køerne med EU-jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
   "settings.dataflow.local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen.",
   "settings.footer": "Ændringer gælder for denne installation.",
-  "settings.save": "Gem indstillinger"
+  "settings.save": "Gem indstillinger",
+  "recorder.menu.more": "Flere handlinger",
+  "recorder.menu.save": "Gem lyd som…",
+  "recorder.menu.open": "Åbn i biblioteket",
+  "recorder.menu.delete": "Slet fra denne Mac",
+  "live.jump": "Gå til det nyeste"
 }

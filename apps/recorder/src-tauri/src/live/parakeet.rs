@@ -28,7 +28,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 impl Parakeet {
     pub fn load(dir: &Path) -> Result<Parakeet, BoxError> {
-        let env = ort::init().with_name("mtxt-live").build()?;
+        let env = environment()?;
         let threads = std::thread::available_parallelism().map(|n| n.get().clamp(1, 4)).unwrap_or(2);
         let open = |file: &str| -> Result<Session, BoxError> {
             let mut builder = Session::builder(&env)?.with_intra_threads(threads).map_err(|e| e.to_string())?;
@@ -116,6 +116,20 @@ impl Parakeet {
     }
 }
 
+/// The ONNX Runtime environment, made once for the process. ONNX Runtime
+/// allows one environment per process: making a new one for the second
+/// recording failed with "only one environment is allowed per process".
+pub fn environment() -> Result<ort::environment::Environment, BoxError> {
+    static ENV: std::sync::Mutex<Option<ort::environment::Environment>> = std::sync::Mutex::new(None);
+    let mut slot = ENV.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(env) = slot.as_ref() {
+        return Ok(env.clone());
+    }
+    let env = ort::init().with_name("mtxt-live").build()?;
+    *slot = Some(env.clone());
+    Ok(env)
+}
+
 impl Engine for Parakeet {
     fn transcribe(&mut self, audio: &[f32]) -> Result<String, String> {
         self.run(audio).map_err(|e| e.to_string())
@@ -165,6 +179,14 @@ pub fn detokenize(vocab: &[String], tokens: &[usize]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_runtime_environment_is_made_once_and_shared() {
+        // The second recording asks again; it must get the same environment.
+        assert!(environment().is_ok());
+        assert!(environment().is_ok());
+        assert!(environment().is_ok());
+    }
 
     #[test]
     fn vocab_and_pieces() {

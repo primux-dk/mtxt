@@ -55,6 +55,9 @@ pub enum Status {
     FailedLocal,
     /// The file could not be read back (`local_error`). Both files are kept.
     Unreadable,
+    /// The user deleted a recording the library does not have; written before
+    /// any file goes, so a crash half-way finishes the deletion it asked for.
+    Discarding,
 }
 
 /// Why the last attempt did not finish.
@@ -216,6 +219,8 @@ pub enum Event {
     SavedElsewhere { path: String },
     /// The local file was deleted after the 7 days.
     FileDeleted,
+    /// "Delete from this Mac" on a recording the library does not have.
+    Discard,
 }
 
 /// What the clock asks the queue to do.
@@ -454,6 +459,12 @@ impl RecordingState {
                 if self.can_save_elsewhere() {
                     self.saved_to = Some(path);
                     self.status = Status::SavedElsewhere;
+                    self.next_attempt_at = None;
+                }
+            }
+            Event::Discard => {
+                if self.can_save_elsewhere() {
+                    self.status = Status::Discarding;
                     self.next_attempt_at = None;
                 }
             }
