@@ -2,6 +2,7 @@ export type * from './storage';
 export type * from './queue';
 export type * from './uploads';
 export type * from './speech';
+export type * from './language';
 export { isJob, JOB_TYPES, routeJobs } from './jobs';
 export type {
   DrainTranscriptionsJob,
@@ -130,6 +131,7 @@ export {
   durableObjectUploadSessions,
   r2Storage,
   WHISPER_MODEL,
+  workersAiLanguage,
   workersAiSpeech,
   type CloudflareBindings,
 } from './cloudflare';

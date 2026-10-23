@@ -42,6 +42,16 @@ export function r2Storage(bucket: R2Bucket): StorageAdapter {
     async delete(keys) {
       await bucket.delete(keys);
     },
+    async list(prefix) {
+      const keys: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await bucket.list({ prefix, cursor, limit: 1000 });
+        keys.push(...page.objects.map((o) => o.key));
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+      return keys;
+    },
     async read(key) {
       const object = await this.get(key);
       return object ? { kind: 'stream', object } : null;

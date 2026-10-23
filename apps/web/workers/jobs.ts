@@ -8,14 +8,16 @@ import {
 } from '@mtxt/adapters';
 import { runTranscribe } from '../lib/transcription/job';
 import { transcriptionDeps } from '../lib/transcription/deps';
-import { drainStep, takeRecapJob } from '../lib/transcription/store';
+import { drainStep } from '../lib/transcription/store';
+import { recapDeps } from '../lib/recap/deps';
+import { runRecap } from '../lib/recap/job';
 
 /**
  * The queue consumer, routed by job type. A transcribe job runs the
  * install's speech-to-text provider (lib/transcription/job.ts); a throw
  * puts the message back on the queue. A drain job queues the recordings
- * that waited for a provider, 100 at a time. Recap jobs are taken once per
- * transcript and logged until packet 5 writes the recap.
+ * that waited for a provider, 100 at a time. A recap job drafts the recap
+ * with the install's recap model (lib/recap/job.ts).
  */
 export const handleJobs = routeJobs<CloudflareEnv>({
   async transcribe(job, message, env) {
@@ -41,18 +43,8 @@ export const handleJobs = routeJobs<CloudflareEnv>({
       message.ack();
       return;
     }
-    const { db } = cloudflareAdapters(env);
-    // One recap job per transcript, whatever the queue delivers twice.
-    const first = await takeRecapJob(db, env.INSTALL_ID, job.transcript_id).catch(() => false);
-    if (!first) {
-      console.log(
-        'Recap job already taken, or its transcript is gone; skipping',
-        job.transcript_id,
-      );
-    } else {
-      // TODO(packet 5): after writing the recap, syncSearch(db, installId, { meetingId, recap: { id, bodyMd } }).
-      console.log('Recaps arrive in packet 5; acking the recap job for', job.meeting_id);
-    }
+    // A retryable failure throws, and the router puts the message back.
+    await runRecap(await recapDeps(env), job, message.attempts);
     message.ack();
   },
   async drain_transcriptions(job, message, env) {

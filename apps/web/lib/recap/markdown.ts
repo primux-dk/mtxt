@@ -81,7 +81,11 @@ function plainInline(state: StateCore, text: string): Token {
 
 /** A paragraph of literal text: what unknown HTML becomes. */
 function literal(state: StateCore, text: string): Token[] {
-  return [tok(state, 'paragraph_open', 'p', 1), plainInline(state, text), tok(state, 'paragraph_close', 'p', -1)];
+  return [
+    tok(state, 'paragraph_open', 'p', 1),
+    plainInline(state, text),
+    tok(state, 'paragraph_close', 'p', -1),
+  ];
 }
 
 /**
@@ -101,7 +105,10 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
   let pendingDecisions = false;
 
   const closeDetails = () => {
-    out.push(tok(state, 'details_content_close', 'div', -1), tok(state, 'details_close', 'details', -1));
+    out.push(
+      tok(state, 'details_content_close', 'div', -1),
+      tok(state, 'details_close', 'details', -1),
+    );
     details--;
   };
   const openDetails = (summary: string) => {
@@ -127,7 +134,8 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
           const what = comment[1]!.toLowerCase();
           if (what === 'toc') out.push(tok(state, 'toc', 'nav', 0));
           // The block is the list right after the opening marker; the closing one only reads well.
-          else if (what === 'decisions') pendingDecisions = lists.length === 0 && quotes.length === 0;
+          else if (what === 'decisions')
+            pendingDecisions = lists.length === 0 && quotes.length === 0;
           break;
         }
         const inline = DETAILS_INLINE.exec(html);
@@ -182,9 +190,7 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
         break;
       }
       case 'blockquote_close':
-        out.push(
-          quotes.pop() === 'callout' ? tok(state, 'callout_close', 'aside', -1) : t,
-        );
+        out.push(quotes.pop() === 'callout' ? tok(state, 'callout_close', 'aside', -1) : t);
         break;
       case 'bullet_list_open': {
         if (pending) {
@@ -221,7 +227,12 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
         if (kind === 'task' || kind === 'decision') {
           const inline = input[i + 2];
           const match = inline?.type === 'inline' ? TASK.exec(inline.content) : null;
-          const item = tok(state, kind === 'task' ? 'task_item_open' : 'decision_item_open', 'li', 1);
+          const item = tok(
+            state,
+            kind === 'task' ? 'task_item_open' : 'decision_item_open',
+            'li',
+            1,
+          );
           item.attrSet('checked', match && match[1] !== ' ' ? 'true' : 'false');
           if (match && inline) {
             inline.content = inline.content.replace(TASK, '');
@@ -412,7 +423,9 @@ function parser(): MarkdownParser {
       node: 'mention',
       getAttrs: (t) => {
         const id = t.attrGet('id') ?? '';
-        return MENTION_ID.test(id) ? { id, label: t.attrGet('label') ?? '' } : { id: null, label: '' };
+        return MENTION_ID.test(id)
+          ? { id, label: t.attrGet('label') ?? '' }
+          : { id: null, label: '' };
       },
     },
   });
@@ -451,20 +464,24 @@ const linkText = (s: string) => s.replace(/[\\[\]]/g, '\\$&');
 
 /** One table cell's content on one line. */
 function cellText(node: PmNode): string {
-  return serializer()
-    .serialize(node, { tightLists: true })
-    .trim()
-    // A cell is not the start of a line: "22. okt." is not a list there.
-    .replace(/^(\d+)\\\./, '$1.')
-    .replace(/^\\([-+>#])/, '$1')
-    .replace(/\n+/g, ' ')
-    .replace(/\|/g, '\\|');
+  return (
+    serializer()
+      .serialize(node, { tightLists: true })
+      .trim()
+      // A cell is not the start of a line: "22. okt." is not a list there.
+      .replace(/^(\d+)\\\./, '$1.')
+      .replace(/^\\([-+>#])/, '$1')
+      .replace(/\n+/g, ' ')
+      .replace(/\|/g, '\\|')
+  );
 }
 
 const nodes: Record<string, NodeSerializer> = {
   blockquote: d.blockquote as NodeSerializer,
   codeBlock: (state, node) => {
-    const fence = node.textContent.match(/`{3,}/gm)?.reduce((a, b) => (b.length > a.length ? b : a), '');
+    const fence = node.textContent
+      .match(/`{3,}/gm)
+      ?.reduce((a, b) => (b.length > a.length ? b : a), '');
     const marks = fence && fence.length >= 3 ? '`'.repeat(fence.length + 1) : '```';
     state.write(marks + (node.attrs.language ?? '') + '\n');
     state.text(node.textContent, false);

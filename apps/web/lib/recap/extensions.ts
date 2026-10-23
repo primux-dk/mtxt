@@ -120,7 +120,8 @@ export const RecapMention = Mention.extend({
 });
 
 /** Image sources the recap may show: the meeting's own permission-checked image route, nothing remote. */
-export const IMAGE_SRC = /^\/api\/v1\/meetings\/[A-Za-z0-9_-]{1,64}\/recap\/images\/[a-f0-9-]{36}\.(png|jpg|gif|webp)$/;
+export const IMAGE_SRC =
+  /^\/api\/v1\/meetings\/[A-Za-z0-9_-]{1,64}\/recap\/images\/[a-f0-9-]{36}\.(png|jpg|gif|webp)$/;
 
 /**
  * The extensions that define the schema. `mention` is the one the client
