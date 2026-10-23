@@ -2,11 +2,18 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { cloudflareAdapters, findUser } from '@mtxt/adapters';
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isPublicPath, SESSION_MAX_AGE, sessionCookieName } from './lib/auth/session-config';
+import {
+  isPublicPath,
+  isRecorderApiPath,
+  SESSION_MAX_AGE,
+  sessionCookieName,
+} from './lib/auth/session-config';
 
 /*
   The gate: every page and API route needs a session, except the login page
-  and Auth.js's own routes. Pages without one go to the login page and come
+  and Auth.js's own routes. A recorder's call with a bearer token goes on
+  to its route, which checks the token (lib/auth/session.ts, getApiUser).
+  Pages without one go to the login page and come
   back after; API routes answer 401 JSON. The cookie only names a user: its
   subject is resolved to the current user row on every request, and a cookie
   whose user row is gone counts as signed out. /settings needs that row's
@@ -16,6 +23,7 @@ import { isPublicPath, SESSION_MAX_AGE, sessionCookieName } from './lib/auth/ses
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (isPublicPath(path)) return NextResponse.next();
+  if (isRecorderApiPath(path) && request.headers.has('authorization')) return NextResponse.next();
 
   const secure = request.nextUrl.protocol === 'https:';
   const { env } = await getCloudflareContext({ async: true });

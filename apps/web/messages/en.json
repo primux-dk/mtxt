@@ -763,7 +763,9 @@
       "visibility_changed": "Visibility changed",
       "deleted": "Deleted",
       "mcp_read": "Read through MCP",
-      "mcp_write": "Changed through MCP"
+      "mcp_write": "Changed through MCP",
+      "recorder_connected": "Recorder connected",
+      "recorder_disconnected": "Recorder disconnected"
     },
     "count": "{count, plural, one {# event} other {# events}}",
     "range": "{from}–{to} of {total, plural, one {# event} other {# events}}",
@@ -786,7 +788,8 @@
       "removed": "Removed {names}",
       "readers": "{count, plural, =0 {nobody else has access} one {# person has access} other {# people have access}}",
       "andMore": "{names} and {count} more",
-      "unknownUser": "a removed user"
+      "unknownUser": "a removed user",
+      "device": "Device: {device}"
     },
     "empty": {
       "first": {
@@ -805,5 +808,60 @@
         "retry": "Try again"
       }
     }
+  },
+  "connect": {
+    "pageTitle": "Connect a recorder · {product}",
+    "title": "Connect {device} to {product}?",
+    "signedInAs": "Signed in as",
+    "body": "The recorder uploads the meetings you record to your library, as you. You can disconnect it at any time under Recorders in the menu.",
+    "approve": "Approve",
+    "approving": "Approving…",
+    "cancel": "Cancel",
+    "toLibrary": "Go to my meetings",
+    "error": {
+      "too_many": "You have 20 connection requests waiting. Finish them in the recorder, or wait 10 minutes and try again.",
+      "invalid": "This link does not work. Open the recorder and connect again.",
+      "signed_out": "Your session ended. Reload the page and sign in again.",
+      "server": "The connection was not saved. Try again."
+    },
+    "approved": {
+      "title": "Approved",
+      "body": "Go back to {device}. It finishes connecting by itself in a few seconds. You can close this tab."
+    },
+    "connected": {
+      "title": "{device} is connected",
+      "body": "You can close this tab. To disconnect it, open Recorders in the menu."
+    },
+    "denied": {
+      "title": "Not connected",
+      "body": "You cancelled this connection. Open the recorder and connect again."
+    },
+    "expired": {
+      "title": "This request has expired",
+      "body": "A connection request lasts 10 minutes and works once. Open the recorder and connect again."
+    },
+    "invalid": {
+      "title": "This link does not work",
+      "body": "The link is missing its code, or the device name is longer than 64 characters. Open the recorder and connect again."
+    }
+  },
+  "recorders": {
+    "open": "Recorders",
+    "title": "Recorders",
+    "description": "Desktop recorders connected to your account. A disconnected recorder stops uploading until it connects again.",
+    "loading": "Loading recorders…",
+    "failed": "Could not load your recorders. Check the connection and try again.",
+    "retry": "Try again",
+    "empty": {
+      "title": "No recorders connected",
+      "body": "Open the desktop recorder and choose Connect. It opens this site so you can sign in."
+    },
+    "count": "{count, plural, one {# recorder} other {# recorders}}",
+    "since": "Connected",
+    "lastUsed": "last used",
+    "neverUsed": "not used yet",
+    "disconnect": "Disconnect",
+    "disconnectLabel": "Disconnect {device}",
+    "disconnectFailed": "{device} was not disconnected. Try again."
   }
 }
