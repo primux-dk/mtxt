@@ -6,23 +6,25 @@
 > Vi øger først kapaciteten, når torsdagens test er godkendt.
 
 > [!WARNING]
-> Skiftet er **ikke** testet med den nye *ordre*.
+> Skiftet er **ikke** testet med den nye _ordre_.
 >
 > Anden linje med ~~gammel~~ tekst og `kode`.
 
 ## Beslutninger
 
 <!-- decisions -->
+
 - [ ] Test det nye skift torsdag. [@Søren Bak](mtxt:user/dev-colleague)
 - [x] Saml kapacitetstallene. [@Anne Holm](mtxt:user/dev-newcomer)
+
 <!-- /decisions -->
 
 ## Næste skridt
 
-| Opgave | Ansvarlig | Frist |
-| --- | --- | --- |
-| Skiftetest | [@Speaker 3](mtxt:speaker/demo-0000-s3) | 22. okt. |
-| Opdatér ugeplan | Anne | 23. okt. |
+| Opgave          | Ansvarlig                               | Frist    |
+| --------------- | --------------------------------------- | -------- |
+| Skiftetest      | [@Speaker 3](mtxt:speaker/demo-0000-s3) | 22. okt. |
+| Opdatér ugeplan | Anne                                    | 23. okt. |
 
 ### Lister
 

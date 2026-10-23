@@ -26,10 +26,11 @@ const notFound = () =>
 
 export async function GET(_request: Request, { params }: Params) {
   try {
+    // Next.js has decoded the segment already; a second decode would throw on `%`.
     const { token } = await params;
     const env = await getEnv();
     if (!env.SETTINGS_KEY) return notFound();
-    const check = await readGrant(env.SETTINGS_KEY, decodeURIComponent(token));
+    const check = await readGrant(env.SETTINGS_KEY, token);
     if (!check.ok) {
       return check.reason === 'expired'
         ? json({ error: { code: 'gone', message: 'This link has expired.' } }, 410)

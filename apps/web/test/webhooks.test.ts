@@ -791,6 +791,46 @@ describe('deliveries', () => {
   });
 });
 
+describe('the export boundary', () => {
+  it('opens the login gate for the one export shape only', async () => {
+    const { isPublicPath } = await import('../lib/auth/session-config');
+    expect(isPublicPath('/api/v1/export/v1.abc')).toBe(true);
+    expect(isPublicPath('/api/v1/export/v1.abc/extra')).toBe(false);
+    expect(isPublicPath('/api/v1/export/')).toBe(false);
+    expect(isPublicPath('/api/v1/exports/v1.abc')).toBe(false);
+  });
+
+  it('refuses at the Worker entry another path, another method, and any body, unread', async () => {
+    const { exportGuard } = await import('../lib/chunk-guard');
+    const at = (path: string, init?: RequestInit) =>
+      exportGuard(new Request(`https://meetings.example.com${path}`, init));
+    expect(at('/api/v1/export/v1.abc')).toBeNull();
+    expect(at('/api/v1/export/v1.abc', { method: 'HEAD' })).toBeNull();
+    expect(at('/api/v1/meetings/m1/export?format=md')).toBeNull();
+    expect(at('/api/v1/export/v1.abc/extra')?.status).toBe(404);
+    expect(at('/api/v1/export')?.status).toBe(404);
+    let read = false;
+    const body = new ReadableStream({
+      pull() {
+        read = true;
+      },
+    });
+    const post = at('/api/v1/export/v1.abc', {
+      method: 'POST',
+      body,
+      headers: { 'content-length': String(1024 * 1024) },
+      duplex: 'half',
+    } as RequestInit);
+    expect(post?.status).toBe(405);
+    expect(post?.headers.get('allow')).toBe('GET, HEAD');
+    expect(read).toBe(false);
+    const withBody = new Request('https://meetings.example.com/api/v1/export/v1.abc', {
+      headers: { 'content-length': '12' },
+    });
+    expect(exportGuard(withBody)?.status).toBe(400);
+  });
+});
+
 describe('the export route', () => {
   let db: Db;
   let raw: DatabaseSync;
@@ -858,6 +898,11 @@ describe('the export route', () => {
     ]);
     raw.exec(`update meetings set visibility = 'private' where id = 'm1'`);
     expect((await fetchLink(await token())).status).toBe(404);
+  });
+
+  it('answers 404, not 500, for a token that is only a percent sign', async () => {
+    // Next.js hands the route `%` for `/export/%25`.
+    expect((await fetchLink('%')).status).toBe(404);
   });
 
   it('answers 410 for an expired link, 404 for a forged one, a disabled endpoint or no recap', async () => {

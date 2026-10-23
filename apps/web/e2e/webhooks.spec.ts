@@ -380,6 +380,13 @@ test('the signed links fetch the transcript and the recap, and stop when the mee
     expect(markdown.headers()['content-type']).toContain('text/markdown');
     const docx = await consumer.get(draftedPayload.links.recap_docx);
     expect(docx.status()).toBe(200);
+    // One exact shape: no extra segment, no other method, no body, no 500 on a bare `%`.
+    expect((await consumer.get(`${draftedPayload.links.recap_markdown}/extra`)).status()).toBe(404);
+    const posted = await consumer.post(draftedPayload.links.recap_markdown, {
+      data: Buffer.alloc(1024 * 1024),
+    });
+    expect(posted.status()).toBe(405);
+    expect((await consumer.get('/api/v1/export/%25')).status()).toBe(404);
     // A link for one format does not open another.
     const swapped = draftedPayload.links.recap_markdown.replace('.md.', '.docx.');
     expect((await consumer.get(swapped)).status()).toBe(404);

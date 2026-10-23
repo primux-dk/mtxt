@@ -13,8 +13,8 @@ export const isPublicPath = (path: string) =>
   path === '/api/v1/webhooks/assemblyai' ||
   // The recorder's token poll stands on the code verifier; it has no token yet.
   path === '/api/v1/recorder/token' ||
-  // A webhook's signed export link is its own grant (lib/webhooks/grant.ts).
-  path.startsWith('/api/v1/export/') ||
+  // A webhook's signed export link is its own grant (lib/webhooks/grant.ts): this one shape only.
+  /^\/api\/v1\/export\/[^/]+$/.test(path) ||
   // Only an e2e build has the test sign-in (lib/auth/test-sign-in.ts); the flag is inlined at build time.
   (process.env.MTXT_E2E_BUILD === '1' &&
     (path === '/api/test/sign-in' ||
