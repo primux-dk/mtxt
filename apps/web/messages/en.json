@@ -254,7 +254,7 @@
       },
       "failed": {
         "title": "Transcription failed",
-        "detail": "{provider} said: {reason}",
+        "detail": "Reason: {reason}",
         "retry": "Try again",
         "retryFailed": "Not queued. Try again.",
         "switchProvider": "Switch provider",
@@ -274,7 +274,18 @@
       "stt_config": "The installation is missing a setting it needs to reach {provider}. Contact your admin."
     },
     "providerUnknown": "The speech-to-text provider",
-    "languageUnknown": "Language not detected"
+    "languageUnknown": "Language not detected",
+    "reason": {
+      "unauthorised": "The provider refused the API key{status, select, none {} other { (HTTP {status})}}.",
+      "rate_limited": "The provider was busy and refused more requests{status, select, none {} other { (HTTP {status})}}.",
+      "bad_audio": "The provider could not read the audio{status, select, none {} other { (HTTP {status})}}.",
+      "provider_error": "The provider had an error{status, select, none {} other { (HTTP {status})}}.",
+      "timeout": "The provider did not answer in time.",
+      "too_long": "The recording is over the provider's size limit.",
+      "missing_audio": "The audio file is missing from storage.",
+      "config": "A setting the installation needs is missing or wrong.",
+      "internal": "The installation had an error while it saved the transcript."
+    }
   },
   "speaker": {
     "rename": {
@@ -668,6 +679,7 @@
     "gateway": {
       "field": "AI Gateway ID",
       "help": "Workers AI requests, and later the recap model's, go through this gateway in the company's Cloudflare account. Leave it empty to call Workers AI directly."
-    }
+    },
+    "drainFailed": "The settings were saved, but the recordings that wait for a provider were not queued. Save again to queue them."
   }
 }

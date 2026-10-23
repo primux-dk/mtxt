@@ -121,6 +121,7 @@ test.beforeEach(async ({ context, request }) => {
 test('upload, confirm, transcribing, webhook, transcribed: segments, speakers and keyterms show', async ({
   page,
   request,
+  baseURL,
 }) => {
   const ids = await upload(request, 'Transskriberet møde');
   await page.goto(`/meetings/${ids.meetingId}`);
@@ -144,7 +145,7 @@ test('upload, confirm, transcribing, webhook, transcribed: segments, speakers an
     speech_models: ['universal-3-5-pro', 'universal-2'],
     speaker_labels: true,
     language_detection: true,
-    webhook_url: 'http://localhost:8788/api/v1/webhooks/assemblyai',
+    webhook_url: `${baseURL}/api/v1/webhooks/assemblyai`,
     webhook_auth_header_name: 'X-Mtxt-Webhook-Secret',
   });
   expect(sent.keyterms_prompt).toEqual(expect.arrayContaining(TERMS));
@@ -196,6 +197,26 @@ test('a timestamp seeks the player and puts ?t= in the address without a navigat
     'true',
   );
   await expect(segments(page).nth(3)).toHaveAttribute('aria-current', 'time');
+});
+
+test('a typed name survives the playhead moving while audio plays', async ({ page, request }) => {
+  const ids = await upload(request, 'Navn under afspilning');
+  await openTranscript(page, request, ids);
+  await page.getByRole('button', { name: 'Play recording' }).click();
+  await expect(page.getByTestId('player-time')).not.toHaveText('00:00');
+  await page
+    .getByRole('button', { name: 'Speaker 2, rename or link to a colleague' })
+    .first()
+    .click();
+  const name = page
+    .getByRole('dialog', { name: 'Rename speaker' })
+    .getByLabel('Name', { exact: true });
+  await name.fill('Søren');
+  const before = await page.getByTestId('player-time').textContent();
+  // Several playhead updates go by; the draft stays.
+  await expect(page.getByTestId('player-time')).not.toHaveText(before!, { timeout: 5000 });
+  await page.waitForTimeout(1500);
+  await expect(name).toHaveValue('Søren');
 });
 
 test('rename a speaker: every line changes at once, and a refused save rolls back', async ({
@@ -285,9 +306,12 @@ test('a failed transcription says why, with Try again for the owner and Switch p
   const alert = page.getByRole('alert').filter({ hasText: 'Transcription failed' });
   await expect(alert.getByRole('heading', { name: 'Transcription failed' })).toBeVisible();
   await expect(alert).toContainText('AssemblyAI (EU) could not transcribe the recording.');
-  await expect(alert).toContainText(
-    'AssemblyAI (EU) said: Fake AssemblyAI could not decode the audio.',
-  );
+  await expect(alert).toContainText('Reason: The provider could not read the audio.');
+  // The provider's own words never reach the page or the row.
+  await expect(alert).not.toContainText('Fake AssemblyAI');
+  expect(d1(`select failure_reason from recordings where id = '${ids.recordingId}'`)).toEqual([
+    { failure_reason: 'bad_audio' },
+  ]);
   await expect(alert).toContainText('To switch provider, ask an admin.');
   await expect(alert.getByRole('link', { name: 'Switch provider' })).toHaveCount(0);
   await settle(page);

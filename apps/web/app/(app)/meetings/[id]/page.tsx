@@ -24,7 +24,7 @@ import { parseStartAt } from '@/lib/meetings/library-params';
 import { loadMeeting, meetingState } from '@/lib/meetings/queries';
 import { requireUser } from '@/lib/auth/session';
 import { keytermList } from '@/lib/transcription/job';
-import { isSttFailure } from '@/lib/stt/types';
+import { isSttFailure, parseReason } from '@/lib/stt/types';
 import { loadTranscript } from '@/lib/transcript/queries';
 
 type Props = {
@@ -169,6 +169,8 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     }
     if (current.status === 'failed') {
       const code = isSttFailure(current.failure) ? current.failure : 'stt_failed';
+      // A fixed reason and the HTTP status; a provider's own words are never stored.
+      const reason = parseReason(current.failureReason);
       return (
         <PanelState
           tone="warning"
@@ -176,9 +178,11 @@ export default async function MeetingPage({ params, searchParams }: Props) {
           title={tt('state.failed.title')}
           body={tt(`failure.${code}`, { provider })}
         >
-          {current.failureReason && (
+          {reason && (
             <p className="basis-full text-xs break-words text-muted-foreground">
-              {tt('state.failed.detail', { provider, reason: current.failureReason })}
+              {tt('state.failed.detail', {
+                reason: tt(`reason.${reason.reason}`, { status: reason.status ?? 'none' }),
+              })}
             </p>
           )}
           {owner && (

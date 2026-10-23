@@ -1,7 +1,7 @@
 'use client';
 
 import { Check } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
 import { searchColleagues, type Colleague } from '@/app/(app)/meetings/speaker-actions';
@@ -60,16 +60,19 @@ export function SpeakerDialog({
   const [searchState, setSearchState] = useState<'idle' | 'searching' | 'failed'>('idle');
   const [error, setError] = useState(false);
 
-  // A fresh draft every time the dialog opens.
+  // A fresh draft when the dialog opens, and only then: the page re-renders a few times a
+  // second while audio plays, and a typed name must survive that.
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
   useEffect(() => {
     if (!open) return;
-    setLabel(initial.label);
-    setUser(initial.user);
+    setLabel(initialRef.current.label);
+    setUser(initialRef.current.user);
     setQuery('');
     setResults(null);
     setSearchState('idle');
     setError(false);
-  }, [open, initial]);
+  }, [open]);
 
   useEffect(() => {
     const q = query.trim();

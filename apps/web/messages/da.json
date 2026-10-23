@@ -254,7 +254,7 @@
       },
       "failed": {
         "title": "Transskriptionen fejlede",
-        "detail": "{provider} svarede: {reason}",
+        "detail": "Årsag: {reason}",
         "retry": "Prøv igen",
         "retryFailed": "Ikke sat i kø. Prøv igen.",
         "switchProvider": "Skift udbyder",
@@ -274,7 +274,18 @@
       "stt_config": "Installationen mangler en indstilling for at nå {provider}. Kontakt din administrator."
     },
     "providerUnknown": "Tale-til-tekst-udbyderen",
-    "languageUnknown": "Sprog ikke genkendt"
+    "languageUnknown": "Sprog ikke genkendt",
+    "reason": {
+      "unauthorised": "Udbyderen afviste API-nøglen{status, select, none {} other { (HTTP {status})}}.",
+      "rate_limited": "Udbyderen havde travlt og afviste flere kald{status, select, none {} other { (HTTP {status})}}.",
+      "bad_audio": "Udbyderen kunne ikke læse lyden{status, select, none {} other { (HTTP {status})}}.",
+      "provider_error": "Udbyderen havde en fejl{status, select, none {} other { (HTTP {status})}}.",
+      "timeout": "Udbyderen svarede ikke i tide.",
+      "too_long": "Optagelsen er over udbyderens størrelsesgrænse.",
+      "missing_audio": "Lydfilen mangler i lageret.",
+      "config": "En indstilling, installationen skal bruge, mangler eller er forkert.",
+      "internal": "Installationen fik en fejl, da den gemte transskriptionen."
+    }
   },
   "speaker": {
     "rename": {
@@ -668,6 +679,7 @@
     "gateway": {
       "field": "AI Gateway-id",
       "help": "Kald til Workers AI, og senere til referatmodellen, går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde Workers AI direkte."
-    }
+    },
+    "drainFailed": "Indstillingerne blev gemt, men de optagelser, der venter på en udbyder, blev ikke sat i kø. Gem igen for at sætte dem i kø."
   }
 }
