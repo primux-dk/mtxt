@@ -50,6 +50,13 @@
       "when": 1792719386865,
       "tag": "0006_access_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792721611340,
+      "tag": "0007_recap",
+      "breakpoints": true
     }
   ]
 }

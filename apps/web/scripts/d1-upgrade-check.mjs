@@ -86,7 +86,12 @@ try {
     INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('s1', 'dev', 'm1', 'Speaker 1');
     INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text)
       VALUES ('g1', 'dev', 't1', 's1', 0, 1, 'a'), ('g2', 'dev', 't1', 's1', 1, 2, 'b'), ('g3', 'dev', 't1', 's1', 2, 3, 'c');
-    INSERT INTO audit_events (id, install_id, user_id, meeting_id, action, at) VALUES ('a1', 'dev', 'u1', 'm1', 'opened', 1000);`);
+    INSERT INTO audit_events (id, install_id, user_id, meeting_id, action, at) VALUES ('a1', 'dev', 'u1', 'm1', 'opened', 1000);
+    INSERT INTO recaps (id, install_id, meeting_id, body_md) VALUES ('c1', 'dev', 'm1', '# Referat');
+    INSERT INTO recap_versions (id, install_id, recap_id, author_id, body_md, created_at)
+      VALUES ('v-b', 'dev', 'c1', 'u1', 'b', 2000), ('v-a', 'dev', 'c1', null, 'a', 1000), ('v-c', 'dev', 'c1', 'u1', 'c', 2000);
+    UPDATE recaps SET current_version_id = 'v-c' WHERE id = 'c1';
+    INSERT INTO decisions (id, install_id, recap_id, text) VALUES ('d2', 'dev', 'c1', 'first'), ('d1', 'dev', 'c1', 'second');`);
   const before = query(COUNT)[0];
   apply(all.slice(all.indexOf(from)));
   const after = query(COUNT)[0];
@@ -120,6 +125,7 @@ try {
   if (
     JSON.stringify(index) !==
     JSON.stringify([
+      { kind: 'recap', n: 1 },
       { kind: 'segment', n: 3 },
       { kind: 'title', n: 1 },
     ])
@@ -132,6 +138,16 @@ try {
   const audit = query(`SELECT meeting_title FROM audit_events WHERE id = 'a1'`)[0];
   if (audit?.meeting_title !== 'MØDE ÆRØ ÅR')
     throw new Error('The audit row has no meeting title.');
+  // Packet 5 (0007): versions numbered oldest first, decisions in the order they were written.
+  const versions = query(`SELECT id, number FROM recap_versions ORDER BY number`);
+  console.log('recap versions', JSON.stringify(versions));
+  if (JSON.stringify(versions.map((v) => v.id)) !== JSON.stringify(['v-a', 'v-b', 'v-c']))
+    throw new Error('The recap versions were not numbered right.');
+  const decided = query(`SELECT id, position FROM decisions ORDER BY position`);
+  if (JSON.stringify(decided.map((d) => d.id)) !== JSON.stringify(['d2', 'd1']))
+    throw new Error('The decisions lost their order.');
+  const recap = query(`SELECT status FROM recaps WHERE id = 'c1'`)[0];
+  if (recap?.status !== 'ready') throw new Error('An existing recap is not ready.');
   console.log('D1 upgrade check passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });

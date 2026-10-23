@@ -164,7 +164,7 @@ describe('schema', () => {
     });
   });
 
-  it('upgrades a populated packet-1 database through 0001 to 0006 without losing a row', async () => {
+  it('upgrades a populated packet-1 database through 0001 to 0007 without losing a row', async () => {
     const old = new DatabaseSync(':memory:');
     old.exec('PRAGMA foreign_keys = ON');
     old.exec(await readFile(new URL('0000_init.sql', migrationsDir), 'utf8'));
@@ -194,6 +194,7 @@ describe('schema', () => {
       '0004_transcription.sql',
       '0005_transcription_claims.sql',
       '0006_access_retention.sql',
+      '0007_recap.sql',
     ]);
     for (const file of later) old.exec(await readFile(new URL(file, migrationsDir), 'utf8'));
     expect(counts()).toEqual(before);
@@ -227,8 +228,8 @@ describe('schema', () => {
     ).toEqual([{ meeting_id: 'm1' }]);
   });
 
-  it('only adds to the schema: 0003 and 0006 drop and rebuild nothing', async () => {
-    for (const file of ['0003_capture.sql', '0006_access_retention.sql']) {
+  it('only adds to the schema: 0003, 0006 and 0007 drop and rebuild nothing', async () => {
+    for (const file of ['0003_capture.sql', '0006_access_retention.sql', '0007_recap.sql']) {
       const sql = await readFile(new URL(file, migrationsDir), 'utf8');
       expect(sql, file).not.toMatch(/DROP|__new_|RENAME|PRAGMA/i);
     }
