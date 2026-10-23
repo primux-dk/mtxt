@@ -334,7 +334,7 @@ test('a failed transcription says why, with Try again for the owner and Switch p
   await adminPage.goto(`/meetings/${ids.meetingId}`);
   await expect(adminPage.getByRole('link', { name: 'Switch provider' })).toHaveAttribute(
     'href',
-    '/settings#stt',
+    '/settings/transcription',
   );
   await expect(adminPage.getByRole('button', { name: 'Try again' })).toHaveCount(0);
   await admin.close();
@@ -397,7 +397,7 @@ test('ElevenLabs Scribe, chosen in Settings: two speakers, synchronous, from one
     // An admin chooses it on the settings page; the panel says the route and the residency.
     await asUser(admin, 'dev');
     const settings = await admin.newPage();
-    await settings.goto('/settings');
+    await settings.goto('/settings/transcription');
     const gateway = await settings.locator('#aiGatewayId').inputValue();
     await settings.locator('#sttProvider').selectOption('elevenlabs');
     await expect(settings.locator('#sttRegion')).toHaveCount(0);
@@ -415,7 +415,7 @@ test('ElevenLabs Scribe, chosen in Settings: two speakers, synchronous, from one
     );
     await settings.locator('#aiGatewayId').fill(gateway);
     await settings.locator('#sttApiKey').fill('e2e-elevenlabs-key');
-    await settings.getByRole('button', { name: 'Save settings' }).click();
+    await settings.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(settings.getByText('Settings saved.')).toBeVisible();
     await expect
       .poll(() => d1(`select stt_provider, stt_region from settings`))

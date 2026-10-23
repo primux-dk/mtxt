@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DESKTOP, expectFocusRing, PHONE, shot, signIn, tabTo } from './helpers';
+import { DESKTOP, expectFocusRing, MEMBER, PHONE, settle, shot, signIn, tabTo } from './helpers';
 
 // Every page needs a session since packet 2.
 test.beforeEach(async ({ page }) => signIn(page));
@@ -30,7 +30,8 @@ test.describe('keyboard and focus (rule 11)', () => {
     await page.setViewportSize(DESKTOP);
     await page.goto('/meetings');
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
-    const items = ['My meetings', 'Shared with me', 'Whole company', 'Settings'];
+    // Three items; Settings is in the user menu (packet 14).
+    const items = ['My meetings', 'Shared with me', 'Whole company'];
 
     await page.keyboard.press('Tab');
     for (const name of items) {
@@ -38,9 +39,13 @@ test.describe('keyboard and focus (rule 11)', () => {
       await page.keyboard.press('Tab');
     }
     // Then the user row: Enter opens its menu, arrows move, Escape closes it back onto the row.
+    // An admin's menu starts with Settings.
     const userRow = page.getByRole('complementary').getByRole('button', { name: /^Mette Lund/ });
     await expectFocusRing(userRow);
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem')).toHaveText(['Settings', 'Recorders', 'Sign out']);
+    await expect(page.getByRole('menuitem', { name: 'Settings' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'API tokens' })).toBeFocused();
@@ -50,7 +55,7 @@ test.describe('keyboard and focus (rule 11)', () => {
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(userRow).toBeFocused();
     await page.keyboard.press('Space');
-    await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
+    await expect(page.getByRole('menuitem', { name: 'Settings' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(userRow).toBeFocused();
 
@@ -76,7 +81,7 @@ test.describe('keyboard and focus (rule 11)', () => {
     }
 
     // Enter on a nav item navigates, and the current item is marked.
-    for (let i = 0; i < header.length + 3; i++) await page.keyboard.press('Shift+Tab');
+    for (let i = 0; i < header.length + 2; i++) await page.keyboard.press('Shift+Tab');
     await expect(nav.getByRole('link', { name: 'Shared with me' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/view=shared/);
@@ -104,7 +109,7 @@ test.describe('keyboard and focus (rule 11)', () => {
     );
     await page.screenshot({ path: shot('sheet-390') });
 
-    // Ten tabs in a six-control dialog: focus never leaves it.
+    // Ten tabs in a five-control dialog: focus never leaves it.
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
       expect(await sheet.evaluate((el) => el.contains(document.activeElement))).toBe(true);
@@ -114,6 +119,8 @@ test.describe('keyboard and focus (rule 11)', () => {
     const userRow = sheet.getByRole('button', { name: /^Mette Lund/ });
     await userRow.focus();
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem', { name: 'Settings' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'API tokens' })).toBeFocused();
@@ -127,6 +134,47 @@ test.describe('keyboard and focus (rule 11)', () => {
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
     await expect(menu).toBeFocused();
+
+    // Settings from the Sheet's user menu: it opens the first tab and the Sheet closes.
+    await page.keyboard.press('Enter');
+    await sheet.getByRole('button', { name: /^Mette Lund/ }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(page).toHaveURL(/\/settings\/general$/);
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('tab', { name: 'General' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  test('Settings is in the user menu for an admin only, and marks the row while open', async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await page.goto('/meetings');
+    const sidebar = page.getByRole('complementary');
+    const userRow = sidebar.getByRole('button', { name: /^Mette Lund/ });
+    await expect(
+      sidebar.getByRole('navigation', { name: 'Main navigation' }).getByRole('link'),
+    ).toHaveText(['My meetings', 'Shared with me', 'Whole company']);
+    await expect(userRow).not.toHaveAttribute('aria-current');
+
+    await userRow.click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(page).toHaveURL(/\/settings\/general$/);
+    await expect(userRow).toHaveAttribute('aria-current', 'page');
+    // No navigation item claims the page.
+    await expect(sidebar.locator('nav [aria-current]')).toHaveCount(0);
+    await page.goto('/settings/webhooks');
+    await expect(userRow).toHaveAttribute('aria-current', 'page');
+    await settle(page);
+    await page.screenshot({ path: shot('settings-user-menu-1280') });
+
+    // A non-admin's menu has Recorders and Sign out, nothing else.
+    await signIn(page, MEMBER);
+    await page.goto('/meetings');
+    await sidebar.getByRole('button', { name: /^Anne Holm/ }).click();
+    await expect(page.getByRole('menuitem')).toHaveText(['Recorders', 'Sign out']);
   });
 });
 

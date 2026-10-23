@@ -18,7 +18,13 @@ test('pages through 10,000 rows with filters in the URL (rules 5, 6, 13)', async
   ) as [{ n: number }];
   expect(n).toBeGreaterThanOrEqual(10_000);
   await page.goto('/settings/audit');
-  await expect(page.getByRole('heading', { level: 1, name: 'Audit log' })).toBeVisible();
+  // The last tab of the settings page, under its title.
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Audit log' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByRole('heading', { level: 2, name: 'Audit log' })).toBeVisible();
   await expect(page.getByTestId('audit-count')).toHaveText(count(n));
   const rows = page.getByTestId('audit-table').locator('tbody tr');
   await expect(rows).toHaveCount(50);
@@ -85,19 +91,16 @@ test('the three empty states differ (rule 8), and only an admin gets in', async 
   await expect(page.getByRole('heading', { name: 'Admins only' })).toBeVisible();
 });
 
-test('keyboard walk: nav, filters, the table and the pages (rule 11)', async ({ page }) => {
+test('keyboard walk: tabs, filters, the table and the pages (rule 11)', async ({ page }) => {
   await page.setViewportSize(DESKTOP);
   await page.goto('/settings/audit');
-  const order = [
-    page.getByRole('link', { name: 'Settings', exact: true }).last(),
-    page.getByRole('link', { name: 'Audit log' }),
-    page.getByRole('button', { name: /^All/ }),
-  ];
-  await tabTo(page, order[0]!);
-  for (const control of order.slice(1)) {
-    await page.keyboard.press('Tab');
-    await expectFocusRing(control);
-  }
+  // The selected tab, then the panel, then the filters.
+  const selected = page.getByRole('tab', { name: 'Audit log' });
+  await tabTo(page, selected);
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('tabpanel', { name: 'Audit log' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expectFocusRing(page.getByRole('button', { name: /^All/ }));
   await tabTo(page, page.getByRole('combobox', { name: 'User' }));
   await expectFocusRing(page.getByRole('combobox', { name: 'User' }));
   // The table scrolls sideways inside itself, so it takes focus for the arrow keys.
