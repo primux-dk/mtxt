@@ -87,10 +87,23 @@ const versionLine = (page: Page) => page.getByTestId('recap-version');
 const status = (page: Page) =>
   page.getByRole('status').filter({ hasText: /Saving|Saved|Not saved|Changed elsewhere/ });
 
-/** Puts the caret at the end of the document's first heading, on a new line. */
+/**
+ * Puts the caret at the end of the document's first heading, on a new line.
+ * The selection is set on the DOM, which ProseMirror follows: a click lands
+ * wherever the pointer is, a block handle or a table cell included.
+ */
 async function newLineAfterHeading(page: Page) {
-  await editor(page).locator('h2').first().click();
-  await page.keyboard.press('End');
+  await editor(page).focus();
+  await editor(page).evaluate((el) => {
+    const heading = el.querySelector('h2')!;
+    const range = document.createRange();
+    range.selectNodeContents(heading);
+    range.collapse(false);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.waitForTimeout(50);
   await page.keyboard.press('Enter');
 }
 
@@ -222,16 +235,131 @@ test('two windows: the second gets "Changed elsewhere · Reload", never a silent
   });
   const reload = second.getByRole('button', { name: 'Reload' });
   await expect(reload).toBeVisible();
+  // Typing goes on after Changed elsewhere: the browser keeps it; the server never gets it.
+  await second.keyboard.type(' AFTER-CONFLICT');
+  await second.waitForTimeout(2000);
   const body = recapRow(meetingId)!.body_md;
   expect(body).toContain('Fra det første vindue.');
   expect(body).not.toContain('Fra det andet vindue.');
-  // After Reload, the server's text, and the unsaved one offered, not applied.
+  expect(body).not.toContain('AFTER-CONFLICT');
+  // After Reload, the server's text, and the unsaved one offered, with the marker, not applied.
   await reload.click();
   await expect(second.getByText(/was not saved, and the recap has changed since/)).toBeVisible();
   await expect(editor(second)).not.toContainText('Fra det andet vindue.');
-  await second.getByRole('button', { name: 'Discard it' }).click();
+  await second.getByRole('button', { name: 'Use my text' }).click();
+  await expect(editor(second)).toContainText('Fra det andet vindue. AFTER-CONFLICT');
+  // Using it is the owner's choice: it saves on top of the newer version.
+  await expect(status(second)).toContainText('Saved', { timeout: 10_000 });
+  expect(recapRow(meetingId)!.body_md).toContain('AFTER-CONFLICT');
   await first.close();
   await second.close();
+});
+
+test('an undone change leaves no copy: a reload does not bring it back or save it', async ({
+  page,
+  context,
+}) => {
+  await page.goto(`/meetings/${meetingId}`);
+  await expect(status(page)).toContainText('Saved');
+  const before = versionsOf(meetingId).length;
+  await context.setOffline(true);
+  await newLineAfterHeading(page);
+  await page.keyboard.type('UNDONE-MARKER');
+  await expect(status(page)).toContainText('Not saved');
+  // Undo back to what the server has: the marker, then the new line.
+  for (let i = 0; i < 6 && !/· Saved/.test(await status(page).innerText()); i++) {
+    await page.keyboard.press('Control+z');
+  }
+  await expect(editor(page)).not.toContainText('UNDONE-MARKER');
+  await expect(status(page)).toContainText('Saved');
+  await context.setOffline(false);
+  await page.reload();
+  await expect(editor(page)).toBeVisible();
+  await page.waitForTimeout(2500);
+  await expect(editor(page)).not.toContainText('UNDONE-MARKER');
+  await expect(page.getByText(/was not saved/)).toHaveCount(0);
+  expect(versionsOf(meetingId)).toHaveLength(before);
+});
+
+test('a refused tick rolls back and says so; unrelated text stays (rule 2)', async ({ page }) => {
+  await page.goto(`/meetings/${meetingId}`);
+  await expect(status(page)).toContainText('Saved');
+  const tick = page.getByRole('checkbox', { name: /^Mark as done: / }).first();
+  const was = await tick.isChecked();
+  await page.route('**/api/v1/meetings/*/recap', (route) =>
+    route.request().method() === 'PUT'
+      ? route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'forbidden', message: 'No.' } }),
+        })
+      : route.continue(),
+  );
+  await newLineAfterHeading(page);
+  await page.keyboard.type('Prosa der bliver.');
+  await tick.click();
+  await expect(tick).toBeChecked({ checked: was });
+  await expect(status(page)).toContainText('the server refused the save');
+  await expect(status(page)).toContainText('the tick was undone');
+  await expect(editor(page)).toContainText('Prosa der bliver.');
+  // The server has neither; the next change saves the prose, with the tick as it was.
+  await page.unroute('**/api/v1/meetings/*/recap');
+  // Focus is on the checkbox after the click: back into the text first.
+  await editor(page).getByText('Prosa der bliver.').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Igen.');
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+  const [row] = d1<{ done: number }>(
+    `select d.done from decisions d join recaps r on r.id = d.recap_id where r.meeting_id = '${meetingId}' and d.position = 0`,
+  );
+  expect(Boolean(row!.done)).toBe(was);
+  expect(recapRow(meetingId)!.body_md).toContain('Prosa der bliver. Igen.');
+});
+
+test('a pasted image from elsewhere becomes its alt text, with no request to its host', async ({
+  page,
+}) => {
+  const remote: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('images.example.com')) remote.push(r.url());
+  });
+  await page.goto(`/meetings/${meetingId}`);
+  await newLineAfterHeading(page);
+  await editor(page).evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData(
+      'text/html',
+      '<p>Indsat tekst</p><img src="https://images.example.com/spor.png" alt="Fjernt billede">',
+    );
+    el.dispatchEvent(
+      new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  await expect(editor(page)).toContainText('Indsat tekst');
+  await expect(editor(page)).toContainText('Fjernt billede');
+  await expect(editor(page).locator('img[src*="example.com"]')).toHaveCount(0);
+  await expect(status(page)).toContainText('Saved', { timeout: 10_000 });
+  const body = recapRow(meetingId)!.body_md;
+  expect(body).toContain('Fjernt billede');
+  expect(body).not.toContain('example.com');
+  expect(remote).toEqual([]);
+});
+
+test('the Worker entry refuses a recap save over 512 KiB and an image over 8 MiB', async ({
+  request,
+}) => {
+  const save = await request.put(`/api/v1/meetings/${meetingId}/recap`, {
+    headers: { ...colleague, 'content-type': 'application/json' },
+    data: JSON.stringify({ base_version_id: null, body_md: 'x'.repeat(600 * 1024) }),
+  });
+  expect(save.status()).toBe(413);
+  expect((await save.json()).error.code).toBe('too_large');
+  const image = await request.post(`/api/v1/meetings/${meetingId}/recap/images`, {
+    headers: { ...colleague, 'content-type': 'application/octet-stream' },
+    data: Buffer.alloc(9 * 1024 * 1024),
+  });
+  expect(image.status()).toBe(413);
+  expect((await image.json()).error.code).toBe('too_large');
 });
 
 test('the / menu inserts a callout and a table; @ mentions a colleague; a tick saves at once', async ({

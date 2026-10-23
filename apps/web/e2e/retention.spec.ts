@@ -160,3 +160,45 @@ test('the nightly job deletes audio from storage and the rows, in batches, and t
     ),
   ).toEqual([{ n: 1 }]);
 });
+
+test('retention removes the recap images of a meeting with no recording, transcript or recap', async ({
+  request,
+  baseURL,
+}) => {
+  const colleague = SESSION_HEADERS.colleague;
+  d1(`delete from meetings where id = 'e2e-empty-images'`);
+  d1(
+    `insert into meetings (id, install_id, owner_id, title, title_folded, started_at, visibility)
+     values ('e2e-empty-images', 'dev', 'dev-colleague', 'Tomt møde med billede', 'tomt møde med billede', ${daysAgo(400).getTime()}, 'private')`,
+  );
+  // A 1×1 PNG, uploaded by the owner into the empty meeting.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const uploaded = await request.post('/api/v1/meetings/e2e-empty-images/recap/images', {
+    headers: { ...colleague, 'content-type': 'application/octet-stream' },
+    data: png,
+  });
+  expect(uploaded.status()).toBe(201);
+  const [image] = d1<{ path: string }>(
+    `select path from recap_images where meeting_id = 'e2e-empty-images'`,
+  );
+  expect(r2Has(image!.path)).toBe(true);
+
+  const cron = await request.get(`${baseURL}/__scheduled?cron=${encodeURIComponent('0 3 * * *')}`);
+  expect(cron.ok()).toBe(true);
+  await expect
+    .poll(
+      () =>
+        d1<{ gone: number }>(
+          `select deleted_at is not null as gone from meetings where id = 'e2e-empty-images'`,
+        )[0]!.gone,
+      { timeout: 60_000, intervals: [1000] },
+    )
+    .toBe(1);
+  expect(r2Has(image!.path)).toBe(false);
+  expect(
+    d1(`select count(*) as n from recap_images where meeting_id = 'e2e-empty-images'`),
+  ).toEqual([{ n: 0 }]);
+});
