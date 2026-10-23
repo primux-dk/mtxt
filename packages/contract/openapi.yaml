@@ -1140,8 +1140,13 @@ components:
         name:
           type: string
     MeetingSummary:
+      description: A meeting in a list or a search result.
+      allOf:
+        - $ref: '#/components/schemas/MeetingFields'
+      unevaluatedProperties: false
+    MeetingFields:
       type: object
-      additionalProperties: false
+      description: What MeetingSummary and MeetingDetail share.
       required:
         [
           id,
@@ -1260,7 +1265,7 @@ components:
       enum: [drafting, ready, failed]
     MeetingDetail:
       allOf:
-        - $ref: '#/components/schemas/MeetingSummary'
+        - $ref: '#/components/schemas/MeetingFields'
         - type: object
           required: [recordings, transcript, recap, shares]
           properties:

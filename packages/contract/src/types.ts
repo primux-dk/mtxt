@@ -375,7 +375,10 @@ export interface components {
             id: string;
             name: string;
         };
-        MeetingSummary: {
+        /** @description A meeting in a list or a search result. */
+        MeetingSummary: components["schemas"]["MeetingFields"];
+        /** @description What MeetingSummary and MeetingDetail share. */
+        MeetingFields: {
             id: string;
             title: string;
             /** Format: date-time */
@@ -436,7 +439,7 @@ export interface components {
          * @enum {string}
          */
         RecapStatus: "drafting" | "ready" | "failed";
-        MeetingDetail: components["schemas"]["MeetingSummary"] & {
+        MeetingDetail: components["schemas"]["MeetingFields"] & {
             /** @description Primary first, then newest first. */
             recordings: components["schemas"]["RecordingSummary"][];
             /** @description The primary recording's transcript, else the newest; null before transcription starts. */
