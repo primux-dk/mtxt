@@ -2,6 +2,7 @@ import {
   cloudflareAdapters,
   readSettings,
   retentionBatch,
+  retryStorageCleanup,
   routeJobs,
   type RetentionJob,
 } from '@mtxt/adapters';
@@ -85,6 +86,13 @@ export async function runRetention(job: RetentionJob, env: CloudflareEnv) {
   const { db, storage, queue, installId } = cloudflareAdapters(env);
   const settings = await readSettings(db, installId);
   const batch = job.batch ?? 0;
+  if (batch === 0) {
+    // Objects whose rows are gone but that storage refused before: one more try each.
+    const cleanup = await retryStorageCleanup(db, storage, installId);
+    console.log(
+      `Storage cleanup: ${cleanup.deleted} deleted, ${cleanup.failed} still failing, ${cleanup.givenUp} given up`,
+    );
+  }
   // The night's first batch lists what is past a deadline and left alone; later ones add what changed meanwhile.
   const result = await retentionBatch(
     { db, storage, installId },

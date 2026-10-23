@@ -81,6 +81,14 @@ export {
 } from './db/audit';
 export { foreignRows, foreignRowsSql } from './db/integrity';
 export {
+  CLEANUP_MAX_ATTEMPTS,
+  cleanupEntries,
+  finishCleanup,
+  recordCleanup,
+  retryStorageCleanup,
+  type CleanupEntry,
+} from './db/storage-cleanup';
+export {
   dropFromSearchStatement,
   ftsQuery,
   meetingKey,

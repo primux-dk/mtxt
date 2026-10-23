@@ -532,6 +532,25 @@ export const auditEvents = sqliteTable(
   ],
 );
 
+/**
+ * Storage objects whose rows are already gone and that are still to be
+ * deleted. A delete commits its rows (and its audit row) first and records
+ * the paths here in the same transaction; only then are the objects
+ * deleted, each row going with its object. What storage refuses stays here
+ * for the nightly job, which retries a bounded number of times.
+ */
+export const storageCleanup = sqliteTable(
+  'storage_cleanup',
+  {
+    id: id(),
+    installId: installId(),
+    path: text('path').notNull(),
+    createdAt: createdAt(),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  (t) => [index('storage_cleanup_install_attempts').on(t.installId, t.attempts, t.createdAt)],
+);
+
 export type Settings = typeof settings.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;

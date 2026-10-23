@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auditStatement } from '@mtxt/adapters';
+import { auditStatement, cleanupEntries, recordCleanup } from '@mtxt/adapters';
 import { fixtures, INSTALL, rows, testDb } from '@mtxt/adapters/test/sqlite';
 import { deleteMeetingRows } from '../lib/meetings/integrity';
 import { accessTo } from '../lib/meetings/queries';
@@ -63,6 +63,26 @@ describe('a change and its audit row land together (D1 batch)', () => {
       ]),
     ).rejects.toThrow();
     expect(t.count("select count(*) as n from meetings where id = 'm'")).toBe(1);
+  });
+
+  it('a failed audit insert records no storage cleanup, so no object is deleted', async () => {
+    const t = setup();
+    t.f.recording('r', 'm');
+    t.failAudit();
+    const cleanup = cleanupEntries(['recordings/test/m/r.webm']);
+    await expect(
+      deleteMeetingRows(t.db, INSTALL, 'm', [
+        auditStatement(t.db, INSTALL, {
+          userId: 'owner',
+          meetingId: null,
+          meetingTitle: 'Budget',
+          action: 'deleted',
+        }),
+        recordCleanup(t.db, INSTALL, cleanup)!,
+      ]),
+    ).rejects.toThrow();
+    expect(t.count('select count(*) as n from storage_cleanup')).toBe(0);
+    expect(t.count("select count(*) as n from recordings where id = 'r'")).toBe(1);
   });
 
   it('a successful change writes exactly one audit row with before and after', async () => {

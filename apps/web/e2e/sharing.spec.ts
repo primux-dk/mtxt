@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { test } from './contract';
-import { dropActions, meetingWithAudio } from './access-helpers';
+import { dropActions, meetingWithAudio, r2Has } from './access-helpers';
 import {
   asUser,
   d1,
@@ -278,3 +278,51 @@ for (const viewport of [DESKTOP, PHONE]) {
     await page.screenshot({ path: shot(`share-dialog-${viewport.width}`) });
   });
 }
+
+test('a delete whose audit row fails changes nothing: the audio still plays; storage goes only after the commit', async ({
+  page,
+  context,
+  request,
+}) => {
+  await asUser(context, 'colleague');
+  const { meetingId, recordingId } = await meetingWithAudio(request, colleague, 'Slet mig ikke');
+  const [{ storage_path: key }] = d1<{ storage_path: string }>(
+    `select storage_path from recordings where id = '${recordingId}'`,
+  ) as [{ storage_path: string }];
+  const audio = `/api/v1/recordings/${recordingId}/audio`;
+  expect((await request.get(audio, { headers: colleague })).status()).toBe(200);
+
+  await page.goto(`/meetings/${meetingId}`);
+  const deleteIt = async () => {
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete…' }).click();
+    await page
+      .getByRole('dialog', { name: 'Delete this meeting?' })
+      .getByRole('button', { name: 'Delete permanently' })
+      .click();
+  };
+  d1(
+    `create trigger e2e_no_audit before insert on audit_events begin select raise(abort, 'audit down'); end`,
+  );
+  try {
+    await deleteIt();
+    await expect(page.getByText('The meeting was not deleted. Try again.')).toBeVisible();
+    // Nothing changed: the rows, the object, and the owner still hears it.
+    expect(d1(`select count(*) as n from meetings where id = '${meetingId}'`)).toEqual([{ n: 1 }]);
+    expect(d1(`select count(*) as n from storage_cleanup`)).toEqual([{ n: 0 }]);
+    expect(r2Has(key)).toBe(true);
+    expect((await request.get(audio, { headers: colleague })).status()).toBe(200);
+  } finally {
+    d1(`drop trigger e2e_no_audit`);
+  }
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete permanently' }).click();
+  await expect(page).toHaveURL(/\/meetings$/);
+  expect(r2Has(key)).toBe(false);
+  expect(d1(`select count(*) as n from storage_cleanup`)).toEqual([{ n: 0 }]);
+  expect((await request.get(audio, { headers: colleague })).status()).toBe(404);
+  expect(
+    d1(
+      `select count(*) as n from audit_events where action = 'deleted' and meeting_title = 'Slet mig ikke'`,
+    ),
+  ).toEqual([{ n: 1 }]);
+});

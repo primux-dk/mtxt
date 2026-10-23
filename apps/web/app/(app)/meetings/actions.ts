@@ -1,7 +1,15 @@
 'use server';
 
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import { auditStatement, foldTitle, schema, syncSearch } from '@mtxt/adapters';
+import {
+  auditStatement,
+  cleanupEntries,
+  finishCleanup,
+  foldTitle,
+  recordCleanup,
+  schema,
+  syncSearch,
+} from '@mtxt/adapters';
 import { HttpError } from '@/lib/http-error';
 import { assertOwnRowsOnly, deleteMeetingRows } from '@/lib/meetings/integrity';
 import { resetForRetry } from '@/lib/transcription/store';
@@ -53,13 +61,13 @@ export async function setArchived(meetingId: string, archived: boolean): Promise
 
 /**
  * Deletes the meeting for good. Refused, with nothing removed, when another
- * install's rows depend on it (lib/meetings/integrity.ts). Otherwise open
- * uploads are aborted, every recording's audio is deleted from storage, then
- * the rows, table by table and by install, in one transaction. Storage goes
- * first, so a failure leaves the meeting in place to delete again, never
- * orphaned audio. The `deleted` audit row, with the title, is in the same
- * transaction as the rows, so neither lands without the other. The
- * owner also removes a meeting retention has already emptied this way.
+ * install's rows depend on it (lib/meetings/integrity.ts). The rows go
+ * first, in one transaction with the `deleted` audit row and a record of
+ * every storage object to remove (`storage_cleanup`): if any part fails,
+ * nothing changes and the audio still plays. Only after that commit are
+ * open uploads aborted and the objects deleted; one storage refuses stays
+ * recorded, and the nightly job retries it. The owner also removes a
+ * meeting retention has already emptied this way.
  */
 export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
   return outcome(() =>
@@ -70,11 +78,6 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
         const recordings = await db.query.recordings.findMany({
           where: and(eq(r.meetingId, meetingId), eq(r.installId, installId)),
         });
-        await Promise.all(
-          recordings
-            .filter((rec) => rec.status === 'uploading')
-            .map((rec) => uploads.get(rec.id).abort()),
-        );
         const recap = await db.query.recaps.findFirst({
           where: and(
             eq(schema.recaps.meetingId, meetingId),
@@ -96,12 +99,12 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
                 ),
               )
           : [];
-        const keys = [
-          ...recordings.map((rec) => rec.storagePath).filter(Boolean),
+        const cleanup = cleanupEntries([
+          ...recordings.map((rec) => rec.storagePath),
           ...raws.flatMap((raw) => (raw.path ? [raw.path] : [])),
           ...(recap?.docxPath ? [recap.docxPath] : []),
-        ];
-        if (keys.length) await storage.delete(keys);
+        ]);
+        const record = recordCleanup(db, installId, cleanup);
         await deleteMeetingRows(db, installId, meetingId, [
           auditStatement(db, installId, {
             userId: user.id,
@@ -109,7 +112,22 @@ export async function deleteMeeting(meetingId: string): Promise<ActionResult> {
             meetingTitle: meeting.title,
             action: 'deleted',
           }),
+          ...(record ? [record] : []),
         ]);
+        // Committed. From here on nothing undoes the delete; storage catches up.
+        await Promise.all(
+          recordings
+            .filter((rec) => rec.status === 'uploading')
+            .map((rec) =>
+              uploads
+                .get(rec.id)
+                .abort()
+                .catch((error: unknown) =>
+                  console.error('Could not abort an upload', rec.id, error),
+                ),
+            ),
+        );
+        await finishCleanup(db, storage, installId, cleanup);
       },
       { deleted: true },
     ),

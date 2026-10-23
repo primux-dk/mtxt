@@ -1,3 +1,12 @@
+CREATE TABLE `storage_cleanup` (
+	`id` text PRIMARY KEY NOT NULL,
+	`install_id` text NOT NULL,
+	`path` text NOT NULL,
+	`created_at` integer DEFAULT (cast(unixepoch('subsec') * 1000 as integer)) NOT NULL,
+	`attempts` integer DEFAULT 0 NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `storage_cleanup_install_attempts` ON `storage_cleanup` (`install_id`,`attempts`,`created_at`);--> statement-breakpoint
 ALTER TABLE `audit_events` ADD `meeting_title` text;--> statement-breakpoint
 ALTER TABLE `audit_events` ADD `details` text;--> statement-breakpoint
 CREATE INDEX `audit_events_install_meeting_user_at` ON `audit_events` (`install_id`,`meeting_id`,`user_id`,`at`);--> statement-breakpoint

@@ -137,6 +137,7 @@ audit_events     id, user_id, meeting_id, meeting_title, action (opened|exported
                  details (JSON: before and after for shared and visibility_changed), at
                  -- meeting_title is the title when the row was written; the row outlives the meeting
 meeting_search   install_id, meeting_id, kind (title|segment|recap), ref, text   -- FTS5 index, kept in sync by the app
+storage_cleanup  id, path, created_at, attempts   -- objects whose rows are gone, still to delete from storage
 ```
 
 Rules:

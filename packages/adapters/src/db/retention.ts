@@ -3,8 +3,10 @@ import type { StorageAdapter } from '../storage';
 import type { Db } from './index';
 import { foreignRowsSql } from './integrity';
 import * as schema from './schema';
+import { storageCleanup } from './schema';
 import type { Settings } from './schema';
 import { meetingKey, meetingSearch } from './search';
+import { finishCleanup } from './storage-cleanup';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 /** A deletion is announced on the meeting page this long ahead (behaviour.md rule 3). */
@@ -202,6 +204,28 @@ export async function retentionBatch(
         select id, docx_path from recaps where install_id = ${installId}
           and meeting_id = ${meeting.id} and docx_path is not null`);
       const guard = eligible(meeting.id, textCutoff);
+      // One cleanup entry per docx, written in the batch only if the guard lets its recap go.
+      const cleanup = docx.map((d) => ({
+        id: crypto.randomUUID(),
+        path: d.docx_path,
+        recapId: d.id,
+      }));
+      const recordDocx = cleanup.map((e) =>
+        db.insert(storageCleanup).select(
+          db
+            .select({
+              id: sql<string>`${e.id}`.as('id'),
+              installId: schema.recaps.installId,
+              path: sql<string>`${e.path}`.as('path'),
+              createdAt: sql<number>`${t}`.as('created_at'),
+              attempts: sql<number>`0`.as('attempts'),
+            })
+            .from(schema.recaps)
+            .where(
+              and(eq(schema.recaps.id, e.recapId), eq(schema.recaps.installId, installId), guard),
+            ),
+        ),
+      );
       const recs = db
         .select({ id: schema.recordings.id })
         .from(schema.recordings)
@@ -226,7 +250,7 @@ export async function retentionBatch(
         .where(
           and(eq(schema.recaps.installId, installId), eq(schema.recaps.meetingId, meeting.id)),
         );
-      const [, , , gone, , dropped] = await db.batch([
+      const deletes = [
         db
           .update(schema.recaps)
           .set({ currentVersionId: null })
@@ -288,15 +312,29 @@ export async function retentionBatch(
               guard,
             ),
           ),
-      ]);
-      const goneIds = new Set(gone.map((r) => r.id));
-      // The docx of the recaps that went; an export can be made again, so a failure here is logged, not retried.
-      const keys = docx.filter((d) => goneIds.has(d.id)).map((d) => d.docx_path);
-      if (keys.length) {
-        await storage.delete(keys).catch((error) => {
-          console.error('Retention could not delete export objects', keys, error);
-        });
-      }
+      ] as const;
+      // Recorded first: the inserts read the recaps the deletes then remove.
+      const results = (await db.batch([...recordDocx, ...deletes] as unknown as Parameters<
+        typeof db.batch
+      >[0])) as unknown as unknown[];
+      const gone = results[recordDocx.length + 3] as { id: string }[];
+      const dropped = results[recordDocx.length + 5] as { id: string }[];
+      // The docx of the recaps that went were recorded in the same batch; delete them now.
+      const recorded = cleanup.length
+        ? await db
+            .select({ id: storageCleanup.id, path: storageCleanup.path })
+            .from(storageCleanup)
+            .where(
+              and(
+                eq(storageCleanup.installId, installId),
+                inArray(
+                  storageCleanup.id,
+                  cleanup.map((e) => e.id),
+                ),
+              ),
+            )
+        : [];
+      if (recorded.length) await finishCleanup(db, storage, installId, recorded);
       if (gone.length || dropped.length) {
         result.textDeleted++;
         touched = true;
