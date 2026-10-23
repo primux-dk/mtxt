@@ -2,7 +2,7 @@
   "id": "fixture-transcript",
   "status": "completed",
   "language_code": "da",
-  "speech_model_used": "universal-3-pro",
+  "speech_model_used": "universal-3-5-pro",
   "audio_duration": 72,
   "text": "Så er vi samlet. Lad os begynde med kapaciteten på linje 2. Jonas, hvor står vi med testen? Vi nåede de 240 enheder i går. Vi mangler stadig at teste det nye skift, før vi ændrer planen. Jeg tager testen torsdag. Hvis kvaliteten holder, kan vi sætte det i drift fra mandag. Godt. Så aftaler vi, at Søren melder tilbage fredag. Anne, vil du samle tallene i ugeplanen? Ja. Jeg opdaterer planen, så alle kan se kapaciteten på Ærø inden fredag klokken tolv.",
   "words": [

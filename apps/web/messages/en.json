@@ -664,7 +664,7 @@
     "retry": "Try again"
   },
   "stt": {
-    "supported": "This version transcribes with {providers}. The other providers in the list arrive later.",
+    "supported": "This version transcribes with {providers}. AssemblyAI runs Universal-3.5 Pro, and Universal-2 for a language Universal-3.5 Pro lacks. The other providers in the list arrive later.",
     "gateway": {
       "field": "AI Gateway ID",
       "help": "Workers AI requests, and later the recap model's, go through this gateway in the company's Cloudflare account. Leave it empty to call Workers AI directly."

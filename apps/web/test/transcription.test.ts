@@ -70,7 +70,7 @@ function harness(provider: Partial<SttProvider> & Pick<SttProvider, 'submit'>) {
   const full: SttProvider = {
     describe: () => ({
       id: 'assemblyai',
-      model: 'universal-3-pro',
+      model: 'universal-3-5-pro',
       supports: { diarization: true, keyterms: true, languages: 'auto' },
     }),
     ...provider,

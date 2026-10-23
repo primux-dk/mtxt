@@ -43,7 +43,7 @@ describe('AssemblyAI mapper', () => {
     });
     expect(result.words?.length).toBe(fixture.words.length);
     expect(result.language).toBe('da');
-    expect(result.model).toBe('universal-3-pro');
+    expect(result.model).toBe('universal-3-5-pro');
     expect(result.raw).toBe(fixture);
   });
 
@@ -58,14 +58,14 @@ describe('AssemblyAI mapper', () => {
 });
 
 describe('AssemblyAI request', () => {
-  it('asks for speaker labels, Universal-3 Pro with Universal-2 as fallback, and the webhook header', () => {
+  it('asks for speaker labels, Universal-3.5 Pro with Universal-2 as fallback, and the webhook header', () => {
     const body = transcriptRequest({ language: 'da', keyterms: ['linje 2'] }, 'u', {
       url: 'https://x/api/v1/webhooks/assemblyai',
       secret: 's',
     });
     expect(body).toEqual({
       audio_url: 'u',
-      speech_models: ['universal-3-pro', 'universal-2'],
+      speech_models: ['universal-3-5-pro', 'universal-2'],
       speaker_labels: true,
       language_code: 'da',
       keyterms_prompt: ['linje 2'],

@@ -141,7 +141,7 @@ test('upload, confirm, transcribing, webhook, transcribed: segments, speakers an
   // What the fake AssemblyAI was asked for.
   const sent = await (await request.get('/api/test/fake-assemblyai/control')).json();
   expect(sent).toMatchObject({
-    speech_models: ['universal-3-pro', 'universal-2'],
+    speech_models: ['universal-3-5-pro', 'universal-2'],
     speaker_labels: true,
     language_detection: true,
     webhook_url: 'http://localhost:8788/api/v1/webhooks/assemblyai',

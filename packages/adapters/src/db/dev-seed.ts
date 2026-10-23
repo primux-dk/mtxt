@@ -344,7 +344,7 @@ function transcriptRows(
 ): string {
   const i = quote(installId);
   const tid = `${key}-t`;
-  let sql = `INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json, status) VALUES (${quote(tid)}, ${i}, ${quote(recordingId)}, 'assemblyai', 'universal-3-pro', 'da', '{}', 'done');\n`;
+  let sql = `INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json, status) VALUES (${quote(tid)}, ${i}, ${quote(recordingId)}, 'assemblyai', 'universal-3-5-pro', 'da', '{}', 'done');\n`;
   if (speakers.length) {
     sql += insertRows(
       'speakers',

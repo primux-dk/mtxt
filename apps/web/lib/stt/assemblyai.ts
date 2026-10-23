@@ -3,7 +3,7 @@
   Called directly: AI Gateway does not front AssemblyAI (spec).
 
   The audio goes up through /v2/upload from the install's own storage, never
-  through a public URL. The job asks for speaker labels, Universal-3 Pro with
+  through a public URL. The job asks for speaker labels, Universal-3.5 Pro with
   an explicit Universal-2 fallback, the install's language or detection, and
   the keyterms as `keyterms_prompt`. AssemblyAI calls the webhook with the
   install's secret in a custom header when the job is done.
@@ -23,8 +23,8 @@ import {
 
 export const ASSEMBLYAI_EU = 'https://api.eu.assemblyai.com';
 export const ASSEMBLYAI_WEBHOOK_HEADER = 'X-Mtxt-Webhook-Secret';
-export const ASSEMBLYAI_MODELS = ['universal-3-pro', 'universal-2'] as const;
-/** Universal-3 Pro's async languages (checked 2026-10-22); keyterms take 1,000 terms there. */
+export const ASSEMBLYAI_MODELS = ['universal-3-5-pro', 'universal-2'] as const;
+/** Universal-3.5 Pro's 18 async languages (checked 2026-10-23); keyterms take 1,000 terms there. */
 export const U3_LANGUAGES = [
   'ar',
   'da',

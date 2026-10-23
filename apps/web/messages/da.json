@@ -664,7 +664,7 @@
     "retry": "Prøv igen"
   },
   "stt": {
-    "supported": "Denne version transskriberer med {providers}. De andre udbydere på listen kommer senere.",
+    "supported": "Denne version transskriberer med {providers}. AssemblyAI kører Universal-3.5 Pro, og Universal-2 for et sprog, Universal-3.5 Pro ikke har. De andre udbydere på listen kommer senere.",
     "gateway": {
       "field": "AI Gateway-id",
       "help": "Kald til Workers AI, og senere til referatmodellen, går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde Workers AI direkte."
