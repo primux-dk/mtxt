@@ -14,7 +14,8 @@ crate-type = ["rlib"]
 
 [features]
 default = ["parakeet", "whisper"]
-# The two local models for the live preview. Each can be left out of a build.
+# The two local models for the live preview. Each can be left out of a build;
+# Parakeet is compiled on aarch64 only (see the ort dependency).
 parakeet = ["dep:ort"]
 whisper = ["dep:whisper-rs"]
 
@@ -47,8 +48,12 @@ cpal = "0.18"
 rtrb = "0.4"
 opus = "0.4"
 ogg = "0.9"
-ort = { version = "=2.0.0-rc.15", optional = true }
 whisper-rs = { version = "0.16", optional = true, features = ["metal"] }
+
+# ONNX Runtime ships no prebuilt library for Intel Macs: Parakeet is in the
+# Apple silicon slice of the universal build only; Whisper is in both.
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+ort = { version = "=2.0.0-rc.15", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

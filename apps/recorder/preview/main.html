@@ -1,28 +1,33 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Preview</title>
-<script type="module" src="./mock.ts"></script>
-<script type="module">
-  // Load the real page's body into this one, then its script.
-  const html = await (await fetch('/index.html')).text();
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  document.head.append(...doc.querySelectorAll('link[rel=stylesheet]'));
-  document.body.innerHTML = doc.body.innerHTML.replace(/<script[^>]*><\/script>/g, '');
-  const p = new URLSearchParams(location.search);
-  await import('/src/main.ts');
-  // Meter values a recording would send ten times a second.
-  if (p.get('state') === 'figure05' || p.get('state') === 'mic-only') {
-    setTimeout(() => {
-      document.getElementById('mic-level').value = 0.64;
-      document.getElementById('sys-level').value = p.get('state') === 'figure05' ? 0.42 : 0;
-    }, 200);
-  }
-  // Open a dialog the way its trigger would.
-  if (p.get('dialog') === 'model') {
-    setTimeout(() => {
-      const select = document.getElementById('model');
-      select.value = 'whisper';
-      select.dispatchEvent(new Event('change'));
-    }, 300);
-  }
-</script>
-</head><body></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Preview</title>
+    <script type="module" src="./mock.ts"></script>
+    <script type="module">
+      // Load the real page's body into this one, then its script.
+      const html = await (await fetch('/index.html')).text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      document.head.append(...doc.querySelectorAll('link[rel=stylesheet]'));
+      document.body.innerHTML = doc.body.innerHTML.replace(/<script[^>]*><\/script>/g, '');
+      const p = new URLSearchParams(location.search);
+      await import('/src/main.ts');
+      // Meter values a recording would send ten times a second.
+      if (p.get('state') === 'figure05' || p.get('state') === 'mic-only') {
+        setTimeout(() => {
+          document.getElementById('mic-level').value = 0.64;
+          document.getElementById('sys-level').value = p.get('state') === 'figure05' ? 0.42 : 0;
+        }, 200);
+      }
+      // Open a dialog the way its trigger would.
+      if (p.get('dialog') === 'model') {
+        setTimeout(() => {
+          const select = document.getElementById('model');
+          select.value = 'whisper';
+          select.dispatchEvent(new Event('change'));
+        }, 300);
+      }
+    </script>
+  </head>
+  <body></body>
+</html>

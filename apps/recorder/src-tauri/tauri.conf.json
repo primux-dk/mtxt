@@ -23,7 +23,13 @@
     "copyright": "Primux (PRIMUX DIGITAL, S.L.). PolyForm Noncommercial 1.0.0.",
     "shortDescription": "Meeting recorder",
     "longDescription": "Records the microphone and the system audio of a meeting and uploads it to the company's own library.",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.png"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
     "resources": {
       "../../../docs/design/fonts/LICENSE-mona-sans.txt": "licenses/LICENSE-mona-sans.txt",
       "../../../NOTICE.md": "licenses/NOTICE.md",

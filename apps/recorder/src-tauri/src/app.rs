@@ -302,8 +302,8 @@ impl App {
             online: inner.online,
             live: LiveView {
                 enabled: p.live_enabled(),
-                model: p.model.clone(),
-                models: models::ALL
+                model: models::usable(&p.model).to_string(),
+                models: models::available()
                     .iter()
                     .map(|s| ModelView {
                         id: s.id,
@@ -996,7 +996,7 @@ impl App {
             }
             inner.live_hidden = false;
             inner.live_update = None;
-            inner.profile.model.clone()
+            models::usable(&inner.profile.model).to_string()
         };
         let app = self.clone();
         let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), move |update| {

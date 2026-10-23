@@ -13,7 +13,13 @@ const dark = params.get('theme') === 'dark';
 // prefers-color-scheme follows the query in the preview.
 const realMatch = window.matchMedia.bind(window);
 window.matchMedia = (q: string) =>
-  q.includes('prefers-color-scheme') ? ({ matches: dark, addEventListener() {}, removeEventListener() {} } as unknown as MediaQueryList) : realMatch(q);
+  q.includes('prefers-color-scheme')
+    ? ({
+        matches: dark,
+        addEventListener() {},
+        removeEventListener() {},
+      } as unknown as MediaQueryList)
+    : realMatch(q);
 
 let next = 1;
 const label = location.pathname.includes('live') ? 'live' : 'main';
@@ -32,4 +38,6 @@ const label = location.pathname.includes('live') ? 'live' : 'main';
     }
   },
 };
-(window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => undefined };
+(window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+  unregisterListener: () => undefined,
+};

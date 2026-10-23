@@ -74,6 +74,24 @@ pub const WHISPER: ModelSpec = ModelSpec {
 
 pub const ALL: [&ModelSpec; 2] = [&PARAKEET, &WHISPER];
 
+/// The models this build can run: Parakeet needs ONNX Runtime, which is in
+/// the Apple silicon build only.
+pub fn available() -> Vec<&'static ModelSpec> {
+    ALL.into_iter()
+        .filter(|s| match s.id {
+            "parakeet" => cfg!(all(feature = "parakeet", target_arch = "aarch64")),
+            "whisper" => cfg!(feature = "whisper"),
+            _ => false,
+        })
+        .collect()
+}
+
+/// The model to use: the chosen one if this build has it, else the first it has.
+pub fn usable(chosen: &str) -> &'static str {
+    let have = available();
+    have.iter().find(|s| s.id == chosen).or(have.first()).map(|s| s.id).unwrap_or("parakeet")
+}
+
 pub fn spec(id: &str) -> Option<&'static ModelSpec> {
     ALL.into_iter().find(|s| s.id == id)
 }

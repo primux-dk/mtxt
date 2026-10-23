@@ -5,10 +5,16 @@ import { deriveTokens, mix } from '../src/theme';
 // The defaults written next to each derivation in docs/design/tokens.css.
 function documented(dark: boolean): Record<string, string> {
   const css = readFileSync(new URL('../../../docs/design/tokens.css', import.meta.url), 'utf8');
-  const marker = dark ? 'Derived from the two theme inputs, dark.' : 'Derived from the two theme inputs, light.';
-  const block = css.slice(css.indexOf(marker), css.indexOf('}', css.indexOf('{', css.indexOf(marker))));
+  const marker = dark
+    ? 'Derived from the two theme inputs, dark.'
+    : 'Derived from the two theme inputs, light.';
+  const block = css.slice(
+    css.indexOf(marker),
+    css.indexOf('}', css.indexOf('{', css.indexOf(marker))),
+  );
   const out: Record<string, string> = {};
-  for (const m of block.matchAll(/(--[a-z-]+):[^;]+;\s*\/\* (#[0-9a-f]{6}) \*\//g)) out[m[1]!] = m[2]!;
+  for (const m of block.matchAll(/(--[a-z-]+):[^;]+;\s*\/\* (#[0-9a-f]{6}) \*\//g))
+    out[m[1]!] = m[2]!;
   return out;
 }
 

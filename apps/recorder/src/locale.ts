@@ -49,7 +49,11 @@ export function format(msg: string, args: Args): string {
     if (parts.length >= 3 && parts[1]!.trim() === 'plural') {
       const forms = parts.slice(2).join(',');
       const n = Number(args[name] ?? 0);
-      const body = form(forms, `=${n}`) ?? form(forms, n === 1 ? 'one' : 'other') ?? form(forms, 'other') ?? '';
+      const body =
+        form(forms, `=${n}`) ??
+        form(forms, n === 1 ? 'one' : 'other') ??
+        form(forms, 'other') ??
+        '';
       out += format(body.replaceAll('#', new Intl.NumberFormat(intlLocale()).format(n)), args);
     } else {
       out += name in args ? String(args[name]) : `{${name}}`;

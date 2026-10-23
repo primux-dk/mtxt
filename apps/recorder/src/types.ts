@@ -1,8 +1,20 @@
 // The snapshot Rust sends (`app.rs`, `Snapshot`).
 
 export type Permission = 'granted' | 'denied' | 'not_determined' | 'unsupported';
-export type Status = 'recording' | 'uploading' | 'pending' | 'warn' | 'ask_user' | 'confirmed' | 'deleted' | 'saved_elsewhere';
-export type Reason = { kind: 'network' } | { kind: 'server' } | { kind: 'signed_out' } | { kind: 'rejected'; code: string };
+export type Status =
+  | 'recording'
+  | 'uploading'
+  | 'pending'
+  | 'warn'
+  | 'ask_user'
+  | 'confirmed'
+  | 'deleted'
+  | 'saved_elsewhere';
+export type Reason =
+  | { kind: 'network' }
+  | { kind: 'server' }
+  | { kind: 'signed_out' }
+  | { kind: 'rejected'; code: string };
 
 export interface Notice {
   key: string;

@@ -12,11 +12,22 @@ Models the library calls:
 
 - **Whisper large-v3-turbo** (OpenAI, MIT), run by Cloudflare Workers AI as `@cf/openai/whisper-large-v3-turbo` when an install picks Workers AI Whisper. Called through the `AI` binding under the installing company's Cloudflare account; no weights are in this repository.
 
+Desktop recorder (`apps/recorder`), installed from crates.io and npm, not copied:
+
+- Rust crates under their own licences: MIT or Apache-2.0 for nearly all; BSD-3-Clause for `ogg` and `opusic-sys` (the libopus bindings `opus` uses); Zlib as one option of the `objc2` family. `node apps/recorder/scripts/check-crate-licenses.mjs --list` prints every crate the recorder ships with its licence. The direct dependencies: `tauri`, `tauri-plugin-dialog`, `tauri-plugin-opener` (Apache-2.0 OR MIT), `cpal` (Apache-2.0), `opus` (MIT OR Apache-2.0) through `opusic-sys` (BSD-3-Clause), with libopus (Xiph.Org, BSD-3-Clause) built from source, `ogg` (BSD-3-Clause), `rtrb`, `reqwest`, `tokio`, `serde`, `serde_json`, `sha2`, `base64`, `getrandom`, `hex`, `percent-encoding`, `unicode-normalization`, `unicode-properties`, `chrono`, `uuid`, `thiserror`, `log`, `env_logger`, `sys-locale`, `libc` (MIT and/or Apache-2.0), `keyring` (MIT OR Apache-2.0), the `objc2`, `objc2-foundation`, `objc2-core-foundation`, `objc2-core-audio`, `objc2-core-audio-types`, `objc2-av-foundation`, `objc2-app-kit` and `block2` crates (Zlib OR Apache-2.0 OR MIT), `ort` (MIT OR Apache-2.0) with ONNX Runtime (Microsoft, MIT) linked statically on Apple silicon, and `whisper-rs` and `whisper-rs-sys` (Unlicense) with whisper.cpp and ggml (MIT) built from source.
+- Licences outside the MIT, Apache-2.0, BSD and ISC list, each used unmodified: Unicode-3.0 for the ICU4X data crates that URL and Unicode handling pull in (`icu_*`, `zerovec`, `yoke`, `tinystr`, `litemap`, `writeable`, `zerofrom`, `zerotrie`, `potential_utf`); Unlicense for `whisper-rs` and `whisper-rs-sys`; MPL-2.0 for `cssparser`, `selectors` and `dtoa-short`, which Tauri's `tauri-utils` uses for HTML handling, and `option-ext`, which `dirs` uses. No GPL or LGPL crate is in the recorder.
+- npm: `@tauri-apps/api` (Apache-2.0 OR MIT) in the window code; `@tauri-apps/cli`, `vite` and `vitest` at build time.
+- Vibe, anarlog and Meetily were read as references for system audio capture and local models; no code from them is in this repository. The process tap follows Apple's documentation for `AudioHardwareCreateProcessTap`, `CATapDescription` and aggregate devices.
+
+Models the recorder downloads on first use, from Hugging Face, into `~/Library/Application Support/co.mtxt.recorder/models/`; no weights are in this repository:
+
+- **Parakeet TDT 0.6B v3** (NVIDIA, CC-BY-4.0), the int8 ONNX export published as `istupakov/parakeet-tdt-0.6b-v3-onnx`. Attribution: "Parakeet TDT 0.6B v3 by NVIDIA, licensed under CC-BY-4.0." The live-transcript default.
+- **Whisper large-v3-turbo** (OpenAI, MIT), the q5_0 whisper.cpp conversion `ggml-large-v3-turbo-q5_0.bin` from `ggerganov/whisper.cpp`. Attribution: "Whisper large-v3-turbo by OpenAI, licensed under MIT." The fallback.
+
+The recorder bundles Mona Sans (above), `NOTICE.md` and `LICENSE.md` in its app resources.
+
 Planned, to be recorded here when they land:
 
-- Rust crates the recorder will depend on (cpal, whisper-rs, ONNX runtime bindings, Tauri plugins), each under MIT or Apache-2.0, listed here when added. Vibe, anarlog and Meetily are read as references; no code from them is in this repository.
-- **Parakeet TDT 0.6B v3** (NVIDIA, CC-BY-4.0): local speech-to-text model, downloaded by the recorder on first run. Attribution: "Parakeet TDT 0.6B v3 by NVIDIA, licensed under CC-BY-4.0."
-- **Whisper large-v3-turbo** (OpenAI, MIT): fallback local model in the recorder.
 - **Tiptap** (@tiptap/core and open extensions, MIT): the recap editor. No Pro extensions.
 
 Speech-to-text and language-model providers are called over their APIs under the installing company's own agreement with them. None of their code is in this repository.

@@ -9,19 +9,24 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn create(handle: &AppHandle, snap: &Snapshot) -> tauri::Result<()> {
     let title = snap.connection.as_ref().map(|c| c.product_name.clone()).unwrap_or_else(|| "mtxt Recorder".into());
-    WebviewWindowBuilder::new(handle, "main", WebviewUrl::App("index.html".into()))
+    let main = WebviewWindowBuilder::new(handle, "main", WebviewUrl::App("index.html".into()))
         .title(&title)
-        .inner_size(360.0, 520.0)
         .min_inner_size(320.0, 440.0)
+        .inner_size(360.0, 520.0)
         .resizable(true)
         .visible(true)
         .build()?;
+    // The builder's size can lose to the minimum on macOS; set it again.
+    let _ = main.set_size(tauri::LogicalSize::new(360.0, 520.0));
+    log::debug!("main window: outer {:?} inner {:?} scale {:?}", main.outer_size(), main.inner_size(), main.scale_factor());
+    let _ = main.center();
     #[allow(unused_mut)]
     let mut live = WebviewWindowBuilder::new(handle, "live", WebviewUrl::App("live.html".into()))
         .title("Live")
         .inner_size(420.0, 200.0)
         .min_inner_size(300.0, 140.0)
         .resizable(true)
+        .position(40.0, 60.0)
         .always_on_top(true)
         .visible_on_all_workspaces(true)
         .skip_taskbar(true)
@@ -32,6 +37,7 @@ pub fn create(handle: &AppHandle, snap: &Snapshot) -> tauri::Result<()> {
         live = live.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
     }
     let live = live.build()?;
+    let _ = live.set_size(tauri::LogicalSize::new(420.0, 200.0));
     #[cfg(target_os = "macos")]
     mac::make_panel(&live);
     #[cfg(not(target_os = "macos"))]

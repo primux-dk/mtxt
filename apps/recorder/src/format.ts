@@ -14,13 +14,17 @@ export function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   const pad = (n: number) => String(n).padStart(2, '0');
   const h = Math.floor(s / 3600);
-  return h > 0 ? `${h}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}` : `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+  return h > 0
+    ? `${h}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`
+    : `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
 }
 
 /** "23 Oct 2026, 09:00" or "23. okt. 2026 09.00". */
 export function dateTime(iso: string | Date): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
-  return new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+  return new Intl.DateTimeFormat(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }).format(
+    d,
+  );
 }
 
 /** 670 MB, 1.6 GB, in the locale's decimal style. */

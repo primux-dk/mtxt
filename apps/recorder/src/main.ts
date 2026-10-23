@@ -34,7 +34,11 @@ function icon(name: string): SVGSVGElement {
   return svg;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: (Node | string)[]) {
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: Partial<HTMLElementTagNameMap[K]> = {},
+  ...children: (Node | string)[]
+) {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children);
   return node;
@@ -65,7 +69,9 @@ function render(s: Snapshot): void {
   translate();
   applyTheme(s.connection?.theme_accent, s.connection?.theme_primary);
   document.title = product();
-  document.querySelectorAll<HTMLElement>('[data-product]').forEach((n) => (n.textContent = product()));
+  document
+    .querySelectorAll<HTMLElement>('[data-product]')
+    .forEach((n) => (n.textContent = product()));
   $('setup').hidden = s.phase !== 'setup';
   $('connecting').hidden = s.phase !== 'connecting';
   $('ready').hidden = s.phase !== 'ready';
@@ -84,7 +90,9 @@ function renderSetup(s: Snapshot): void {
 }
 
 function renderConnecting(s: Snapshot): void {
-  $('connect-instructions').textContent = t('recorder.connect.instructions', { host: s.host_label ?? '' });
+  $('connect-instructions').textContent = t('recorder.connect.instructions', {
+    host: s.host_label ?? '',
+  });
   $('pairing-code').textContent = s.pairing_code ?? '';
 }
 
@@ -136,7 +144,13 @@ function renderBanners(s: Snapshot): void {
   const box = $('banners');
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   box.replaceChildren();
-  const banner = (kind: 'warn' | '', iconName: string, text: string, action?: [string, () => void], key?: string) => {
+  const banner = (
+    kind: 'warn' | '',
+    iconName: string,
+    text: string,
+    action?: [string, () => void],
+    key?: string,
+  ) => {
     const b = el('div', { className: `banner ${kind}` });
     b.setAttribute('role', kind ? 'alert' : 'status');
     const body = el('span', { className: 'banner-text' }, text);
@@ -150,10 +164,22 @@ function renderBanners(s: Snapshot): void {
     box.append(b);
   };
   if (s.notice) {
-    banner('warn', 'warning', notice(s.notice), [t('common.close'), () => invoke('dismiss_notice')], 'notice');
+    banner(
+      'warn',
+      'warning',
+      notice(s.notice),
+      [t('common.close'), () => invoke('dismiss_notice')],
+      'notice',
+    );
   }
   if (s.signed_out) {
-    banner('warn', 'warning', t('recorder.signedOut', { product: product() }), [t('recorder.connect.again'), connectAgain], 'signedout');
+    banner(
+      'warn',
+      'warning',
+      t('recorder.signedOut', { product: product() }),
+      [t('recorder.connect.again'), connectAgain],
+      'signedout',
+    );
   } else if (!s.online && s.queue.some((q) => q.reason?.kind === 'network')) {
     banner('', 'network', t('recorder.network.offline', { host: s.host_label ?? '' }));
   }
@@ -169,33 +195,68 @@ function renderPermissions(s: Snapshot): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   box.replaceChildren();
   if (pendingStart && undetermined) {
-    const cont = el('button', { type: 'button', className: 'btn small', textContent: t('recorder.permission.continue') });
+    const cont = el('button', {
+      type: 'button',
+      className: 'btn small',
+      textContent: t('recorder.permission.continue'),
+    });
     cont.dataset.focusKey = 'perm-continue';
     cont.addEventListener('click', askPermissions);
     box.append(
       el('h2', { textContent: t('recorder.permission.heading') }),
       el('p', { className: 'muted', textContent: t('recorder.permission.intro') }),
-      el('ul', {}, el('li', { textContent: t('recorder.permission.mic.explain') }), el('li', { textContent: t('recorder.permission.system.explain') })),
+      el(
+        'ul',
+        {},
+        el('li', { textContent: t('recorder.permission.mic.explain') }),
+        el('li', { textContent: t('recorder.permission.system.explain') }),
+      ),
       el('div', { className: 'row' }, cont),
     );
   }
   for (const which of denied) {
-    const open = el('button', { type: 'button', className: 'btn small', textContent: t('recorder.permission.openSettings') });
+    const open = el('button', {
+      type: 'button',
+      className: 'btn small',
+      textContent: t('recorder.permission.openSettings'),
+    });
     open.dataset.focusKey = `open-${which}`;
     open.addEventListener('click', () => invoke('open_settings', { which }));
     box.append(
-      el('div', { className: 'permission-denied' }, icon('warning'), el('span', { textContent: t(which === 'microphone' ? 'recorder.permission.mic.denied' : 'recorder.permission.system.denied') })),
+      el(
+        'div',
+        { className: 'permission-denied' },
+        icon('warning'),
+        el('span', {
+          textContent: t(
+            which === 'microphone'
+              ? 'recorder.permission.mic.denied'
+              : 'recorder.permission.system.denied',
+          ),
+        }),
+      ),
       el('div', { className: 'row' }, open),
     );
   }
   if (denied.length) {
-    const again = el('button', { type: 'button', className: 'btn quiet small', textContent: t('recorder.permission.recheck') });
+    const again = el('button', {
+      type: 'button',
+      className: 'btn quiet small',
+      textContent: t('recorder.permission.recheck'),
+    });
     again.dataset.focusKey = 'recheck';
     again.addEventListener('click', () => invoke('refresh'));
     box.lastElementChild?.append(again);
   }
   if (unsupported) {
-    box.append(el('div', { className: 'permission-denied muted' }, icon('info'), el('span', { textContent: t('recorder.permission.system.unsupported') })));
+    box.append(
+      el(
+        'div',
+        { className: 'permission-denied muted' },
+        icon('info'),
+        el('span', { textContent: t('recorder.permission.system.unsupported') }),
+      ),
+    );
   }
   box.hidden = box.childElementCount === 0;
   if (focusKey) box.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
@@ -212,24 +273,59 @@ export function statusOf(q: QueueItem): StatusView {
   const reason = q.reason;
   const rejected = (): StatusView =>
     reason?.kind === 'rejected' && reason.code === 'file_missing'
-      ? { icon: 'warning', cls: 'warn', text: t('recorder.queue.fileMissing'), action: () => invoke('remove_recording', { id: q.id }) }
+      ? {
+          icon: 'warning',
+          cls: 'warn',
+          text: t('recorder.queue.fileMissing'),
+          action: () => invoke('remove_recording', { id: q.id }),
+        }
       : { icon: 'warning', cls: 'warn', text: t('recorder.queue.rejected') };
   switch (q.status) {
     case 'recording':
       return { icon: 'dot', cls: 'warn', text: t('recorder.queue.recording') };
     case 'uploading':
-      return { icon: 'upload', cls: '', text: t('recorder.queue.uploading', { done: q.done, total: q.total }) };
+      return {
+        icon: 'upload',
+        cls: '',
+        text: t('recorder.queue.uploading', { done: q.done, total: q.total }),
+      };
     case 'pending':
     case 'warn':
       if (reason?.kind === 'rejected') return rejected();
-      if (reason?.kind === 'signed_out') return { icon: 'warning', cls: 'warn', text: t('recorder.queue.signedOut'), action: connectAgain };
-      if (q.status === 'warn') return { icon: 'warning', cls: 'warn', text: t('recorder.queue.warn24h'), action: () => invoke('try_now', { id: q.id }) };
-      if (reason?.kind === 'server') return { icon: 'network', cls: 'muted', text: t('recorder.queue.pendingServer') };
+      if (reason?.kind === 'signed_out')
+        return {
+          icon: 'warning',
+          cls: 'warn',
+          text: t('recorder.queue.signedOut'),
+          action: connectAgain,
+        };
+      if (q.status === 'warn')
+        return {
+          icon: 'warning',
+          cls: 'warn',
+          text: t('recorder.queue.warn24h'),
+          action: () => invoke('try_now', { id: q.id }),
+        };
+      if (reason?.kind === 'server')
+        return { icon: 'network', cls: 'muted', text: t('recorder.queue.pendingServer') };
       return { icon: 'network', cls: 'muted', text: t('recorder.queue.pendingNetwork') };
     case 'ask_user':
-      return { icon: 'warning', cls: 'warn', text: t('recorder.queue.ask7d'), action: () => openAsk(q, true) };
+      return {
+        icon: 'warning',
+        cls: 'warn',
+        text: t('recorder.queue.ask7d'),
+        action: () => openAsk(q, true),
+      };
     case 'confirmed':
-      return { icon: 'check', cls: 'accent-fg', text: t(q.server_status === 'transcribed' ? 'recorder.queue.transcribed' : 'recorder.queue.confirmed') };
+      return {
+        icon: 'check',
+        cls: 'accent-fg',
+        text: t(
+          q.server_status === 'transcribed'
+            ? 'recorder.queue.transcribed'
+            : 'recorder.queue.confirmed',
+        ),
+      };
     case 'deleted':
       return { icon: 'check', cls: 'muted', text: t('recorder.queue.deleted') };
     case 'saved_elsewhere':
@@ -242,12 +338,22 @@ function renderQueue(s: Snapshot): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   list.replaceChildren();
   for (const q of s.queue) {
-    const meta = [q.title, dateTime(q.started_at), q.duration_s ? duration(q.duration_s) : '', q.size_bytes ? size(q.size_bytes) : '']
+    const meta = [
+      q.title,
+      dateTime(q.started_at),
+      q.duration_s ? duration(q.duration_s) : '',
+      q.size_bytes ? size(q.size_bytes) : '',
+    ]
       .filter(Boolean)
       .join(' · ');
     let titleNode: HTMLElement;
     if (q.meeting_url) {
-      const b = el('button', { type: 'button', className: 'queue-title', textContent: q.title, title: meta });
+      const b = el('button', {
+        type: 'button',
+        className: 'queue-title',
+        textContent: q.title,
+        title: meta,
+      });
       b.setAttribute('aria-label', t('recorder.queue.open', { title: q.title }));
       b.dataset.focusKey = `open-${q.id}`;
       b.addEventListener('click', () => invoke('open_url', { url: q.meeting_url }));
@@ -259,7 +365,12 @@ function renderQueue(s: Snapshot): void {
     const v = statusOf(q);
     const status = el('span', { className: `queue-status ${v.cls}` }, icon(v.icon));
     if (v.action) {
-      const b = el('button', { type: 'button', className: 'queue-action', textContent: v.text, title: v.text });
+      const b = el('button', {
+        type: 'button',
+        className: 'queue-action',
+        textContent: v.text,
+        title: v.text,
+      });
       b.dataset.focusKey = `act-${q.id}`;
       b.addEventListener('click', v.action);
       status.append(b);
@@ -268,7 +379,9 @@ function renderQueue(s: Snapshot): void {
     }
     list.append(el('li', { className: 'queue-row' }, titleNode, status));
   }
-  $('queue-count').textContent = s.queue.length ? t('recorder.queue.count', { count: s.queue.length }) : '';
+  $('queue-count').textContent = s.queue.length
+    ? t('recorder.queue.count', { count: s.queue.length })
+    : '';
   $('queue-empty').hidden = s.queue.length > 0;
   if (focusKey) list.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
 }
@@ -283,14 +396,17 @@ function renderFooter(s: Snapshot): void {
   const focused = document.activeElement === select;
   select.replaceChildren();
   for (const m of s.live.models) {
-    const key = m.download && !m.download.failed
-      ? 'recorder.model.downloading'
-      : m.download?.failed
-        ? 'recorder.model.failed'
-        : m.downloaded
-          ? 'recorder.model.downloaded'
-          : 'recorder.model.download';
-    const percent = m.download ? Math.floor((100 * m.download.done) / Math.max(1, m.download.total)) : 0;
+    const key =
+      m.download && !m.download.failed
+        ? 'recorder.model.downloading'
+        : m.download?.failed
+          ? 'recorder.model.failed'
+          : m.downloaded
+            ? 'recorder.model.downloaded'
+            : 'recorder.model.download';
+    const percent = m.download
+      ? Math.floor((100 * m.download.done) / Math.max(1, m.download.total))
+      : 0;
     select.append(el('option', { value: m.id, textContent: t(key, { model: m.label, percent }) }));
   }
   select.value = s.live.model;
@@ -299,7 +415,11 @@ function renderFooter(s: Snapshot): void {
   const progress = $('model-progress');
   progress.hidden = !busy;
   if (busy?.download) {
-    progress.textContent = t('recorder.model.progress', { model: busy.label, done: size(busy.download.done), total: size(busy.download.total) });
+    progress.textContent = t('recorder.model.progress', {
+      model: busy.label,
+      done: size(busy.download.done),
+      total: size(busy.download.total),
+    });
   }
 }
 
@@ -359,7 +479,12 @@ function showError(e: unknown): void {
   const key = typeof e === 'string' && e.includes('.') ? e : 'recorder.error.file';
   // Shown as the window's notice; Rust holds no error for a refused command.
   const box = $('banners');
-  const b = el('div', { className: 'banner warn' }, icon('warning'), el('span', { className: 'banner-text', textContent: t(key) }));
+  const b = el(
+    'div',
+    { className: 'banner warn' },
+    icon('warning'),
+    el('span', { className: 'banner-text', textContent: t(key) }),
+  );
   b.setAttribute('role', 'alert');
   box.prepend(b);
 }
@@ -370,7 +495,9 @@ async function connectAgain(): Promise<void> {
 
 function openDisconnect(): void {
   if (!snap?.connection) return;
-  const pending = snap.queue.filter((q) => ['uploading', 'pending', 'warn', 'ask_user'].includes(q.status)).length;
+  const pending = snap.queue.filter((q) =>
+    ['uploading', 'pending', 'warn', 'ask_user'].includes(q.status),
+  ).length;
   $('disconnect-title').textContent = t('recorder.disconnect.title', { product: product() });
   $('disconnect-body').textContent = t('recorder.disconnect.body', { host: snap.host_label ?? '' });
   const pend = $('disconnect-pending');
@@ -462,7 +589,11 @@ function wire(): void {
   $('ask-save').addEventListener('click', async () => {
     const d = $('ask-dialog');
     try {
-      const saved = await invoke<boolean>('save_elsewhere', { id: d.dataset.id, title: d.dataset.title, dialogTitle: t('recorder.ask.saveTitle') });
+      const saved = await invoke<boolean>('save_elsewhere', {
+        id: d.dataset.id,
+        title: d.dataset.title,
+        dialogTitle: t('recorder.ask.saveTitle'),
+      });
       if (saved) $<HTMLDialogElement>('ask-dialog').close();
     } catch (e) {
       const err = $('ask-error');
@@ -477,8 +608,12 @@ function wire(): void {
   });
   $('disconnect-confirm').addEventListener('click', () => disconnect(false));
   $('disconnect-local').addEventListener('click', () => disconnect(true));
-  $('disconnect-cancel').addEventListener('click', () => $<HTMLDialogElement>('disconnect-dialog').close());
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => snap && render(snap));
+  $('disconnect-cancel').addEventListener('click', () =>
+    $<HTMLDialogElement>('disconnect-dialog').close(),
+  );
+  window
+    .matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => snap && render(snap));
 }
 
 async function main(): Promise<void> {

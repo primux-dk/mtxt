@@ -15,7 +15,10 @@ function parseHex(hex: string): Rgb {
 }
 
 function toHex([r, g, b]: Rgb): string {
-  const c = (v: number) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+  const c = (v: number) =>
+    Math.round(Math.min(255, Math.max(0, v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
@@ -23,7 +26,8 @@ const toLinear = (c: number) => {
   const v = c / 255;
   return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
 };
-const fromLinear = (v: number) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+const fromLinear = (v: number) =>
+  255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
 
 // Björn Ottosson's sRGB <-> Oklab matrices, as CSS Color 4 uses them.
 export function rgbToOklab(rgb: Rgb): Lab {
@@ -63,7 +67,11 @@ const INK = '#111111';
 const GREY = '#888888';
 
 /** Every token tokens.css derives from the two inputs, for one theme. */
-export function deriveTokens(accent: string, primary: string, dark: boolean): Record<string, string> {
+export function deriveTokens(
+  accent: string,
+  primary: string,
+  dark: boolean,
+): Record<string, string> {
   const t: Record<string, string> = dark
     ? {
         '--primary': mix(primary, WHITE, 96),
