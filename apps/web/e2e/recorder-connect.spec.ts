@@ -376,7 +376,7 @@ test.describe('25 recorders and a 64-character device name (rule 13)', () => {
     await expectFocusRing(opener);
     await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Recorders' });
-    await expect(dialog.getByRole('heading', { name: 'Recorders' })).toBeFocused();
+    await expect(dialog.getByRole('heading', { name: 'Recorders', exact: true })).toBeFocused();
     const disconnects = dialog.getByRole('button', { name: /^Disconnect / });
     await expect(disconnects).toHaveCount(26);
     // The newest first: the keyboard laptop from the last test.
