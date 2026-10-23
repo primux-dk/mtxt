@@ -81,7 +81,7 @@ describe('the search index', () => {
     expect(ftsQuery('MØDE')).toBe('text : ("MØDE"*)');
   });
 
-  it('ranks title hits first, then content by bm25, across the install only', async () => {
+  it('ranks title hits first, then recap, then transcript, across the install only', async () => {
     const { db, sqlite, segments } = setup();
     await syncSearch(db, INSTALL, { meetingId: 'm1', segments });
     await syncSearch(db, INSTALL, { meetingId: 'm2', title: 'Budget' });
@@ -94,9 +94,10 @@ describe('the search index', () => {
     );
     const hits = (q: string) =>
       db.all<{ meeting_id: string }>(
-        sql`select meeting_id from (${searchHitsSql(INSTALL, ftsQuery(q), like(q.toLocaleLowerCase()))}) order by score, meeting_id`,
+        sql`select meeting_id from (${searchHitsSql(INSTALL, ftsQuery(q), like(q.toLocaleLowerCase()))}) order by kind_rank, hits desc, meeting_id`,
       );
-    expect((await hits('kapacitet')).map((h) => h.meeting_id).sort()).toEqual(['m1', 'm2']);
+    // m2's hit is in its recap, m1's in its transcript.
+    expect((await hits('kapacitet')).map((h) => h.meeting_id)).toEqual(['m2', 'm1']);
     // A substring of a title still finds it, as before the index.
     expect(await hits('møde')).toEqual([{ meeting_id: 'm1' }]);
     expect(await hits('budget')).toEqual([{ meeting_id: 'm2' }]);

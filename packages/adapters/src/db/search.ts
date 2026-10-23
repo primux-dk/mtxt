@@ -135,28 +135,39 @@ export function ftsQuery(input: string): string | null {
   return `text : (${words.map((w) => `"${w}"*`).join(' AND ')})`;
 }
 
-/** The score a title hit gets: ahead of every bm25 score, which is negative and small. */
-const TITLE_SCORE = -1e9;
+/** Kind first: a title hit, then a recap hit, then a transcript hit. */
+const KIND_RANK = sql`case kind when 'title' then 0 when 'recap' then 1 else 2 end`;
 
 /**
- * A `select meeting_id, score` over every meeting in the install that the
- * search hits, best first by ascending score: a title hit (a substring of
- * `title_folded`, as before the index, or a word of the title) ahead of
- * transcript and recap hits, which rank by bm25. Not yet held to what the
- * user may see: the caller joins it to its permission scope, then pages.
+ * The matched words in one indexed text, counted from FTS5's highlight():
+ * a signal of that document alone. bm25() is not used, because its term
+ * statistics cover the whole table, so documents the user may not see
+ * would move the order of those they may.
+ */
+const MATCHED_WORDS = (column: SQL) =>
+  sql`(length(${column}) - length(replace(${column}, ${SNIPPET_OPEN}, '')))`;
+
+/**
+ * A `select meeting_id, kind_rank, hits` over every meeting in the install
+ * that the search hits: the best kind of hit (title 0, recap 1, segment 2)
+ * and the most matched words in one of its documents. A substring of
+ * `title_folded` is a title hit too, as before the index. Not yet held to
+ * what the user may see: the caller joins it to its permission scope, then
+ * orders by kind_rank, hits descending and the meeting's start, then pages.
  */
 export function searchHitsSql(installId: string, query: string | null, titleLike: string): SQL {
-  // bm25() only runs inside the full-text query itself, so that query is
-  // materialised before it is grouped (SQLite would otherwise flatten it).
+  // highlight() only runs inside the full-text query itself, so that query is
+  // materialised (limit -1) before it is grouped; SQLite would otherwise flatten it.
   const fts = query
-    ? sql`select meeting_id, score from (select meeting_id,
-          case when kind = 'title' then ${TITLE_SCORE} else bm25(meeting_search) end as score
-        from meeting_search where meeting_search match ${query} and install_id = ${installId}
-        limit -1)
+    ? sql`select meeting_id, ${KIND_RANK} as kind_rank, ${MATCHED_WORDS(sql`h`)} as hits
+        from (select meeting_id, kind,
+            highlight(meeting_search, 5, ${SNIPPET_OPEN}, ${SNIPPET_CLOSE}) as h
+          from meeting_search where meeting_search match ${query} and install_id = ${installId}
+          limit -1)
       union all `
     : sql``;
-  return sql`select meeting_id, min(score) as score from (
-      ${fts}select id as meeting_id, ${TITLE_SCORE} as score from meetings
+  return sql`select meeting_id, min(kind_rank) as kind_rank, max(hits) as hits from (
+      ${fts}select id as meeting_id, 0 as kind_rank, 1 as hits from meetings
         where install_id = ${installId} and title_folded like ${titleLike} escape '\\'
     ) group by meeting_id`;
 }
@@ -177,8 +188,9 @@ export interface SearchHit {
 /**
  * The best snippet per meeting, for the meetings of one page. Call it only
  * with meetings the user may read: the page's rows have been through the
- * permission scope already. A segment or recap hit beats a title hit, since
- * the row already shows its title.
+ * permission scope already. Chosen within the meeting's own documents: a
+ * recap hit before a transcript hit, then the most matched words. A title
+ * hit has no snippet, since the row already shows its title.
  */
 export async function searchSnippets(
   db: Db,
@@ -196,16 +208,22 @@ export async function searchSnippets(
     start_ms: number | null;
   }>(sql`
     with hits as materialized (
-      select meeting_id, kind, ref, bm25(meeting_search) as score,
+      select meeting_id, kind, ref, ${KIND_RANK} as kind_rank,
+        highlight(meeting_search, 5, ${SNIPPET_OPEN}, ${SNIPPET_CLOSE}) as h,
         snippet(meeting_search, 5, ${SNIPPET_OPEN}, ${SNIPPET_CLOSE}, '…', 14) as snippet
       from meeting_search
       where meeting_search match ${`(${query}) AND meeting_key : (${keys})`}
         and install_id = ${installId} and kind != 'title'
+    ),
+    ranked as (
+      select meeting_id, kind, ref, snippet, row_number() over (
+        partition by meeting_id order by kind_rank, ${MATCHED_WORDS(sql`h`)} desc, ref) as n
+      from hits
     )
-    select h.meeting_id, h.kind, h.snippet, min(h.score) as score, s.start_ms
-    from hits h
+    select h.meeting_id, h.kind, h.snippet, s.start_ms
+    from ranked h
     left join segments s on h.kind = 'segment' and s.id = h.ref and s.install_id = ${installId}
-    group by h.meeting_id`);
+    where h.n = 1`);
   for (const row of rows) {
     out.set(row.meeting_id, {
       meetingId: row.meeting_id,

@@ -167,4 +167,37 @@ describe('the permission matrix', () => {
     expect(company.rows.some((r) => r.id === 'gone')).toBe(false);
     expect(await loadMeeting(db, INSTALL, user('owner'), 'gone')).toBeNull();
   });
+
+  it('documents the user may not see change neither the count nor the order of those they may', async () => {
+    const { db, sqlite } = setup();
+    const f = fixtures(sqlite);
+    // Two visible meetings: A with one "alpha" in its transcript, B with two.
+    f.meeting('A', { owner: 'owner', title: 'A', startedAt: Date.UTC(2026, 9, 2) });
+    f.meeting('B', { owner: 'owner', title: 'B', startedAt: Date.UTC(2026, 9, 1) });
+    await syncSearch(db, INSTALL, { meetingId: 'A', segments: [{ id: 'a1', text: 'alpha beta' }] });
+    await syncSearch(db, INSTALL, {
+      meetingId: 'B',
+      segments: [{ id: 'b1', text: 'alpha og alpha igen' }],
+    });
+    const visible = async () => {
+      const page = await listMeetings(
+        db,
+        INSTALL,
+        user('owner'),
+        parseLibraryParams({ q: 'alpha' }),
+      );
+      return { total: page.total, order: page.rows.map((r) => r.id) };
+    };
+    const before = await visible();
+    expect(before).toEqual({ total: 2, order: ['B', 'A'] });
+    // 100 private documents of someone else, full of the word.
+    for (let i = 0; i < 100; i++) {
+      f.meeting(`x${i}`, { owner: 'member', title: `X${i}` });
+      await syncSearch(db, INSTALL, {
+        meetingId: `x${i}`,
+        segments: [{ id: `x${i}-s`, text: i % 2 ? 'alpha' : 'alpha beta beta beta' }],
+      });
+    }
+    expect(await visible()).toEqual(before);
+  });
 });

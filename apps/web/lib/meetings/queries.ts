@@ -141,7 +141,7 @@ export async function listMeetings(
     params.sort === 'title'
       ? sql`m.title_folded asc, m.started_at desc, m.id`
       : params.sort === 'relevance' && hits
-        ? sql`h.score asc, m.started_at desc, m.id`
+        ? sql`h.kind_rank asc, h.hits desc, m.started_at desc, m.id`
         : sql`m.started_at desc, m.id`;
 
   const rows = await db.all<{
