@@ -459,8 +459,11 @@ test('the tab strip follows the keyboard tab pattern (rule 11)', async ({ page }
   await expect(page).toHaveURL(/\/settings\/general$/);
 
   // Enter opens a tab: its route, selected, focus stays on it.
+  // Radix moves focus a tick after each key, so each press waits for it.
   await page.keyboard.press('ArrowRight');
+  await expect(tab(page, 'Login')).toBeFocused();
   await page.keyboard.press('ArrowRight');
+  await expect(tab(page, 'Transcription')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/settings\/transcription$/);
   const transcription = tab(page, 'Transcription');
