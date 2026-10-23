@@ -1270,6 +1270,11 @@ impl App {
 
     /// "Save audio to…": a checked copy elsewhere; the entry does not change.
     pub fn export_audio(&self, id: &str, dest: PathBuf) -> Result<(), String> {
+        // A file still being recorded is not finished; a copy would be cut short.
+        let status = self.lock().queue.get(id).map(|r| r.status);
+        if matches!(status, Some(Status::Recording) | Some(Status::Discarding)) {
+            return Err("recorder.delete.busy".into());
+        }
         let expected = self.lock().queue.get(id).and_then(|r| {
             (r.status != Status::FailedLocal).then(|| r.sha256.clone()).flatten()
         });

@@ -41,11 +41,15 @@ node apps/recorder/scripts/check-crate-licenses.mjs   # also run by pnpm check:l
 - **Live transcript.** Off unless the admin default or the user's switch turns it on. The mix, at 16 kHz mono, goes to Parakeet TDT 0.6B v3 through ONNX Runtime (`src/live/parakeet.rs`, one runtime environment per process) or Whisper large-v3-turbo through whisper.cpp (`src/live/whisper.rs`), cut at pauses (`src/live/segmenter.rs`). The live window lists every finished line of the running recording with its time (mm:ss from the recording's start), the line in progress muted under them; it follows new lines while the view is at the end and shows "Jump to latest" when the user has scrolled up. Arrows and Page keys scroll, End jumps to the latest. If the model cannot run, the window says why. The text lives in memory only and is dropped when the recording stops.
 - **Look and strings.** The window CSS is the mockup's (figures 05 and 06) on `docs/design/tokens.css`; `src/theme.ts` derives the accent and button tokens from the install's two colours with the same oklab mixing tokens.css uses, and a test checks them against the defaults written there. Strings are in `locales/en.json` and `locales/da.json`; the interface follows the operating system's language when a translation exists, otherwise the install's default.
 
+## Checked on a Mac
+
+`docs/screenshots/native/` holds the native evidence: real capture of the microphone and system audio, device switching during a recording, two recordings in a row with live text, the Keychain token after a reinstall, and the row menu, with the numbers measured in the files.
+
 ## The row menu
 
 Each row of "Recent recordings" has a three-dot menu (keyboard: Enter or Arrow Down opens it, arrows move, Escape closes and returns focus to the dots):
 
-- **Save audio to…**: a hash-checked copy, named "<title> <date>.ogg", whenever the audio is on this Mac. The entry does not change.
+- **Save audio to…**: a hash-checked copy, named "<title> <date>.ogg", whenever the finished audio is on this Mac (not while it records). The entry does not change.
 - **Open in library**: the meeting on the install, once the library has the recording.
 - **Delete from this Mac**: the local copy only. A confirmed recording goes at once and shows "Uploaded · Removed from this Mac". One the library does not have yet asks by name first, because it is the only copy. Never offered while a recording records or uploads.
 
