@@ -189,7 +189,7 @@ export default async function DeliveryLogPage({ params, searchParams }: Params) 
                       <td className={`${cell} whitespace-nowrap tabular-nums`}>
                         {tl('attempts', { count: row.attempts, max: MAX_ATTEMPTS })}
                       </td>
-                      <td className={`${cell} min-w-44 text-muted-foreground`}>
+                      <td className={`${cell} min-w-28 text-muted-foreground`}>
                         {t(`answer.${answer}`, { code: row.lastStatusCode ?? 0 })}
                       </td>
                       <td
