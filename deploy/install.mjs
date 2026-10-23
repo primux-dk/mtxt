@@ -674,6 +674,15 @@ async function main() {
     );
     row('Settings ai_gateway_id', `${gatewayId}, if the row had none`);
   }
+  // The config's time zone goes into a row that still has the default. A zone an admin
+  // chose on the settings page stands; a run never sets a row back to UTC.
+  if (existing.length > 0 && settings.timeZone && settings.timeZone !== 'UTC') {
+    d1File(
+      `UPDATE settings SET time_zone = '${settings.timeZone}' ` +
+        `WHERE install_id = '${installId}' AND time_zone = 'UTC';\n`,
+    );
+    row('Settings time_zone', `${settings.timeZone}, if the row had UTC`);
+  }
 
   // ---- secrets: what the Worker gets
   const generated = {};

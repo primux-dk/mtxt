@@ -127,6 +127,17 @@ test('an admin saves the product and company name and sees them in the shell', a
   await page.reload();
   await expect(page.locator('#productName')).toHaveValue(PRODUCT);
 
+  // The time zone is on General too, under Interface language (packet 15); then back to UTC.
+  await expect(page.locator('#timeZone')).toHaveValue('UTC');
+  await page.getByLabel('Install time zone').selectOption('Europe/Copenhagen');
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#timeZone')).toHaveValue('Europe/Copenhagen');
+  await page.getByLabel('Install time zone').selectOption('UTC');
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
+
   // Keyterms are on the Transcription tab, saved by its own form.
   await tab(page, 'Transcription').click();
   await page.getByLabel('Keyterms').fill('Primux\nlinje 2,2\nugeplan');
@@ -656,7 +667,13 @@ test('each tab form works from the keyboard alone (rule 11)', async ({ page }) =
     return seen;
   };
   const general = await walk('/settings/general', 'productName');
-  for (const id of ['companyName', 'themeAccent', 'themePrimary', 'interfaceLanguage']) {
+  for (const id of [
+    'companyName',
+    'themeAccent',
+    'themePrimary',
+    'interfaceLanguage',
+    'timeZone',
+  ]) {
     expect(general, id).toContain(id);
   }
   // The preview row is inert: none of its samples take focus.

@@ -86,6 +86,11 @@ export function loadInstall(path) {
   if (settings.interfaceLanguage && !['en', 'da'].includes(settings.interfaceLanguage)) {
     fail('settings.interfaceLanguage is en or da.');
   }
+  if (settings.timeZone !== undefined && !knownTimeZone(settings.timeZone)) {
+    fail(
+      `settings.timeZone is an IANA time zone such as Europe/Copenhagen: "${settings.timeZone}"`,
+    );
+  }
   if (settings.identityProvider && !['entra', 'google'].includes(settings.identityProvider)) {
     fail('settings.identityProvider is entra or google.');
   }
@@ -106,6 +111,17 @@ export function loadInstall(path) {
     secretsFile: expand(config.secretsFile ?? `~/.config/mtxt/${installId}.env`),
     generatedConfig: join(web, `wrangler.${installId}.jsonc`),
   };
+}
+
+/** Whether `zone` is a time zone name Node knows, the same check the settings page makes. */
+export function knownTimeZone(zone) {
+  if (typeof zone !== 'string' || !zone || zone.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** wrangler.jsonc to JSON: drops comments and trailing commas, leaves strings alone. */
