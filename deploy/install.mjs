@@ -360,27 +360,38 @@ function pendingMigrations() {
 
 const git = (args) => run('git', args, { cwd: root, allowFail: true }).out.trim();
 
+/**
+ * What the Worker is built from: the git trees of apps/web and packages, the
+ * lockfile and the generated config. A commit that touches only docs or deploy/
+ * keeps the tag, so a run after it deploys nothing.
+ */
 function desiredTag(configText) {
-  const commit = git(['rev-parse', 'HEAD']).slice(0, 12) || 'nogit';
-  const dirty = git(['status', '--porcelain', '--', 'apps/web', 'packages']) !== '';
-  const cfgHash = createHash('sha256').update(configText).digest('hex').slice(0, 8);
-  return { tag: `${commit}-${cfgHash}`, dirty, commit };
+  const commit = git(['rev-parse', '--short=12', 'HEAD']) || 'nogit';
+  const inputs = git(['rev-parse', 'HEAD:apps/web', 'HEAD:packages', 'HEAD:pnpm-lock.yaml']);
+  const dirty =
+    git(['status', '--porcelain', '--', 'apps/web', 'packages', 'pnpm-lock.yaml']) !== '';
+  const code = createHash('sha256').update(inputs).digest('hex').slice(0, 12);
+  const cfg = createHash('sha256').update(configText).digest('hex').slice(0, 8);
+  return { tag: `${code}-${cfg}`, dirty, commit };
 }
 
+/**
+ * The tag of the code that is live: the newest deployment that was not only a
+ * secret change (a secret put makes a version of its own, with the same code).
+ * Its message is `mtxt-<tag>-at-<commit>`; a rollback or a dashboard deploy has none.
+ */
 function deployedTag() {
   const list = wrangler(['deployments', 'list', '--name', names.worker, '--json'], {
     allowFail: true,
   });
   if (!list.ok) return null;
   const deployments = JSON.parse(list.out.slice(list.out.indexOf('[')));
-  const latest = deployments.at(-1);
-  const versionId = latest?.versions?.[0]?.version_id;
-  if (!versionId) return null;
-  const view = wrangler(['versions', 'view', versionId, '--name', names.worker, '--json'], {
-    allowFail: true,
-  });
-  if (!view.ok) return null;
-  return JSON.parse(view.out.slice(view.out.indexOf('{'))).annotations?.['workers/tag'] ?? null;
+  const code = deployments
+    .filter((d) => d.annotations?.['workers/triggered_by'] !== 'secret')
+    .sort((a, b) => a.created_on.localeCompare(b.created_on))
+    .at(-1);
+  const message = code?.annotations?.['workers/message'] ?? '';
+  return message.match(/^mtxt-([0-9a-f]{12}-[0-9a-f]{8})-at-/)?.[1] ?? null;
 }
 
 // ---------------------------------------------------------------- status
@@ -633,7 +644,8 @@ async function main() {
       run('pnpm', ['check:no-fakes'], { show: false });
       row('Build', 'done; no fake providers in the bundle');
     }
-    const deployTag = dirty ? `${commit.slice(0, 12)}-dirty` : tag;
+    // A build from uncommitted files never matches a later run's tag.
+    const deployTag = dirty ? `${tag.slice(0, 12)}-dirty000` : tag;
     run(
       join(web, 'node_modules/.bin/opennextjs-cloudflare'),
       // OpenNext runs wrangler through a shell: a path relative to apps/web and no spaces.
@@ -645,11 +657,11 @@ async function main() {
         '--tag',
         deployTag,
         '--message',
-        `mtxt-${deployTag}`,
+        `mtxt-${deployTag}-at-${commit}`,
       ],
       { show: false },
     );
-    row(names.worker, `deployed (tag ${deployTag})`);
+    row(names.worker, `deployed (tag ${deployTag}, commit ${commit})`);
   }
 
   // ---- secrets, now that the Worker exists
