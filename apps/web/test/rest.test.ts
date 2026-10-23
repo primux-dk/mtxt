@@ -12,6 +12,7 @@ import {
   encodeCursor,
   etagFor,
   etagMatches,
+  parseIsoTime,
   parseListParams,
   parseSearchParams,
   queryFingerprint,
@@ -142,6 +143,24 @@ describe('query parameters', () => {
     expect(parseListParams(new URLSearchParams('since=2026-10-01'))).toMatchObject({
       since: new Date('2026-10-01T00:00:00Z'),
     });
+    // Calendar fields are checked, not rolled over into the next month.
+    for (const bad of [
+      '2026-02-31',
+      '2026-02-30T00:00:00Z',
+      '2026-02-29',
+      '2026-13-01',
+      '2026-10-01T24:00:00Z',
+      '2026-10-01T10:60Z',
+      '2026-10-01T10:00:61Z',
+      '2026-10-01T10:00:00+24:00',
+    ]) {
+      expect(error(`since=${encodeURIComponent(bad)}`), bad).toMatch(/^since is an ISO 8601 time/);
+    }
+    expect(parseIsoTime('2028-02-29')).toEqual(new Date('2028-02-29T00:00:00Z'));
+    expect(parseIsoTime('2026-10-01T10:30+02:00')).toEqual(new Date('2026-10-01T08:30:00Z'));
+    expect(parseIsoTime('2026-10-01T10:30:15.123456Z')).toEqual(
+      new Date('2026-10-01T10:30:15.123Z'),
+    );
     expect('error' in parseSearchParams(new URLSearchParams('q='))).toBe(true);
   });
 });

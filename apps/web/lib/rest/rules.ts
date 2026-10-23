@@ -173,8 +173,30 @@ export interface ListParams {
   fingerprint: string;
 }
 
-/** An ISO 8601 date-time with a zone (RFC 3339), or a bare date taken as UTC midnight. */
-const ISO_TIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2}))?$/;
+const ISO_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|([+-])(\d{2}):(\d{2})))?$/;
+
+/**
+ * An ISO 8601 date-time with a zone (RFC 3339, seconds optional), or a bare
+ * date taken as UTC midnight; null for anything else. Every field is
+ * checked against the calendar before the time is made, since Date would
+ * roll 2026-02-31 over into March.
+ */
+export function parseIsoTime(raw: string): Date | null {
+  const m = ISO_TIME.exec(raw);
+  if (!m) return null;
+  const [, y, mo, d, h = '0', mi = '0', sec = '0', frac = '', , sign, oh = '0', om = '0'] = m;
+  const year = Number(y);
+  const month = Number(mo);
+  const day = Number(d);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth) return null;
+  if (Number(h) > 23 || Number(mi) > 59 || Number(sec) > 59) return null;
+  if (Number(oh) > 23 || Number(om) > 59) return null;
+  const offset = (sign === '-' ? -1 : 1) * (Number(oh) * 60 + Number(om));
+  const ms = Number(frac.padEnd(3, '0').slice(0, 3));
+  return new Date(Date.UTC(year, month - 1, day, Number(h), Number(mi) - offset, Number(sec), ms));
+}
 
 /**
  * `GET /meetings`'s query, strictly: an unknown parameter or value is an
@@ -196,9 +218,8 @@ export function parseListParams(search: URLSearchParams): ListParams | { error: 
   const rawSince = search.get('since');
   let since: Date | undefined;
   if (rawSince !== null) {
-    since = new Date(rawSince);
-    if (!ISO_TIME.test(rawSince) || Number.isNaN(since.getTime()))
-      return { error: 'since is an ISO 8601 time, for example 2026-10-01T00:00:00Z.' };
+    since = parseIsoTime(rawSince) ?? undefined;
+    if (!since) return { error: 'since is an ISO 8601 time, for example 2026-10-01T00:00:00Z.' };
   }
   const limit = parseLimit(search.get('limit'));
   if (limit === null) return { error: `limit is a whole number from 1 to ${MAX_LIMIT}.` };

@@ -237,6 +237,12 @@ test("the list holds what the token's user may read: other people's private meet
   const bad = await request.get('/api/v1/meetings?page=2', { headers: bearer(readToken) });
   expect(bad.status()).toBe(400);
   expect((await bad.json()).error.message).toBe('Unknown parameter "page".');
+  for (const since of ['2026-02-31', '2026-02-30T00:00:00Z']) {
+    const day = await request.get(`/api/v1/meetings?since=${since}`, {
+      headers: bearer(readToken),
+    });
+    expect(day.status(), since).toBe(400);
+  }
 });
 
 test('a meeting, its transcript and its recap in every format; ETag and 304; search', async ({
