@@ -431,6 +431,24 @@
     "title": "Indstillinger",
     "subheading": "Virksomhedens opsætning. Kun for administratorer.",
     "adminBadge": "Administrator",
+    "tabs": {
+      "label": "Indstillingssektioner",
+      "general": "Generelt",
+      "login": "Login",
+      "transcription": "Transskription",
+      "recap": "Referat",
+      "sharing": "Deling og opbevaring",
+      "webhooks": "Webhooks",
+      "audit": "Revisionslog",
+      "unsaved": "Du har ændringer, der ikke er gemt.",
+      "unsavedLabel": "ændringer, der ikke er gemt",
+      "discard": {
+        "title": "Kassér ændringer, der ikke er gemt?",
+        "body": "Ændringerne under {tab} er ikke gemt. Åbner du {next}, kasseres de.",
+        "keep": "Fortsæt redigering",
+        "confirm": "Kassér ændringer"
+      }
+    },
     "productName": {
       "heading": "Produktnavn",
       "help": "Navnet på loginsiden, i optageren og i menulinjen.",
@@ -512,14 +530,15 @@
       "importFailed": "{file} kunne ikke importeres. {reason}"
     },
     "defaults": {
-      "heading": "Standarder",
       "help": "Brugerne kan selv slå live transskription til.",
       "liveDefault": "Live transskription som standard",
       "liveDefaultHelp": "Fra. Den lokale tekst er kun en forhåndsvisning.",
       "visibility": "Synlighed for nye møder",
       "visibilityShared": "Delt med valgte kolleger",
       "visibilityCompany": "Hele virksomheden",
-      "visibilityHelp": "Kun mødeejeren kan ændre synligheden."
+      "visibilityHelp": "Kun mødeejeren kan ændre synligheden.",
+      "liveHeading": "Live transskription",
+      "visibilityHeading": "Standardsynlighed"
     },
     "sources": {
       "heading": "Optagekilder",
@@ -583,7 +602,6 @@
       "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen."
     },
     "footer": "Ændringer gælder for denne installation.",
-    "save": "Gem indstillinger",
     "companyName": {
       "heading": "Virksomhedsnavn",
       "help": "Under produktnavnet i sidepanelet og nederst på loginsiden.",
@@ -744,7 +762,7 @@
         "done": "Færdig"
       },
       "logPage": {
-        "back": "Tilbage til indstillinger",
+        "back": "Tilbage til webhooks",
         "title": "Leveringslog · {name}",
         "subheading": "De seneste 50 leveringer til dette endpoint. En levering får seks forsøg, derefter parkeres den. Kun titler og svar, aldrig indhold.",
         "url": "URL",
@@ -910,11 +928,6 @@
   "audit": {
     "title": "Revisionslog",
     "subheading": "Hvem der åbnede, delte, ændrede eller slettede hvilket møde. Kun titler og ejere, aldrig indhold.",
-    "nav": {
-      "label": "Administration",
-      "settings": "Indstillinger",
-      "audit": "Revisionslog"
-    },
     "filters": {
       "label": "Filtrer efter handling",
       "all": "Alle",

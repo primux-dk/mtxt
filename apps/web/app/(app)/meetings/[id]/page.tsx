@@ -231,7 +231,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
           )}
           {user.isAdmin ? (
             <Button asChild variant="quiet">
-              <Link href="/settings#stt">{tt('state.failed.switchProvider')}</Link>
+              <Link href="/settings/transcription">{tt('state.failed.switchProvider')}</Link>
             </Button>
           ) : (
             <p className="basis-full text-xs text-muted-foreground">
