@@ -39,6 +39,7 @@ export async function GET(request: Request, { params }: Params) {
             { db, installId, storage },
             meeting,
             format === 'markdown' ? 'md' : 'docx',
+            { etagBasis: true },
           );
     if (!response) throw new HttpError(404, 'not_found', 'This meeting has no recap yet.');
     served(() =>
