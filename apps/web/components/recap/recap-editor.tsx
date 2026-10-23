@@ -41,7 +41,7 @@ import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/r
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
 import { Extension, type Range } from '@tiptap/core';
 import Suggestion from '@tiptap/suggestion';
-import { PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import { cn } from 'cn';
 import { searchMentions, type MentionOption } from '@/app/(app)/meetings/recap-actions';
@@ -54,11 +54,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { recapExtensions, recapMention } from '@/lib/recap/extensions';
+import { allowedImage, recapExtensions, recapMention } from '@/lib/recap/extensions';
 import { draftsFor, deleteDraft, type LocalDraft } from '@/lib/recap/local-draft';
 import { parseMarkdown, toMarkdown } from '@/lib/recap/markdown';
 import type { VersionView } from '@/lib/recap/view';
-import { FLUSH_SAVE, viewOverrides, ViewContext } from './node-views';
+import { FLUSH_SAVE, ROLLBACK, viewOverrides, ViewContext, type Tick } from './node-views';
 import { useAutosave, type SaveState } from './save-state';
 import { createMenu, SuggestionMenu, type MenuItem } from './suggestion-menu';
 
@@ -132,6 +132,7 @@ export function VersionLine({
                     time: when(save.conflict.createdAt),
                   })
                 : t('status.changedElsewhere')}
+              {save.tickUndone && <span>· {t('status.tickUndone')}</span>}
               <span aria-hidden="true">·</span>
               <button
                 type="button"
@@ -159,6 +160,9 @@ export function VersionLine({
                   {' '}
                   · {t(`status.problem.${save.problem}`)}
                 </span>
+              )}
+              {save.tickUndone && (
+                <span className="text-muted-foreground"> · {t('status.tickUndone')}</span>
               )}
             </span>
           )}
@@ -282,6 +286,8 @@ export function RecapEditor(props: RecapEditorProps) {
     () => (editorRef.current ? toMarkdown(editorRef.current.state.doc) : props.bodyMd),
     [props.bodyMd],
   );
+  /** Decision ticks not yet confirmed by the server, by their place among the decisions. */
+  const pendingTicks = useRef<{ ordinal: number; checked: boolean }[]>([]);
   const {
     state: save,
     changed,
@@ -293,7 +299,37 @@ export function RecapEditor(props: RecapEditorProps) {
     initial: props.current,
     initialMd: props.bodyMd,
     read,
-    onSaved: props.onVersion,
+    onSaved: (version) => {
+      pendingTicks.current = [];
+      props.onVersion?.(version);
+    },
+    onNormalized: (bodyMd) => {
+      editorRef.current?.commands.setContent(parseMarkdown(bodyMd).toJSON(), { emitUpdate: false });
+    },
+    // A refused save undoes its ticks and keeps every other change (rule 2).
+    onRefused: () => {
+      const e = editorRef.current;
+      const ticks = pendingTicks.current;
+      pendingTicks.current = [];
+      if (!e || !ticks.length) return false;
+      const items: { pos: number; checked: boolean }[] = [];
+      e.state.doc.descendants((n, pos) => {
+        if (n.type.name === 'decisionItem') items.push({ pos, checked: Boolean(n.attrs.checked) });
+        return n.type.name !== 'decisionItem';
+      });
+      const tr = e.state.tr;
+      let undone = false;
+      for (const tick of [...ticks].reverse()) {
+        const item = items[tick.ordinal];
+        if (!item || item.checked !== tick.checked) continue;
+        const node = tr.doc.nodeAt(item.pos)!;
+        tr.setNodeMarkup(item.pos, undefined, { ...node.attrs, checked: !tick.checked });
+        item.checked = !tick.checked;
+        undone = true;
+      }
+      if (undone) e.view.dispatch(tr.setMeta(ROLLBACK, true).setMeta('addToHistory', false));
+      return undone;
+    },
   });
 
   const blockMenu = useMemo(() => createMenu<BlockItem>(`recap-blocks-${recapId}`), [recapId]);
@@ -474,8 +510,45 @@ export function RecapEditor(props: RecapEditorProps) {
       },
       render: mentionMenu.render as never,
     });
+    // An image is this meeting's own or becomes its alt text, however it arrives: paste, drop, insert.
+    const ownImages = Extension.create({
+      name: 'ownImages',
+      addProseMirrorPlugins() {
+        return [
+          new Plugin({
+            key: new PluginKey('ownImages'),
+            appendTransaction(transactions, _old, state) {
+              if (!transactions.some((tr) => tr.docChanged)) return null;
+              const foreign: { pos: number; size: number; alt: string }[] = [];
+              state.doc.descendants((node, pos) => {
+                if (node.type.name === 'image' && !allowedImage(node.attrs.src, meetingId)) {
+                  foreign.push({
+                    pos,
+                    size: node.nodeSize,
+                    alt: String(node.attrs.alt ?? '').trim(),
+                  });
+                }
+                return true;
+              });
+              if (!foreign.length) return null;
+              const tr = state.tr;
+              for (const image of foreign.reverse()) {
+                const text = image.alt ? state.schema.text(image.alt) : null;
+                tr.replaceWith(
+                  image.pos,
+                  image.pos + image.size,
+                  state.schema.nodes.paragraph!.create(null, text),
+                );
+              }
+              return tr;
+            },
+          }),
+        ];
+      },
+    });
     return [
       ...recapExtensions({ overrides: { ...viewOverrides, mention } }),
+      ownImages,
       Placeholder.configure({ placeholder: t('placeholder'), showOnlyWhenEditable: true }),
       slash,
     ];
@@ -496,7 +569,19 @@ export function RecapEditor(props: RecapEditorProps) {
           ...(owner ? {} : { 'aria-readonly': 'true' }),
         },
       },
-      onUpdate: ({ transaction }) => changed(Boolean(transaction.getMeta(FLUSH_SAVE))),
+      onUpdate: ({ transaction, editor: e }) => {
+        if (transaction.getMeta(ROLLBACK)) return changed(false, true);
+        const tick = transaction.getMeta(FLUSH_SAVE) as Tick | undefined;
+        if (tick) {
+          let ordinal = 0;
+          e.state.doc.descendants((n, pos) => {
+            if (n.type.name === 'decisionItem' && pos < tick.pos) ordinal++;
+            return n.type.name !== 'decisionItem';
+          });
+          pendingTicks.current.push({ ordinal, checked: tick.checked });
+        }
+        changed(Boolean(tick));
+      },
     },
     [extensions],
   );

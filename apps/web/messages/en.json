@@ -318,7 +318,8 @@
         "offline": "no network, kept in this browser",
         "too_long": "too long to save",
         "refused": "the server refused the save"
-      }
+      },
+      "tickUndone": "the tick was undone"
     },
     "toolbar": {
       "label": "Recap formatting",

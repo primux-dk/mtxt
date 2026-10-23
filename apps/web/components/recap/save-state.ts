@@ -26,6 +26,8 @@ export type SaveProblem = 'offline' | 'too_long' | 'refused' | null;
 export interface SaveState {
   status: SaveStatus;
   problem: SaveProblem;
+  /** A refused save undid a decision tick (rule 2). */
+  tickUndone: boolean;
   /** The newer version that refused the save. */
   conflict: VersionView | null;
   current: VersionView | null;
@@ -41,11 +43,19 @@ export function useAutosave(options: {
   read: () => string;
   /** A new version landed (the version line, the decisions). */
   onSaved?: (version: VersionView) => void;
+  /**
+   * The server refused a save (a conflict or a 4xx): the editor rolls back
+   * the decision ticks in it and says whether there were any (rule 2).
+   */
+  onRefused?: () => boolean;
+  /** The server stored other text than it was sent (a foreign image or mention removed): show that. */
+  onNormalized?: (bodyMd: string) => void;
 }) {
   const { meetingId, recapId } = options;
   const [state, setState] = useState<SaveState>({
     status: 'saved',
     problem: null,
+    tickUndone: false,
     conflict: null,
     current: options.initial,
   });
@@ -59,6 +69,25 @@ export function useAutosave(options: {
   read.current = options.read;
   const onSaved = useRef(options.onSaved);
   onSaved.current = options.onSaved;
+  const onRefused = useRef(options.onRefused);
+  onRefused.current = options.onRefused;
+  const onNormalized = useRef(options.onNormalized);
+  onNormalized.current = options.onNormalized;
+
+  /** Keeps the editor's text in IndexedDB, or removes the copy once it equals what the server has. */
+  const keepLocal = useCallback(
+    (body: string) => {
+      if (body === confirmed.current) void deleteDraft(recapId, base.current).catch(() => {});
+      else
+        void putDraft({
+          recapId,
+          baseVersionId: base.current,
+          bodyMd: body,
+          savedAt: Date.now(),
+        }).catch(() => {});
+    },
+    [recapId],
+  );
 
   const set = (patch: Partial<SaveState>) => setState((s) => ({ ...s, ...patch }));
 
@@ -94,13 +123,20 @@ export function useAutosave(options: {
     }
     inFlight.current = false;
     if (response?.ok) {
-      const { version } = (await response.json()) as { version: VersionView };
+      const { version, body_md: stored } = (await response.json()) as {
+        version: VersionView;
+        body_md?: string;
+      };
       base.current = version.id;
-      confirmed.current = body;
+      confirmed.current = stored ?? body;
       void deleteDraft(recapId, sentOn).catch(() => {});
       onSaved.current?.(version);
+      // Screen and store agree: the stored text replaces the sent one, unless more was typed meanwhile.
+      if (stored !== undefined && stored !== body && read.current() === body) {
+        onNormalized.current?.(stored);
+      }
       const now = read.current();
-      if (now !== body) {
+      if (now !== confirmed.current) {
         // Typed during the save: keep it under the new base, and save it too.
         void putDraft({
           recapId,
@@ -108,49 +144,54 @@ export function useAutosave(options: {
           bodyMd: now,
           savedAt: Date.now(),
         }).catch(() => {});
-        set({ current: version, status: 'saving', problem: null });
+        set({ current: version, status: 'saving', problem: null, tickUndone: false });
         timer.current = setTimeout(() => void save(), again.current ? 0 : AUTOSAVE_MS);
-      } else set({ current: version, status: 'saved', problem: null });
+      } else set({ current: version, status: 'saved', problem: null, tickUndone: false });
       again.current = false;
       return;
     }
     if (response?.status === 409) {
       const { current } = (await response.json().catch(() => ({}))) as { current?: VersionView };
+      // Network saves stop; the text typed from here on is still kept in this browser.
       stopped.current = true;
-      set({ status: 'conflict', conflict: current ?? null });
+      const undone = onRefused.current?.() ?? false;
+      set({ status: 'conflict', conflict: current ?? null, tickUndone: undone });
       return;
     }
     const problem: SaveProblem =
       response === null ? 'offline' : response.status === 413 ? 'too_long' : 'refused';
-    set({ status: 'unsaved', problem });
+    // A refusal (not the network, not the server's own failure) undoes the ticks it carried.
+    const refused = response !== null && response.status < 500;
+    const undone = refused ? (onRefused.current?.() ?? false) : false;
+    set({ status: 'unsaved', problem, tickUndone: undone });
     // A network error or the server's own failure: try again; a refusal waits for the next change.
     if (problem === 'offline' || (response && response.status >= 500)) {
       timer.current = setTimeout(() => void save(), RETRY_MS);
     }
   }, [meetingId, recapId]);
 
-  /** The editor changed: keep it locally, and save after a pause (`now` for a tick). */
+  /**
+   * The editor changed: keep it locally, and save after a pause (`now` for a
+   * tick). `localOnly` keeps it without a save (a rollback). After "Changed
+   * elsewhere" nothing goes to the server, but the text is still kept.
+   */
   const changed = useCallback(
-    (now = false) => {
-      if (stopped.current) return;
+    (now = false, localOnly = false) => {
       const body = read.current();
+      keepLocal(body);
+      if (stopped.current || localOnly) return;
       if (body === confirmed.current) {
+        // Back to what the server has (an undo): no copy to keep, nothing to save.
         if (!inFlight.current) set({ status: 'saved', problem: null });
         clearTimeout(timer.current);
         return;
       }
-      void putDraft({
-        recapId,
-        baseVersionId: base.current,
-        bodyMd: body,
-        savedAt: Date.now(),
-      }).catch(() => {});
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       set(offline ? { status: 'unsaved', problem: 'offline' } : { status: 'saving' });
       clearTimeout(timer.current);
       timer.current = setTimeout(() => void save(), now ? 0 : AUTOSAVE_MS);
     },
-    [recapId, save],
+    [keepLocal, save],
   );
 
   /** A version made elsewhere in this window (Restore): the editor now holds it. */
@@ -160,7 +201,7 @@ export function useAutosave(options: {
       base.current = version.id;
       confirmed.current = bodyMd;
       stopped.current = false;
-      set({ current: version, status: 'saved', problem: null, conflict: null });
+      set({ current: version, status: 'saved', problem: null, conflict: null, tickUndone: false });
     },
     [recapId],
   );
@@ -185,6 +226,7 @@ export function useAutosave(options: {
     window.addEventListener('online', online);
     window.addEventListener('offline', offline);
     // Leaving with text the server does not have: the browser asks first.
+    // After "Changed elsewhere" the text is kept in this browser and Reload offers it: no question.
     const leave = (e: BeforeUnloadEvent) => {
       if (read.current() !== confirmed.current && !stopped.current) e.preventDefault();
     };

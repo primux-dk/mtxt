@@ -31,8 +31,16 @@ export const ViewContext = createContext<RecapViewContext>({
   owners: [],
 });
 
-/** The `flushSave` meta on a transaction saves at once instead of after the pause. */
+/** The `flushSave` meta on a transaction saves at once instead of after the pause; it carries the tick. */
 export const FLUSH_SAVE = 'flushSave';
+/** A transaction that undoes refused ticks: kept locally, not saved (rule 2). */
+export const ROLLBACK = 'recapRollback';
+
+export interface Tick {
+  /** The decision item's position in the document when it was ticked. */
+  pos: number;
+  checked: boolean;
+}
 
 function DecisionView({ node, editor, getPos, updateAttributes }: NodeViewProps) {
   const t = useTranslations('recap');
@@ -62,7 +70,7 @@ function DecisionView({ node, editor, getPos, updateAttributes }: NodeViewProps)
           editor.view.dispatch(
             editor.state.tr
               .setNodeMarkup(pos, undefined, { ...node.attrs, checked: e.target.checked })
-              .setMeta(FLUSH_SAVE, true),
+              .setMeta(FLUSH_SAVE, { pos, checked: e.target.checked } satisfies Tick),
           );
         }}
       />
