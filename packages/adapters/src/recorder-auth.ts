@@ -49,6 +49,25 @@ export const hashRecorderToken = async (token: string) => hex(await digest(token
 /** RFC 7636 S256: base64url SHA-256 of the verifier. */
 export const s256 = async (verifier: string) => base64Url(await digest(verifier));
 
+/** Crockford's base32 alphabet: no I, L, O or U, so a code read aloud or retyped stays unambiguous. */
+export const PAIRING_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/**
+ * The pairing code the connect page and the recorder both show, so the user
+ * can see that the page belongs to the recorder in front of them. Derived
+ * from the challenge alone, so it needs no server state: SHA-256 of the
+ * challenge's ASCII bytes, the first 30 bits (the first 4 bytes as a
+ * big-endian integer, shifted right by 2), six 5-bit groups from the most
+ * significant, each mapped through PAIRING_ALPHABET, shown as `XXX-XXX`.
+ */
+export async function pairingCode(challenge: string): Promise<string> {
+  const bytes = await digest(challenge);
+  const bits = (((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 2) >>> 0;
+  let code = '';
+  for (let shift = 25; shift >= 0; shift -= 5) code += PAIRING_ALPHABET[(bits >>> shift) & 31];
+  return `${code.slice(0, 3)}-${code.slice(3)}`;
+}
+
 /** Compares two strings in time that depends only on their length. */
 export function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;

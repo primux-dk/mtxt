@@ -813,6 +813,8 @@
     "pageTitle": "Forbind en optager · {product}",
     "title": "Forbind {device} med {product}?",
     "signedInAs": "Logget ind som",
+    "pairing": "Parringskode <code>{code}</code>. Den skal passe med koden, din optager viser.",
+    "warning": "Godkend kun en forbindelse, du lige har startet i din egen optager. Hvis ikke, så tryk Annuller.",
     "body": "Optageren uploader de møder, du optager, til dit bibliotek, i dit navn. Du kan altid afbryde forbindelsen under Optagere i menuen.",
     "approve": "Godkend",
     "approving": "Godkender…",

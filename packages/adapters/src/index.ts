@@ -148,6 +148,8 @@ export {
   LAST_USED_EVERY_MS,
   MAX_PENDING_GRANTS,
   newRecorderToken,
+  PAIRING_ALPHABET,
+  pairingCode,
   POLL_ADVICE_S,
   POLL_INTERVAL_MS,
   pollAllowed,

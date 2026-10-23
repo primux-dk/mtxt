@@ -813,6 +813,8 @@
     "pageTitle": "Connect a recorder · {product}",
     "title": "Connect {device} to {product}?",
     "signedInAs": "Signed in as",
+    "pairing": "Pairing code <code>{code}</code>. It must match the code your recorder shows.",
+    "warning": "Only approve a connection you just started in your own recorder. If you did not, press Cancel.",
     "body": "The recorder uploads the meetings you record to your library, as you. You can disconnect it at any time under Recorders in the menu.",
     "approve": "Approve",
     "approving": "Approving…",

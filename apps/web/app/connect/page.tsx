@@ -1,7 +1,7 @@
 import { CircleCheck, CircleX, Clock, TriangleAlert, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { findGrant } from '@mtxt/adapters';
+import { findGrant, pairingCode } from '@mtxt/adapters';
 import { ConnectForm } from '@/components/connect/connect-form';
 import { Avatar } from '@/components/ui/avatar';
 import { requireUser } from '@/lib/auth/session';
@@ -50,6 +50,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Sear
     state = connectState(await findGrant(db, installId, params.challenge), user.id);
   }
   const device = params?.deviceName ?? '';
+  const code = params && state === 'ask' ? await pairingCode(params.challenge) : '';
   const product = settings.productName;
 
   return (
@@ -73,7 +74,24 @@ export default async function ConnectPage({ searchParams }: { searchParams: Sear
                 </div>
               </div>
             </div>
-            <p className="mt-6 mb-8 text-sm text-muted-foreground">{t('body')}</p>
+            <p className="mt-6 text-sm" data-testid="pairing-code">
+              {t.rich('pairing', {
+                code: () => (
+                  <code className="rounded-control border border-accent-line-strong bg-accent-tint px-1.5 py-0.5 font-mono text-base font-[650] tracking-[0.08em] whitespace-nowrap text-accent-foreground">
+                    {code}
+                  </code>
+                ),
+              })}
+            </p>
+            <p className="mt-3 flex gap-2 text-sm font-[550]">
+              <TriangleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-destructive"
+                strokeWidth={1.5}
+              />
+              <span>{t('warning')}</span>
+            </p>
+            <p className="mt-3 mb-8 text-sm text-muted-foreground">{t('body')}</p>
             <ConnectForm challenge={params.challenge} deviceName={params.deviceName} />
           </>
         ) : (
