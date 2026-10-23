@@ -553,11 +553,18 @@ test('the data-flow panel names the chosen provider and the saved retention', as
 
   // Retention is set on its own tab; the panel shows what is saved.
   await page.goto('/settings/sharing');
+  const saved = await page.locator('#retentionAudioDays').inputValue();
   await page.locator('#retentionAudioDays').fill('14');
   await save(page).click();
   await expect(page.getByText('Settings saved.')).toBeVisible();
   await page.goto('/settings/transcription');
   await expect(panel).toContainText('Audio is deleted after 14 days.');
+
+  // Put it back: the retention spec counts on the install's own value.
+  await page.goto('/settings/sharing');
+  await page.locator('#retentionAudioDays').fill(saved);
+  await save(page).click();
+  await expect(page.getByText('Settings saved.')).toBeVisible();
 });
 
 test('a sign-in request cannot replace the client id', async ({ page }) => {
