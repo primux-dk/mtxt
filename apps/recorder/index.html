@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>mtxt Recorder</title>
+<link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v5m-5 0h10"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-network" viewBox="0 0 24 24"><path d="m2 8 3 3m3 3 4 4m-7-7a12 12 0 0 1 14 0M2 7a17 17 0 0 1 20 0M9 15a5 5 0 0 1 6 0M3 3l18 18"/></symbol>
+<symbol id="i-warning" viewBox="0 0 24 24"><path d="m12 3 10 18H2zM12 9v5m0 3v.1"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+<symbol id="i-hide" viewBox="0 0 24 24"><path d="M3 12h18"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+<symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></symbol>
+</svg>
+<main class="recorder" id="app">
+
+<section id="setup" class="setup" hidden aria-labelledby="setup-heading">
+  <h1 class="recorder-brand" data-product>mtxt Recorder</h1>
+  <h2 id="setup-heading" data-i18n="recorder.connect.heading">Connect to your company's library</h2>
+  <form id="host-form" class="setup" style="padding:0" novalidate>
+    <label class="field">
+      <span data-i18n="recorder.connect.host.label">Your company's address</span>
+      <input id="host" type="text" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" aria-describedby="host-help host-error" placeholder="meetings.yourcompany.com">
+      <small id="host-help" data-i18n="recorder.connect.host.help"></small>
+      <small id="host-error" class="error-text" role="alert" hidden></small>
+    </label>
+    <p id="connect-error" class="error-text" role="alert" hidden></p>
+    <button class="btn primary" type="submit" id="connect" data-i18n="recorder.connect.continue">Connect</button>
+  </form>
+</section>
+
+<section id="connecting" class="setup" hidden aria-labelledby="connecting-heading">
+  <h1 class="recorder-brand" data-product>mtxt Recorder</h1>
+  <h2 id="connecting-heading" data-i18n="recorder.connect.heading">Connect to your company's library</h2>
+  <p id="connect-instructions"></p>
+  <div class="pairing">
+    <span class="label" id="code-label" data-i18n="recorder.connect.code">Pairing code</span>
+    <output id="pairing-code" aria-labelledby="code-label"></output>
+  </div>
+  <p class="waiting" role="status"><span class="dot" aria-hidden="true"></span><span data-i18n="recorder.connect.waiting">Waiting for approval</span></p>
+  <div class="row">
+    <button class="btn" type="button" id="reopen" data-i18n="recorder.connect.reopen">Open the browser again</button>
+    <button class="btn quiet" type="button" id="cancel-connect" data-i18n="recorder.connect.cancel">Cancel</button>
+  </div>
+</section>
+
+<section id="ready" hidden>
+  <div class="recorder-body">
+    <h1 class="recorder-brand" data-product></h1>
+    <div id="banners"></div>
+    <label class="field">
+      <span data-i18n="recorder.meetingTitle">Meeting title</span>
+      <input id="title" type="text" maxlength="500" autocomplete="off">
+    </label>
+    <div class="record-area">
+      <button class="record-button" type="button" id="record" data-state="idle"><span aria-hidden="true"></span></button>
+      <div>
+        <div class="record-clock" id="clock">00:00:00</div>
+        <small id="record-state" role="status"></small>
+      </div>
+    </div>
+    <div class="meters">
+      <div class="meter-row"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg><span data-i18n="recorder.mic">Microphone</span><meter id="mic-level" min="0" max="1" value="0" data-i18n-attr="aria-label:recorder.mic.level"></meter></div>
+      <div class="meter-row"><svg class="icon" aria-hidden="true"><use href="#i-monitor"></use></svg><span data-i18n="recorder.system">System audio</span><meter id="sys-level" min="0" max="1" value="0" data-i18n-attr="aria-label:recorder.system.level"></meter></div>
+    </div>
+    <div id="permissions" class="permissions" hidden></div>
+    <div class="row between live-setting">
+      <span id="live-label" data-i18n="recorder.live">Live transcript</span>
+      <span class="row">
+        <button type="button" class="text-btn" id="show-live" hidden data-i18n="live.show"></button>
+        <button type="button" class="toggle" id="live-toggle" aria-pressed="false" aria-labelledby="live-label" aria-describedby="live-help"></button>
+      </span>
+    </div>
+    <small id="live-help" hidden data-i18n="recorder.live.help"></small>
+    <div class="queue">
+      <div class="queue-heading">
+        <span id="queue-heading" data-i18n="recorder.queue.heading">Recent recordings</span>
+        <span id="queue-count"></span>
+      </div>
+      <ul id="queue-list" aria-labelledby="queue-heading"></ul>
+      <p id="queue-empty" class="queue-empty" hidden data-i18n="recorder.queue.empty"></p>
+    </div>
+  </div>
+  <footer class="recorder-footer">
+    <div class="row between">
+      <span class="row" style="min-width:0"><span class="avatar" id="avatar" aria-hidden="true"></span><span class="user-name" id="user-name"></span></span>
+      <span class="accent-fg" id="connected-mark"><svg class="icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-check"></use></svg></span>
+    </div>
+    <div class="row between" style="margin-top:6px">
+      <select id="model" data-i18n-attr="aria-label:recorder.model.label"></select>
+      <span class="muted" data-i18n="recorder.model.label">Local model</span>
+    </div>
+    <p class="progress" id="model-progress" role="status" hidden></p>
+  </footer>
+</section>
+
+<dialog id="ask-dialog" aria-labelledby="ask-title" aria-describedby="ask-body">
+  <h2 id="ask-title"></h2>
+  <p id="ask-body" data-i18n="recorder.ask.body"></p>
+  <p id="ask-error" class="error-text" role="alert" hidden></p>
+  <div class="actions">
+    <button class="btn primary" type="button" id="ask-keep" data-i18n="recorder.ask.keep"></button>
+    <button class="btn" type="button" id="ask-save" data-i18n="recorder.ask.save"></button>
+  </div>
+</dialog>
+
+<dialog id="disconnect-dialog" aria-labelledby="disconnect-title" aria-describedby="disconnect-body">
+  <h2 id="disconnect-title"></h2>
+  <p id="disconnect-body"></p>
+  <p id="disconnect-pending"></p>
+  <p id="disconnect-error" class="error-text" role="alert" hidden></p>
+  <div class="actions">
+    <button class="btn primary" type="button" id="disconnect-confirm" data-i18n="recorder.disconnect.confirm"></button>
+    <button class="btn" type="button" id="disconnect-local" hidden data-i18n="recorder.disconnect.local"></button>
+    <button class="btn quiet" type="button" id="disconnect-cancel" data-i18n="common.cancel"></button>
+  </div>
+</dialog>
+
+<dialog id="model-dialog" aria-labelledby="model-title" aria-describedby="model-body">
+  <h2 id="model-title"></h2>
+  <p id="model-body"></p>
+  <div class="actions">
+    <button class="btn primary" type="button" id="model-confirm" data-i18n="recorder.model.confirm"></button>
+    <button class="btn quiet" type="button" id="model-cancel" data-i18n="common.cancel"></button>
+  </div>
+</dialog>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

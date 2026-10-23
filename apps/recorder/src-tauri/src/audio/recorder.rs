@@ -84,11 +84,20 @@ pub enum StartError {
     File(#[from] std::io::Error),
 }
 
-pub fn start(path: &Path, live: Arc<LiveFeed>) -> Result<Recording, StartError> {
+/// Which sources to open. A source macOS has not allowed is left closed: a
+/// Core Audio tap without the permission blocks on the prompt and then
+/// delivers silence.
+#[derive(Debug, Clone, Copy)]
+pub struct Wanted {
+    pub microphone: bool,
+    pub system_audio: bool,
+}
+
+pub fn start(path: &Path, live: Arc<LiveFeed>, wanted: Wanted) -> Result<Recording, StartError> {
     let (mic_tx, mic_rx) = rtrb::RingBuffer::<f32>::new(RING_SAMPLES);
     let (sys_tx, sys_rx) = rtrb::RingBuffer::<f32>::new(RING_SAMPLES);
-    let mic = capture::microphone(mic_tx);
-    let system = capture::system_audio(sys_tx);
+    let mic = if wanted.microphone { capture::microphone(mic_tx) } else { Err(CaptureError::PermissionDenied) };
+    let system = if wanted.system_audio { capture::system_audio(sys_tx) } else { Err(CaptureError::PermissionDenied) };
     let sources = SourceStatus {
         microphone: mic.as_ref().map(|_| ()).map_err(Clone::clone),
         system_audio: system.as_ref().map(|_| ()).map_err(Clone::clone),

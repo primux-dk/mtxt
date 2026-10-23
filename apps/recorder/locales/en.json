@@ -94,6 +94,7 @@
   "live.pause": "Pause live text",
   "live.resume": "Resume live text",
   "live.hide": "Hide live text",
+  "live.show": "Show live text",
   "live.foot": "Local preview · Recording continues when you hide the text.",
   "live.loading": "Loading the local model",
   "live.listening": "Listening",

@@ -94,6 +94,7 @@
   "live.pause": "Sæt teksten på pause",
   "live.resume": "Genoptag teksten",
   "live.hide": "Skjul teksten",
+  "live.show": "Vis teksten",
   "live.foot": "Lokal forhåndsvisning · Optagelsen fortsætter, når du skjuler teksten.",
   "live.loading": "Indlæser den lokale model",
   "live.listening": "Lytter",

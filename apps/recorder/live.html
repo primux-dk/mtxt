@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Live</title>
+<link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v5m-5 0h10"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5h16v-5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-network" viewBox="0 0 24 24"><path d="m2 8 3 3m3 3 4 4m-7-7a12 12 0 0 1 14 0M2 7a17 17 0 0 1 20 0M9 15a5 5 0 0 1 6 0M3 3l18 18"/></symbol>
+<symbol id="i-warning" viewBox="0 0 24 24"><path d="m12 3 10 18H2zM12 9v5m0 3v.1"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+<symbol id="i-hide" viewBox="0 0 24 24"><path d="M3 12h18"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+<symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></symbol>
+</svg>
+<div class="live-window">
+  <div class="live-head" data-tauri-drag-region>
+    <span class="dot" aria-hidden="true" data-tauri-drag-region></span>
+    <strong data-i18n="live.label" data-tauri-drag-region>Live</strong>
+    <span class="muted product" id="product" data-tauri-drag-region></span>
+    <span class="grow" data-tauri-drag-region></span>
+    <button type="button" class="btn quiet" id="pause" data-i18n-attr="aria-label:live.pause,title:live.pause"><svg class="icon" aria-hidden="true"><use href="#i-pause"></use></svg></button>
+    <button type="button" class="btn quiet" id="hide" data-i18n-attr="aria-label:live.hide,title:live.hide"><svg class="icon" aria-hidden="true"><use href="#i-hide"></use></svg></button>
+  </div>
+  <div class="live-copy" id="copy" aria-live="polite">
+    <p class="prev" id="prev"></p>
+    <p class="current" id="current"></p>
+  </div>
+  <div class="live-foot" data-i18n="live.foot">Local preview · Recording continues when you hide the text.</div>
+</div>
+<script type="module" src="/src/live.ts"></script>
+</body>
+</html>

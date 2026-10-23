@@ -12,7 +12,7 @@ fn main() {
     let path = args.next().unwrap_or_else(|| "/tmp/mtxt-probe.ogg".into());
     let secs: u64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(5);
     println!("permissions: {:?}", mtxt_recorder::permissions::current());
-    let rec = recorder::start(std::path::Path::new(&path), Arc::new(recorder::LiveFeed::default())).expect("start");
+    let rec = recorder::start(std::path::Path::new(&path), Arc::new(recorder::LiveFeed::default()), recorder::Wanted { microphone: true, system_audio: true }).expect("start");
     println!("sources: {:?}", rec.sources);
     let mut peak = (0f32, 0f32);
     for _ in 0..secs * 10 {
