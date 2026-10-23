@@ -10,29 +10,31 @@ import {
 } from '@/app/(app)/recorders/actions';
 import { LocalTime } from '@/components/local-time';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 type ListState = { state: 'loading' | 'failed' } | { state: 'done'; recorders: RecorderRow[] };
 
 const DATE: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
 /**
- * "Recorders" in the user slot: the desktop recorders connected to the
+ * "Recorders" in the user menu: the desktop recorders connected to the
  * signed-in user, with Disconnect (docs/spec.md "Recorder connection"). The
  * list loads when the dialog opens. Disconnect is optimistic: the row goes at
  * once and comes back with a message if the server refuses (behaviour.md
- * rule 2). The Dialog traps focus and returns it to the opener (rule 11).
+ * rule 2). The Dialog traps focus; opened from a menu item that is gone on
+ * close, it returns focus to `returnFocusTo`, the menu's button (rule 11).
  */
-export function RecordersDialog() {
+export function RecordersDialog({
+  open,
+  onOpenChange,
+  returnFocusTo,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  returnFocusTo: React.RefObject<HTMLElement | null>;
+}) {
   const t = useTranslations('recorders');
   const common = useTranslations('common');
-  const [open, setOpen] = useState(false);
   const [list, setList] = useState<ListState>({ state: 'loading' });
   const [error, setError] = useState<string | null>(null);
   const asked = useRef(0);
@@ -90,19 +92,18 @@ export function RecordersDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="quiet" className="w-full justify-start px-2">
-          <Laptop aria-hidden="true" />
-          {t('open')}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         closeLabel={common('close')}
         className="max-w-[560px]"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           heading.current?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusTo.current) return;
+          event.preventDefault();
+          returnFocusTo.current.focus();
         }}
       >
         <div className="grid gap-2">
