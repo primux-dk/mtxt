@@ -81,6 +81,21 @@ describe('recap markdown', () => {
     expect(due(block('- [ ] Test \\~2026-10-30'))).toEqual([[null, 'Test ~2026-10-30']]);
     expect(due(block('- [ ] Test~2026-10-30'))).toEqual([[null, 'Test~2026-10-30']]);
     expect(normalizeMarkdown('- [ ] Test ~2026-10-30\n')).toBe('- [ ] Test \\~2026-10-30\n');
+    // Only the first physical line counts (packet 15 review): a soft-wrapped item keeps its date,
+    // a date on the continuation line is text, and with a hard break the date goes before the `\`.
+    const wrapped = block('- [ ] Test ~2026-10-30\n  mere');
+    expect(due(wrapped)).toEqual([['2026-10-30', 'Test mere']]);
+    expect(normalizeMarkdown(wrapped)).toBe(block('- [ ] Test mere ~2026-10-30'));
+    const continued = block('- [ ] Test\n  mere ~2026-10-30');
+    expect(due(continued)).toEqual([[null, 'Test mere ~2026-10-30']]);
+    expect(normalizeMarkdown(continued)).toBe(block('- [ ] Test mere \\~2026-10-30'));
+    const hard = block('- [ ] Test ~2026-10-30\\\n  mere');
+    expect(due(hard)).toEqual([['2026-10-30', 'Testmere']]);
+    expect(normalizeMarkdown(hard)).toBe(hard);
+    expect(normalizeMarkdown(block('- [ ] Test ~2026-10-30  \n  mere'))).toBe(hard);
+    const afterBreak = block('- [ ] Test\\\n  mere ~2026-10-30');
+    expect(due(afterBreak)).toEqual([[null, 'Testmere ~2026-10-30']]);
+    expect(normalizeMarkdown(afterBreak)).toBe(block('- [ ] Test\\\n  mere \\~2026-10-30'));
     // A tilde typed into the text is escaped, so it stays text after a save.
     const typed = block('- [ ] Test \\~2026-10-30');
     expect(normalizeMarkdown(typed)).toBe(typed);

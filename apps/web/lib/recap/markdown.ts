@@ -43,9 +43,11 @@ const ALERT = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*/i;
 const TASK = /^\[([ xX])\][ \t]+/;
 /**
  * A decision's due date: `~` and an ISO date, the last word of the item's
- * first line. In the raw source, so an escaped `\~2026-10-30` stays text.
+ * first physical line, before a hard break's `\` if it has one. Read on the
+ * raw source, so an escaped `\~2026-10-30` stays text, and a date on a
+ * continuation line is text too (packet 15 review).
  */
-const DUE = /(?:^|[ \t])~(\d{4}-\d{2}-\d{2})[ \t]*$/;
+const DUE = /(?:^|[ \t])~(\d{4}-\d{2}-\d{2})[ \t]*\\?[ \t]*$/;
 const DUE_TEXT = /[ \t]*~\d{4}-\d{2}-\d{2}[ \t]*$/;
 const DETAILS_OPEN = /^<details(?:\s+open)?\s*>\s*(?:<summary>([\s\S]*?)<\/summary>)?\s*$/i;
 const DETAILS_INLINE =
@@ -317,12 +319,17 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
 
 /** The due date that ends a decision's first line, taken out of its text; null when there is none. */
 function takeDue(inline: Token): string | null {
-  const due = dueDate(DUE.exec(inline.content)?.[1]);
-  const last = inline.children?.at(-1);
+  const [first, ...rest] = inline.content.split('\n');
+  const due = dueDate(DUE.exec(first!)?.[1]);
+  const children = inline.children ?? [];
+  // The first line's tokens end at the first soft or hard break.
+  const brk = children.findIndex((c) => c.type === 'softbreak' || c.type === 'hardbreak');
+  const at = (brk === -1 ? children.length : brk) - 1;
+  const last = children[at];
   if (!due || last?.type !== 'text' || !DUE_TEXT.test(last.content)) return null;
   last.content = last.content.replace(DUE_TEXT, '');
-  if (!last.content) inline.children!.pop();
-  inline.content = inline.content.replace(DUE, '');
+  if (!last.content) children.splice(at, 1);
+  inline.content = [first!.replace(/[ \t]*~\d{4}-\d{2}-\d{2}/, ''), ...rest].join('\n');
   return due;
 }
 
@@ -560,11 +567,19 @@ const nodes: Record<string, NodeSerializer> = {
     state.write(node.attrs.checked ? '[x] ' : '[ ] ');
     const due = dueDate(node.attrs.due);
     if (!due) return state.renderContent(node);
-    // The date ends the first line, after the text and the owner.
+    // The date ends the first physical line, after the text and the owner:
+    // before the first hard break's `\`, or at the end when there is none.
     node.forEach((child, _, i) => {
       if (i === 0 && child.type.name === 'paragraph') {
-        state.renderInline(child);
-        state.write(`${child.content.size ? ' ' : ''}~${due}`);
+        const line = serializer()
+          .serialize(recapSchema().node('doc', null, [child]), { tightLists: true })
+          .trimEnd();
+        const marker = `${line ? ' ' : ''}~${due}`;
+        const brk = line.indexOf('\\\n');
+        state.text(
+          brk === -1 ? line + marker : line.slice(0, brk) + marker + line.slice(brk),
+          false,
+        );
         state.closeBlock(child);
       } else state.render(child, node, i);
     });
