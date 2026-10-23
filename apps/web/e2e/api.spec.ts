@@ -501,7 +501,8 @@ test('every read and write through the API is in the audit log with via: api', a
     .filter((r) => r.action === 'exported')
     .map((r) => JSON.parse(r.details).format)
     .sort();
-  expect(formats).toEqual(['docx', 'json', 'md', 'text', 'transcript']);
+  // The Word file was served twice (the same bytes); its 304 wrote nothing.
+  expect(formats).toEqual(['docx', 'docx', 'json', 'md', 'text', 'transcript']);
   // Once per meeting and hour; the 304 wrote nothing.
   expect(api.filter((r) => r.action === 'opened').map((r) => r.meeting_id)).toEqual(['api-ida-1']);
   for (const r of api) expect(JSON.parse(r.details).token).toMatch(/^Alex /);
