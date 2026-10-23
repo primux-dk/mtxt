@@ -21,3 +21,7 @@ next-env.d.ts
 test-results/
 playwright-report/
 coverage/
+.claude/settings.local.json
+# deploy/install.mjs: one config per install, and the wrangler config it generates
+/deploy/installs/
+/apps/web/wrangler.*.jsonc
