@@ -5,6 +5,7 @@
 */
 import { open, type Settings, type SpeechModels } from '@mtxt/adapters';
 import { assemblyAi } from './assemblyai';
+import { rememberSecret } from './redact';
 import { SttError, type SttProvider, type SttProviderId } from './types';
 import { workersAiWhisper } from './workers-ai';
 
@@ -26,6 +27,8 @@ export interface ProviderDeps {
   publicUrl: string | undefined;
   /** The sealed webhook secret (settings.webhook_secret). */
   webhookSecret: () => Promise<string>;
+  /** http://localhost:<port> is a valid PUBLIC_URL only in the e2e build or local wrangler. */
+  allowLocalPublicUrl?: boolean;
   /** Test-only overrides; see lib/stt/test-hooks.ts. */
   assemblyAiBaseUrl?: string;
   fetch?: (input: string, init?: RequestInit) => Promise<Response>;
@@ -33,33 +36,63 @@ export interface ProviderDeps {
 
 export const WEBHOOK_PATH = '/api/v1/webhooks/assemblyai';
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+/**
+ * The webhook's address from PUBLIC_URL: an https origin with no
+ * credentials, path, query or fragment. http://localhost:<port> and
+ * http://127.0.0.1:<port> pass only when `allowLocal` (the e2e build or
+ * local wrangler). Anything else is a configuration error.
+ */
+export function webhookUrl(publicUrl: string | undefined, allowLocal = false): string {
+  const bad = () => new SttError('stt_config', 'config', false, undefined, 'PUBLIC_URL');
+  if (!publicUrl) throw bad();
+  let url: URL;
+  try {
+    url = new URL(publicUrl);
+  } catch {
+    throw bad();
+  }
+  const bare =
+    !url.username &&
+    !url.password &&
+    url.pathname === '/' &&
+    !url.search &&
+    !url.hash &&
+    !/[?#]/.test(publicUrl);
+  const https = url.protocol === 'https:';
+  const local = url.protocol === 'http:' && LOCAL_HOSTS.has(url.hostname) && url.port !== '';
+  if (!bare || !(https || (local && allowLocal))) throw bad();
+  return `${url.origin}${WEBHOOK_PATH}`;
+}
+
 export async function providerFor(
   settings: Pick<Settings, 'sttProvider' | 'sttApiKey' | 'aiGatewayId'>,
   deps: ProviderDeps,
 ): Promise<SttProvider> {
   const id = settings.sttProvider;
-  if (!id) throw new SttError('stt_no_provider', 'No speech-to-text provider is chosen.');
-  if (!isAvailable(id)) {
-    throw new SttError('stt_unavailable', `${id} is not available in this version.`);
-  }
+  if (!id) throw new SttError('stt_no_provider', 'config');
+  if (!isAvailable(id)) throw new SttError('stt_unavailable', 'config');
   if (id === 'workers-ai-whisper') {
     return workersAiWhisper({ speech: deps.speech, gatewayId: settings.aiGatewayId });
   }
   // assemblyai
-  if (!settings.sttApiKey) throw new SttError('stt_auth', 'No AssemblyAI API key is stored.');
-  if (!deps.settingsKey) throw new SttError('stt_config', 'SETTINGS_KEY is not set.');
-  if (!deps.publicUrl) throw new SttError('stt_config', 'PUBLIC_URL is not set.');
+  if (!settings.sttApiKey) throw new SttError('stt_auth', 'unauthorised');
+  if (!deps.settingsKey) throw new SttError('stt_config', 'config');
+  const url = webhookUrl(deps.publicUrl, deps.allowLocalPublicUrl);
   let apiKey: string;
   let secret: string;
   try {
     apiKey = await open(settings.sttApiKey, 'settings.stt_api_key', deps.settingsKey);
     secret = await open(await deps.webhookSecret(), 'settings.webhook_secret', deps.settingsKey);
   } catch {
-    throw new SttError('stt_config', 'A stored secret could not be opened with SETTINGS_KEY.');
+    throw new SttError('stt_config', 'config');
   }
+  rememberSecret(apiKey);
+  rememberSecret(secret);
   return assemblyAi({
     apiKey,
-    webhook: { url: new URL(WEBHOOK_PATH, deps.publicUrl).toString(), secret },
+    webhook: { url, secret },
     ...(deps.assemblyAiBaseUrl ? { baseUrl: deps.assemblyAiBaseUrl } : {}),
     ...(deps.fetch ? { fetch: deps.fetch } : {}),
   });

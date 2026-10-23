@@ -159,28 +159,37 @@ export function mapAssemblyAi(json: AaiTranscript, requestedLanguage: string): S
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** An HTTP failure as an SttError: auth and bad requests fail now, the rest retry. */
-async function failure(response: Response, what: string): Promise<SttError> {
-  let detail = '';
-  try {
-    const body = (await response.json()) as { error?: unknown };
-    if (typeof body.error === 'string') detail = body.error;
-  } catch {
-    // Not JSON: the status says enough.
+/** Deadlines per call (docs/decisions.md, packet 4 review). */
+export const ASSEMBLYAI_TIMEOUTS = { uploadMs: 10 * 60_000, requestMs: 60_000 };
+
+/** An HTTP failure as a fixed reason. The body is not read: it may echo the request. */
+export function failure(status: number, call: string): SttError {
+  if (status === 401 || status === 403)
+    return new SttError('stt_auth', 'unauthorised', false, status, call);
+  if (status === 429) return new SttError('stt_failed', 'rate_limited', true, status, call);
+  if (status >= 500) return new SttError('stt_failed', 'provider_error', true, status, call);
+  if ([400, 413, 415, 422].includes(status)) {
+    return new SttError('stt_failed', 'bad_audio', false, status, call);
   }
-  const message = `${what}: HTTP ${response.status}${detail ? `, ${detail}` : ''}`;
-  if (response.status === 401 || response.status === 403) return new SttError('stt_auth', message);
-  if (response.status === 429 || response.status >= 500)
-    return new SttError('stt_failed', message, true);
-  return new SttError('stt_failed', message);
+  return new SttError('stt_failed', 'provider_error', false, status, call);
 }
 
-/** A network error before any answer is worth another try. */
-async function call(fetchFn: FetchFn, url: string, init: RequestInit, what: string) {
+/** AssemblyAI's `error` text on a failed transcript, reduced to a reason and never kept. */
+export const reasonForError = (text: string | null | undefined) =>
+  /audio|file|decod|duration|short|corrupt|format|codec|silence/i.test(text ?? '')
+    ? ('bad_audio' as const)
+    : ('provider_error' as const);
+
+/** One call under a deadline. A network error or the deadline is worth another try. */
+async function call(fetchFn: FetchFn, url: string, init: RequestInit, what: string, ms: number) {
   try {
-    return await fetchFn(url, init);
+    return await fetchFn(url, { ...init, signal: AbortSignal.timeout(ms) });
   } catch (error) {
-    throw new SttError('stt_failed', `${what}: ${(error as Error).message}`, true);
+    const name = (error as Error)?.name;
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      throw new SttError('stt_failed', 'timeout', true, undefined, what);
+    }
+    throw new SttError('stt_failed', 'provider_error', true, undefined, what);
   }
 }
 
@@ -189,7 +198,9 @@ export function assemblyAi(options: {
   webhook: { url: string; secret: string };
   baseUrl?: string;
   fetch?: FetchFn;
+  timeouts?: Partial<typeof ASSEMBLYAI_TIMEOUTS>;
 }): SttProvider {
+  const timeouts = { ...ASSEMBLYAI_TIMEOUTS, ...options.timeouts };
   const base = (options.baseUrl ?? ASSEMBLYAI_EU).replace(/\/$/, '');
   const fetchFn: FetchFn = options.fetch ?? ((input, init) => fetch(input, init));
   const auth = { authorization: options.apiKey };
@@ -216,10 +227,13 @@ export function assemblyAi(options: {
           duplex: 'half',
         } as RequestInit,
         'AssemblyAI upload',
+        timeouts.uploadMs,
       );
-      if (!upload.ok) throw await failure(upload, 'AssemblyAI upload');
+      if (!upload.ok) throw failure(upload.status, 'AssemblyAI upload');
       const { upload_url: audioUrl } = (await upload.json()) as { upload_url?: string };
-      if (!audioUrl) throw new SttError('stt_failed', 'AssemblyAI upload: no upload_url', true);
+      if (!audioUrl) {
+        throw new SttError('stt_failed', 'provider_error', true, undefined, 'AssemblyAI upload');
+      }
 
       const created = await call(
         fetchFn,
@@ -230,10 +244,19 @@ export function assemblyAi(options: {
           body: JSON.stringify(transcriptRequest(job, audioUrl, options.webhook)),
         },
         'AssemblyAI transcript',
+        timeouts.requestMs,
       );
-      if (!created.ok) throw await failure(created, 'AssemblyAI transcript');
+      if (!created.ok) throw failure(created.status, 'AssemblyAI transcript');
       const body = (await created.json()) as AaiTranscript;
-      if (!body.id) throw new SttError('stt_failed', 'AssemblyAI transcript: no id', true);
+      if (!body.id) {
+        throw new SttError(
+          'stt_failed',
+          'provider_error',
+          true,
+          undefined,
+          'AssemblyAI transcript',
+        );
+      }
       languages.set(body.id, job.language);
       return { kind: 'pending', handle: body.id };
     },
@@ -243,15 +266,14 @@ export function assemblyAi(options: {
         `${base}/v2/transcript/${encodeURIComponent(handle)}`,
         { headers: auth },
         'AssemblyAI transcript',
+        timeouts.requestMs,
       );
-      if (!response.ok) throw await failure(response, 'AssemblyAI transcript');
+      if (!response.ok) throw failure(response.status, 'AssemblyAI transcript');
       const body = (await response.json()) as AaiTranscript;
       if (body.status === 'completed') {
         return { kind: 'done', result: mapAssemblyAi(body, languages.get(handle) ?? 'auto') };
       }
-      if (body.status === 'error') {
-        return { kind: 'failed', reason: body.error || 'AssemblyAI reported an error.' };
-      }
+      if (body.status === 'error') return { kind: 'failed', reason: reasonForError(body.error) };
       return { kind: 'pending', handle };
     },
   };

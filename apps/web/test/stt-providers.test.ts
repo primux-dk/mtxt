@@ -11,7 +11,7 @@ import {
 } from '../lib/stt/assemblyai';
 import fixture from '../lib/stt/fixtures/assemblyai-3-speakers.json';
 import whisper from '../lib/stt/fixtures/whisper.json';
-import { providerFor, SttError } from '../lib/stt';
+import { providerFor, SttError, webhookUrl } from '../lib/stt';
 import {
   mapWhisper,
   WHISPER_MAX_BYTES,
@@ -156,13 +156,80 @@ describe('AssemblyAI request', () => {
     await expect(provider(400).fetch!('x')).rejects.toMatchObject({ retryable: false });
   });
 
-  it('reports a provider error with its own words', async () => {
+  it('reduces a provider error to a fixed reason, never its own words', async () => {
+    const provider = (error: string) =>
+      assemblyAi({
+        apiKey: 'k',
+        webhook: { url: 'w', secret: 's' },
+        fetch: async () => Response.json({ id: 'x', status: 'error', error }),
+      });
+    expect(await provider('Audio is too short').fetch!('x')).toEqual({
+      kind: 'failed',
+      reason: 'bad_audio',
+    });
+    expect(await provider('Internal failure, key k-123').fetch!('x')).toEqual({
+      kind: 'failed',
+      reason: 'provider_error',
+    });
+  });
+
+  it('maps statuses to fixed reasons with the status, without the body', async () => {
+    const message = async (status: number) => {
+      const provider = assemblyAi({
+        apiKey: 'k',
+        webhook: { url: 'w', secret: 's' },
+        fetch: async () => Response.json({ error: 'secret-ish body' }, { status }),
+      });
+      return provider.fetch!('x').catch((e: SttError) => [e.message, e.stored, e.retryable]);
+    };
+    expect(await message(401)).toEqual([
+      'AssemblyAI transcript: unauthorised (HTTP 401)',
+      'unauthorised:401',
+      false,
+    ]);
+    expect(await message(429)).toEqual([
+      'AssemblyAI transcript: rate_limited (HTTP 429)',
+      'rate_limited:429',
+      true,
+    ]);
+    expect(await message(422)).toEqual([
+      'AssemblyAI transcript: bad_audio (HTTP 422)',
+      'bad_audio:422',
+      false,
+    ]);
+    expect(await message(502)).toEqual([
+      'AssemblyAI transcript: provider_error (HTTP 502)',
+      'provider_error:502',
+      true,
+    ]);
+  });
+
+  it('runs every call under a deadline; past it, a retryable timeout', async () => {
+    const hang = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason));
+      });
     const provider = assemblyAi({
       apiKey: 'k',
       webhook: { url: 'w', secret: 's' },
-      fetch: async () => Response.json({ id: 'x', status: 'error', error: 'Audio is too short' }),
+      fetch: hang,
+      timeouts: { uploadMs: 20, requestMs: 20 },
     });
-    expect(await provider.fetch!('x')).toEqual({ kind: 'failed', reason: 'Audio is too short' });
+    await expect(provider.fetch!('x')).rejects.toMatchObject({
+      reason: 'timeout',
+      retryable: true,
+    });
+    await expect(
+      provider.submit({
+        recordingId: 'r',
+        contentType: 'audio/webm',
+        sizeBytes: 1,
+        durationS: 1,
+        language: 'da',
+        keyterms: [],
+        audio: async () => new Response('a').body!,
+      }),
+    ).rejects.toMatchObject({ reason: 'timeout', retryable: true, call: 'AssemblyAI upload' });
   });
 });
 
@@ -234,10 +301,68 @@ describe('Workers AI Whisper', () => {
     });
   });
 
+  it('gives a Whisper call that does not return a retryable timeout', async () => {
+    const provider = workersAiWhisper({
+      speech: { whisperModel: 'm', whisper: () => new Promise(() => {}) },
+      timeoutMs: 20,
+    });
+    await expect(
+      provider.submit({
+        recordingId: 'r',
+        contentType: 'audio/webm',
+        sizeBytes: 3,
+        durationS: 1,
+        language: 'da',
+        keyterms: [],
+        audio: async () => new Response('abc').body!,
+      }),
+    ).rejects.toMatchObject({ reason: 'timeout', retryable: true });
+  });
+
   it('cuts the prompt at a whole term', () => {
     const prompt = whisperPrompt(Array.from({ length: 200 }, (_, i) => `term${i}`))!;
     expect(prompt.length).toBeLessThanOrEqual(600);
     expect(prompt.endsWith(',')).toBe(false);
+  });
+});
+
+describe('PUBLIC_URL', () => {
+  it('takes a bare https origin', () => {
+    expect(webhookUrl('https://meetings.example.com')).toBe(
+      'https://meetings.example.com/api/v1/webhooks/assemblyai',
+    );
+    expect(webhookUrl('https://meetings.example.com/')).toBe(
+      'https://meetings.example.com/api/v1/webhooks/assemblyai',
+    );
+  });
+
+  it('refuses http, credentials, a path, a query or a fragment', () => {
+    for (const bad of [
+      undefined,
+      '',
+      'meetings.example.com',
+      'http://meetings.example.com',
+      'https://user:pw@meetings.example.com',
+      'https://meetings.example.com/app',
+      'https://meetings.example.com/?x=1',
+      'https://meetings.example.com/#x',
+      'https://meetings.example.com?',
+      'ftp://meetings.example.com',
+    ]) {
+      expect(() => webhookUrl(bad), String(bad)).toThrow(SttError);
+    }
+  });
+
+  it('takes http://localhost or 127.0.0.1 with a port only in the e2e build or local wrangler', () => {
+    expect(() => webhookUrl('http://localhost:8788')).toThrow(SttError);
+    expect(webhookUrl('http://localhost:8788', true)).toBe(
+      'http://localhost:8788/api/v1/webhooks/assemblyai',
+    );
+    expect(webhookUrl('http://127.0.0.1:8787', true)).toBe(
+      'http://127.0.0.1:8787/api/v1/webhooks/assemblyai',
+    );
+    expect(() => webhookUrl('http://localhost', true)).toThrow(SttError);
+    expect(() => webhookUrl('http://example.com:8788', true)).toThrow(SttError);
   });
 });
 

@@ -14,6 +14,8 @@ import { SttError, type SttJob, type SttProvider, type SttResult } from './types
  * larger) inside a Worker's 128 MB, so 25 MiB leaves room.
  */
 export const WHISPER_MAX_BYTES = 25 * 1024 * 1024;
+/** The deadline on one Whisper call; the binding takes no signal, so the call races a timer. */
+export const WHISPER_TIMEOUT_MS = 5 * 60_000;
 /** Whisper's prompt is 224 tokens; keyterms past this length are left out. */
 const PROMPT_CHARS = 600;
 
@@ -79,7 +81,8 @@ async function readAll(stream: ReadableStream<Uint8Array>, limit: number): Promi
   let size = 0;
   for await (const part of stream as unknown as AsyncIterable<Uint8Array>) {
     size += part.byteLength;
-    if (size > limit) throw new SttError('stt_too_long', `The file is over ${limit} bytes.`);
+    if (size > limit)
+      throw new SttError('stt_too_long', 'too_long', false, undefined, 'Workers AI');
     parts.push(part);
   }
   const out = new Uint8Array(size);
@@ -91,9 +94,26 @@ async function readAll(stream: ReadableStream<Uint8Array>, limit: number): Promi
   return out;
 }
 
+/** A promise against a deadline: past it, a retryable timeout. */
+async function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new SttError('stt_failed', 'timeout', true, undefined, 'Workers AI')),
+      ms,
+    );
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function workersAiWhisper(options: {
   speech: SpeechModels;
   gatewayId?: string | null;
+  timeoutMs?: number;
 }): SttProvider {
   const model = options.speech.whisperModel;
   return {
@@ -109,27 +129,30 @@ export function workersAiWhisper(options: {
     }),
     async submit(job: SttJob) {
       if (job.sizeBytes > WHISPER_MAX_BYTES) {
-        throw new SttError(
-          'stt_too_long',
-          `The recording is ${job.sizeBytes} bytes; Workers AI Whisper takes at most ${WHISPER_MAX_BYTES}.`,
-        );
+        throw new SttError('stt_too_long', 'too_long', false, undefined, 'Workers AI');
       }
       const audio = await readAll(await job.audio(), WHISPER_MAX_BYTES);
       let output: WhisperOutput;
       try {
-        output = await options.speech.whisper({
-          audio,
-          ...(job.language !== 'auto' ? { language: job.language } : {}),
-          initialPrompt: whisperPrompt(job.keyterms),
-          gatewayId: options.gatewayId ?? null,
-        });
+        output = await withDeadline(
+          options.speech.whisper({
+            audio,
+            ...(job.language !== 'auto' ? { language: job.language } : {}),
+            initialPrompt: whisperPrompt(job.keyterms),
+            gatewayId: options.gatewayId ?? null,
+          }),
+          options.timeoutMs ?? WHISPER_TIMEOUT_MS,
+        );
       } catch (error) {
-        // Workers AI's errors carry no key; a capacity error is worth another try.
-        const message = `Workers AI: ${(error as Error).message}`;
+        if (error instanceof SttError) throw error;
+        // Workers AI's own text is not kept; a capacity or 5xx error is worth another try.
+        const text = String((error as Error)?.message ?? '');
         throw new SttError(
           'stt_failed',
-          message,
-          /capacity|timeout|unavailable|5\d\d/i.test(message),
+          'provider_error',
+          /capacity|timeout|unavailable|5\d\d/i.test(text),
+          undefined,
+          'Workers AI',
         );
       }
       return { kind: 'done', result: mapWhisper(output, job.language, model) } as const;

@@ -59,7 +59,7 @@ export interface SttJob {
 }
 
 export type Submitted = { kind: 'done'; result: SttResult } | { kind: 'pending'; handle: string };
-export type Fetched = Submitted | { kind: 'failed'; reason: string };
+export type Fetched = Submitted | { kind: 'failed'; reason: SttReason };
 
 export interface SttDescription {
   id: SttProviderId;
@@ -96,21 +96,53 @@ export const STT_FAILURES = [
 export type SttFailure = (typeof STT_FAILURES)[number];
 
 /**
+ * What went wrong, from a fixed set. A provider's own words never reach a
+ * log line or a row: they may echo the request, key and all. The page says
+ * each kind in the reader's language (transcript.reason.*).
+ */
+export const STT_REASONS = [
+  'unauthorised',
+  'rate_limited',
+  'bad_audio',
+  'provider_error',
+  'timeout',
+  'too_long',
+  'missing_audio',
+  'config',
+  'internal',
+] as const;
+export type SttReason = (typeof STT_REASONS)[number];
+
+/**
  * A provider error. `retryable` ones (network, rate limits, the provider's
- * own 5xx) go back to the queue; the rest fail the recording at once.
- * `message` is the provider's own words, shown under the localised line;
- * it never holds a key.
+ * own 5xx, a deadline) go back to the queue; the rest fail the recording at
+ * once. The message is built from the fixed reason and the HTTP status only.
  */
 export class SttError extends Error {
   constructor(
     readonly code: SttFailure,
-    message: string,
+    readonly reason: SttReason,
     readonly retryable = false,
+    readonly status?: number,
+    /** Which call failed, for the log: "AssemblyAI upload". */
+    readonly call = 'Speech-to-text',
   ) {
-    super(message);
+    super(`${call}: ${reason}${status ? ` (HTTP ${status})` : ''}`);
     this.name = 'SttError';
+  }
+
+  /** What `recordings.failure_reason` stores: the reason and the status, nothing else. */
+  get stored(): string {
+    return this.status ? `${this.reason}:${this.status}` : this.reason;
   }
 }
 
 export const isSttFailure = (code: string | null | undefined): code is SttFailure =>
   (STT_FAILURES as readonly string[]).includes(code ?? '');
+
+/** A stored `failure_reason`, read back: the reason kind and the HTTP status, if any. */
+export function parseReason(stored: string | null | undefined) {
+  const [kind, status] = (stored ?? '').split(':');
+  if (!(STT_REASONS as readonly string[]).includes(kind ?? '')) return null;
+  return { reason: kind as SttReason, status: status && /^\d{3}$/.test(status) ? status : null };
+}
