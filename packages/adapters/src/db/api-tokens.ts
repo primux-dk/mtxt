@@ -1,10 +1,5 @@
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import {
-  API_RATE_LIMIT,
-  API_RATE_WINDOW_MS,
-  MAX_API_TOKENS,
-  rateAllowed,
-} from '../recorder-auth';
+import { API_RATE_LIMIT, API_RATE_WINDOW_MS, MAX_API_TOKENS, rateAllowed } from '../recorder-auth';
 import type { Db } from './index';
 import { auditEvents, recorderTokens, users, type ApiTokenScope } from './schema';
 
@@ -131,8 +126,7 @@ export async function listApiTokens(
 }
 
 export type RateResult =
-  | { ok: true; remaining: number }
-  | { ok: false; retryAfter: number; remaining: 0 };
+  { ok: true; remaining: number } | { ok: false; retryAfter: number; remaining: 0 };
 
 /**
  * Counts one request against the token's minute (docs/spec.md "API": 60 a

@@ -116,9 +116,9 @@ describe('API tokens', () => {
     expect(await revokeRecorderToken(db, INSTALL, { userId: 'mette', tokenId: id })).toBe(
       'not_found',
     );
-    expect(
-      await revokeToken(db, INSTALL, { userId: 'mette', tokenId: 'rec', kind: 'api' }),
-    ).toBe('not_found');
+    expect(await revokeToken(db, INSTALL, { userId: 'mette', tokenId: 'rec', kind: 'api' })).toBe(
+      'not_found',
+    );
     // Another user's token is not found either.
     expect(await revokeToken(db, INSTALL, { userId: 'anne', tokenId: id, kind: 'api' })).toBe(
       'not_found',
@@ -192,7 +192,11 @@ describe('the API rate limit', () => {
   });
 
   it('rateAllowed is the same rule, pure', () => {
-    expect(rateAllowed({ at: null, count: 0 }, T)).toEqual({ ok: true, fresh: true, remaining: 59 });
+    expect(rateAllowed({ at: null, count: 0 }, T)).toEqual({
+      ok: true,
+      fresh: true,
+      remaining: 59,
+    });
     expect(rateAllowed({ at: T, count: 59 }, T + 1)).toEqual({
       ok: true,
       fresh: false,

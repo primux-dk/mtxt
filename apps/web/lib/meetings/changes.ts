@@ -21,7 +21,12 @@ export function cleanTitle(title: unknown): string | null {
 }
 
 /** Renames the meeting and its search row. */
-export async function renameMeetingRows(db: Db, installId: string, meetingId: string, title: string) {
+export async function renameMeetingRows(
+  db: Db,
+  installId: string,
+  meetingId: string,
+  title: string,
+) {
   const clean = cleanTitle(title);
   if (!clean) throw new HttpError(400, 'invalid_request', 'Title is 1 to 500 characters.');
   await db
