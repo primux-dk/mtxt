@@ -2,7 +2,7 @@
 
 import { Copy, Plus, Send, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
 import {
@@ -65,6 +65,13 @@ export function Webhooks({ initial }: { initial: EndpointRow[] }) {
   const listRef = useRef<HTMLUListElement>(null);
   const secretRef = useRef<HTMLInputElement>(null);
   const deletedRef = useRef(false);
+
+  // The secret takes focus once it is on the screen, so a keyboard user can copy it at once.
+  useEffect(() => {
+    if (!secret) return;
+    secretRef.current?.focus();
+    secretRef.current?.select();
+  }, [secret]);
 
   const full = endpoints.length >= MAX_ENDPOINTS;
   const nameOf = (e: { label: string | null }) => e.label || t('unnamed');
@@ -158,7 +165,6 @@ export function Webhooks({ initial }: { initial: EndpointRow[] }) {
       setEndpoints(result.endpoints);
       setSecret({ value: result.secret, name: draft.label.trim() || t('unnamed') });
       setNotice({ tone: 'status', text: t('added', { name: draft.label.trim() || t('unnamed') }) });
-      requestAnimationFrame(() => secretRef.current?.select());
     });
   };
 
