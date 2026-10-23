@@ -165,14 +165,26 @@ export function TranscriptView({
     return set;
   }, [near, playing, startIndex]);
 
-  // A `?t=` link opens with its segment in view.
+  // A `?t=` link opens with its segment in view. The blocks around it render after this, and
+  // the web font swaps in; both move it, so it stays centred while the list changes size, until
+  // the reader moves the page. Later seeks come from the reader.
   const listRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (startIndex < 0) return;
-    listRef.current
-      ?.querySelector(`[data-index="${startIndex}"]`)
-      ?.scrollIntoView({ block: 'center' });
-    // Only on the first render: later seeks come from the reader.
+    const list = listRef.current;
+    if (startIndex < 0 || !list) return;
+    const centre = () =>
+      list.querySelector(`[data-index="${startIndex}"]`)?.scrollIntoView({ block: 'center' });
+    centre();
+    const follow = new ResizeObserver(centre);
+    follow.observe(list);
+    const reader = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+    const stop = () => {
+      follow.disconnect();
+      for (const type of reader) window.removeEventListener(type, stop, true);
+    };
+    for (const type of reader)
+      window.addEventListener(type, stop, { capture: true, passive: true });
+    return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

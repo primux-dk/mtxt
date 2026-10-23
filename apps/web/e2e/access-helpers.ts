@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import { sha256, wav } from './helpers';
+import { sha256, wav, withLocalStore } from './helpers';
 
 /** A meeting with a 3-second WAV, made through the recorder API as the user whose cookie is in `headers`. */
 export async function meetingWithAudio(
@@ -39,25 +38,11 @@ export async function dropActions(page: Page) {
   );
 }
 
-/** Whether the e2e run's local R2 holds an object (wrangler's own local store, .wrangler/e2e). */
+/** Whether the e2e run's local R2 holds an object: a row in Miniflare's object index for the bucket. */
 export function r2Has(key: string): boolean {
-  try {
-    execFileSync(
-      'wrangler',
-      [
-        'r2',
-        'object',
-        'get',
-        `mtxt-audio/${key}`,
-        '--local',
-        '--persist-to',
-        '.wrangler/e2e',
-        '--pipe',
-      ],
-      { stdio: ['ignore', 'ignore', 'pipe'] },
-    );
-    return true;
-  } catch {
-    return false;
-  }
+  return withLocalStore(
+    'r2/miniflare-R2BucketObject',
+    'read',
+    (db) => db.prepare('select 1 from _mf_objects where key = ?').get(key) !== undefined,
+  );
 }

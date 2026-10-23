@@ -85,18 +85,20 @@ test('the nightly job deletes audio from storage and the rows, in batches, and t
   const [rec] = d1<{ storage_path: string }>(
     `select storage_path from recordings where id = '${old.recordingId}'`,
   );
-  expect(r2Has(rec!.storage_path)).toBe(true);
+  await expect.poll(() => r2Has(rec!.storage_path)).toBe(true);
   expect(
     (
       await request.get(`/api/v1/recordings/${old.recordingId}/audio`, { headers: colleague })
     ).status(),
   ).toBe(200);
   // 230 seeded meetings past both deadlines: three batches of at most 100.
-  expect(
-    d1(
-      `select count(*) as n from meetings where owner_id = 'dev-archivist' and deleted_at is null`,
-    ),
-  ).toEqual([{ n: 230 }]);
+  await expect
+    .poll(() =>
+      d1(
+        `select count(*) as n from meetings where owner_id = 'dev-archivist' and deleted_at is null`,
+      ),
+    )
+    .toEqual([{ n: 230 }]);
 
   // wrangler dev --test-scheduled: this runs the Cron Trigger, which queues the first batch.
   const cron = await request.get(`${baseURL}/__scheduled?cron=${encodeURIComponent('0 3 * * *')}`);
@@ -119,23 +121,25 @@ test('the nightly job deletes audio from storage and the rows, in batches, and t
       ),
     )
     .toEqual([{ storage_path: '', dated: 1 }]);
-  expect(
-    d1(`select deleted_at is not null as gone from meetings where id = '${old.meetingId}'`),
-  ).toEqual([{ gone: 1 }]);
-  expect(r2Has(rec!.storage_path)).toBe(false);
+  await expect
+    .poll(() =>
+      d1(`select deleted_at is not null as gone from meetings where id = '${old.meetingId}'`),
+    )
+    .toEqual([{ gone: 1 }]);
+  await expect.poll(() => r2Has(rec!.storage_path)).toBe(false);
   expect(
     (
       await request.get(`/api/v1/recordings/${old.recordingId}/audio`, { headers: colleague })
     ).status(),
   ).toBe(404);
   // Keep stopped it.
-  expect(d1(`select deleted_at from meetings where id = '${kept.meetingId}'`)).toEqual([
-    { deleted_at: null },
-  ]);
+  await expect
+    .poll(() => d1(`select deleted_at from meetings where id = '${kept.meetingId}'`))
+    .toEqual([{ deleted_at: null }]);
   const [keptRec] = d1<{ storage_path: string }>(
     `select storage_path from recordings where id = '${kept.recordingId}'`,
   );
-  expect(r2Has(keptRec!.storage_path)).toBe(true);
+  await expect.poll(() => r2Has(keptRec!.storage_path)).toBe(true);
 
   // Not silent: the owner's library shows the row, muted, with the date, until Remove.
   await page.goto('/meetings?q=Over%20et%20%C3%A5r');
@@ -151,14 +155,16 @@ test('the nightly job deletes audio from storage and the rows, in batches, and t
   await expect(dialog).toContainText('Retention has already deleted the audio');
   await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'No meetings match' })).toBeVisible();
-  expect(d1(`select count(*) as n from meetings where id = '${old.meetingId}'`)).toEqual([
-    { n: 0 },
-  ]);
-  expect(
-    d1(
-      `select count(*) as n from audit_events where action = 'deleted' and meeting_title = 'Over et år gammelt'`,
-    ),
-  ).toEqual([{ n: 1 }]);
+  await expect
+    .poll(() => d1(`select count(*) as n from meetings where id = '${old.meetingId}'`))
+    .toEqual([{ n: 0 }]);
+  await expect
+    .poll(() =>
+      d1(
+        `select count(*) as n from audit_events where action = 'deleted' and meeting_title = 'Over et år gammelt'`,
+      ),
+    )
+    .toEqual([{ n: 1 }]);
 });
 
 test('retention removes the recap images of a meeting with no recording, transcript or recap', async ({
@@ -184,7 +190,7 @@ test('retention removes the recap images of a meeting with no recording, transcr
   const [image] = d1<{ path: string }>(
     `select path from recap_images where meeting_id = 'e2e-empty-images'`,
   );
-  expect(r2Has(image!.path)).toBe(true);
+  await expect.poll(() => r2Has(image!.path)).toBe(true);
 
   const cron = await request.get(`${baseURL}/__scheduled?cron=${encodeURIComponent('0 3 * * *')}`);
   expect(cron.ok()).toBe(true);
@@ -197,8 +203,8 @@ test('retention removes the recap images of a meeting with no recording, transcr
       { timeout: 60_000, intervals: [1000] },
     )
     .toBe(1);
-  expect(r2Has(image!.path)).toBe(false);
-  expect(
-    d1(`select count(*) as n from recap_images where meeting_id = 'e2e-empty-images'`),
-  ).toEqual([{ n: 0 }]);
+  await expect.poll(() => r2Has(image!.path)).toBe(false);
+  await expect
+    .poll(() => d1(`select count(*) as n from recap_images where meeting_id = 'e2e-empty-images'`))
+    .toEqual([{ n: 0 }]);
 });

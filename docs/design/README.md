@@ -82,7 +82,7 @@ The derived defaults sit close to the site's own sage shades; the largest differ
 
 ## Locales
 
-The interface is written in English and translated; Danish is the first translation. [locales/en.json](locales/en.json) is the source and [locales/da.json](locales/da.json) the translation. They are the first real locale files of the product: `apps/web` is seeded from them, and `apps/recorder` gets its own set. Since v0.1 packet 1, `apps/web/messages/` is the source for the app's strings; the files here stay the mockups' copy and are not kept in step automatically.
+The interface is written in English and translated; Danish is the first translation. [locales/en.json](locales/en.json) is the source and [locales/da.json](locales/da.json) the translation. They are the first real locale files of the product: `apps/web` is seeded from them, and `apps/recorder` gets its own set. Since v0.1 packet 1, the app's own files in `apps/web/messages/` are authoritative for its strings; the files here stay the mockups' copy, have drifted from the app on purpose, and are not to be synced with it in either direction.
 
 - Keys are flat and namespaced by screen or component: `nav.myMeetings`, `library.search.placeholder`, `meeting.tabs.recap`, `settings.theme.accent`, `recorder.queue.pendingNetwork`. Shared words live under `common.*`, `visibility.*`, `status.*` and `format.*`.
 - Messages use ICU syntax. Arguments carry names and counts; plurals are `{count, plural, one {# meeting} other {# meetings}}`. Never concatenate strings.

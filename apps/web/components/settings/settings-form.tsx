@@ -804,8 +804,9 @@ export function SettingsForm({
           provider={stt || null}
           providerName={stt ? providerName(stt) : ''}
           recapName={recapName(recap)}
-          recapGateway={Boolean(gateway.trim())}
+          gateway={Boolean(gateway.trim())}
           supported={STT_AVAILABLE.map(providerName)}
+          available={Boolean(stt) && STT_AVAILABLE.includes(stt as SttProvider)}
           audioDays={Number(audioDays) || 0}
           textDays={Number(textDays) || 0}
         />

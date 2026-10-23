@@ -351,8 +351,18 @@ test('the data-flow panel names the chosen provider and the retention typed', as
   await page.locator('#sttProvider').selectOption('assemblyai');
   await expect(panel).toContainText('AssemblyAI (EU) receives audio and keyterms directly');
   await expect(page.locator('#sttApiKey')).toBeVisible();
+  await page.locator('#sttProvider').selectOption('workers-ai-whisper');
+  await page.locator('#aiGatewayId').fill('');
+  await expect(panel).toContainText(
+    'No AI Gateway ID is set, so audio and keyterms go to it directly. It returns text without speakers.',
+  );
+  await expect(panel).toContainText('so the requests go to Workers AI directly');
+  // With a gateway id typed, Workers AI and the recap model go through it.
+  await page.locator('#aiGatewayId').fill('mtxt-gateway');
+  await expect(panel).toContainText('Audio and keyterms go to it through AI Gateway.');
+  await expect(panel).toContainText('and the requests go through AI Gateway');
   await page.locator('#sttProvider').selectOption('local-parakeet');
-  await expect(panel).toContainText('Local Parakeet runs inside the installation');
+  await expect(panel).toContainText('Local Parakeet is not available in this version');
   await expect(page.locator('#sttApiKey')).toHaveCount(0);
   await page.locator('#retentionAudioDays').fill('14');
   await expect(panel).toContainText('Audio is deleted after 14 days.');

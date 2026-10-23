@@ -607,11 +607,16 @@ test('export: Markdown is the stored body, Word holds the recap; one audit row e
   expect(xml).toContain('w:val="Heading1"');
   expect(xml).toContain('Beslutninger');
   expect(xml).not.toContain('mtxt:');
-  const rows = d1<{ details: string }>(
-    `select details from audit_events where meeting_id = '${meetingId}' and action = 'exported' order by at`,
-  );
-  expect(rows.length - before).toBe(2);
-  expect(rows.slice(-2).map((r) => JSON.parse(r.details).format)).toEqual(['md', 'docx']);
+  const exported = () =>
+    d1<{ details: string }>(
+      `select details from audit_events where meeting_id = '${meetingId}' and action = 'exported' order by at`,
+    );
+  await expect.poll(() => exported().length - before).toBe(2);
+  expect(
+    exported()
+      .slice(-2)
+      .map((r) => JSON.parse(r.details).format),
+  ).toEqual(['md', 'docx']);
 });
 
 test('a reader gets the recap read-only, and may export it', async ({ browser }) => {

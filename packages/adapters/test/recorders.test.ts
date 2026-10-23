@@ -6,6 +6,7 @@ import {
   findRecorderUser,
   listRecorderTokens,
   pollGrant,
+  pruneRecorderRows,
   revokeRecorderToken,
 } from '../src/db/recorders';
 import {
@@ -22,6 +23,7 @@ import {
   RECORDER_TOKEN_PATTERN,
   s256,
   safeEqual,
+  TOKEN_KEEP_MS,
   TOKEN_LIFETIME_MS,
   verifierMatches,
 } from '../src/recorder-auth';
@@ -408,5 +410,59 @@ describe('Recorders list and Disconnect', () => {
     ).toEqual([{ user_id: 'mette', details: '{"device":"D0"}' }]);
     // Expired tokens leave the list.
     expect(await listRecorderTokens(db, INSTALL, 'mette', at(20 + TOKEN_LIFETIME_MS))).toEqual([]);
+  });
+});
+
+describe('the nightly job', () => {
+  it('deletes grants that expired over a day ago and tokens revoked or expired over 90 days ago', async () => {
+    const { db, sqlite } = setup();
+    const now = at(0).getTime();
+    const grant = (challenge: string, status: string, expiresAgo: number, install = INSTALL) =>
+      sqlite
+        .prepare(
+          "INSERT INTO recorder_grants (install_id, challenge, user_id, device_name, status, created_at, expires_at) VALUES (?, ?, 'mette', 'Mac', ?, ?, ?)",
+        )
+        .run(install, challenge, status, now - expiresAgo - GRANT_LIFETIME_MS, now - expiresAgo);
+    grant('old-approved', 'approved', DAY + 1);
+    grant('old-denied', 'denied', 2 * DAY);
+    grant('old-redeemed', 'redeemed', 30 * DAY);
+    grant('young-redeemed', 'redeemed', DAY - 1);
+    grant('pending', 'approved', -GRANT_LIFETIME_MS / 2);
+    grant('other-install', 'denied', 30 * DAY, 'other');
+    const token = (
+      id: string,
+      o: { expiresAgo?: number; revokedAgo?: number | null; install?: string },
+    ) =>
+      sqlite
+        .prepare(
+          "INSERT INTO recorder_tokens (id, install_id, user_id, device_name, token_hash, created_at, expires_at, revoked_at) VALUES (?, ?, 'mette', 'Mac', ?, ?, ?, ?)",
+        )
+        .run(
+          id,
+          o.install ?? INSTALL,
+          id.padEnd(64, '0'),
+          now - TOKEN_LIFETIME_MS,
+          now - (o.expiresAgo ?? -DAY),
+          o.revokedAgo == null ? null : now - o.revokedAgo,
+        );
+    token('working', {});
+    token('revoked-old', { revokedAgo: TOKEN_KEEP_MS + 1 });
+    token('revoked-young', { revokedAgo: TOKEN_KEEP_MS - DAY });
+    token('expired-old', { expiresAgo: TOKEN_KEEP_MS + 1 });
+    token('expired-young', { expiresAgo: 10 * DAY });
+    token('other-install', { revokedAgo: TOKEN_KEEP_MS + DAY, install: 'other' });
+
+    expect(await pruneRecorderRows(db, INSTALL, at(0))).toEqual({ grants: 3, tokens: 2 });
+    expect(
+      rows<{ challenge: string }>(
+        sqlite,
+        'select challenge from recorder_grants order by challenge',
+      ).map((r) => r.challenge),
+    ).toEqual(['other-install', 'pending', 'young-redeemed']);
+    expect(
+      rows<{ id: string }>(sqlite, 'select id from recorder_tokens order by id').map((r) => r.id),
+    ).toEqual(['expired-young', 'other-install', 'revoked-young', 'working']);
+    // A second run finds nothing more.
+    expect(await pruneRecorderRows(db, INSTALL, at(0))).toEqual({ grants: 0, tokens: 0 });
   });
 });

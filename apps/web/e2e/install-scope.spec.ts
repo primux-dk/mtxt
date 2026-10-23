@@ -93,18 +93,20 @@ test("delete and archive are refused, with nothing removed, when another install
   );
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   expect(foreign()).toBe(1);
-  expect(d1(`select id from recordings where id = 'demo-0000-r1'`)).toHaveLength(1);
-  expect(d1(`select id from meetings where id = 'demo-0000' and archived_at is null`)).toHaveLength(
-    1,
-  );
+  await expect
+    .poll(() => d1(`select id from recordings where id = 'demo-0000-r1'`))
+    .toHaveLength(1);
+  await expect
+    .poll(() => d1(`select id from meetings where id = 'demo-0000' and archived_at is null`))
+    .toHaveLength(1);
 
   await openMenu(page, 'Archive');
   await expect(
     page.getByText('Data from another installation depends on this meeting'),
   ).toBeVisible();
-  expect(d1(`select id from meetings where id = 'demo-0000' and archived_at is null`)).toHaveLength(
-    1,
-  );
+  await expect
+    .poll(() => d1(`select id from meetings where id = 'demo-0000' and archived_at is null`))
+    .toHaveLength(1);
 });
 
 test('delete removes every row under the meeting, table by table, and nothing of another install', async ({
@@ -132,10 +134,14 @@ test('delete removes every row under the meeting, table by table, and nothing of
     .click();
   await expect(page).toHaveURL(/\/meetings$/);
   expect(Object.values(d1(COUNTS)[0]!).every((n) => n === 0)).toBe(true);
-  expect(d1(`select id from meetings where id = 'foreign-meeting'`)).toHaveLength(1);
-  expect(d1(`select id from recordings where id = 'foreign-recording'`)).toHaveLength(1);
+  await expect
+    .poll(() => d1(`select id from meetings where id = 'foreign-meeting'`))
+    .toHaveLength(1);
+  await expect
+    .poll(() => d1(`select id from recordings where id = 'foreign-recording'`))
+    .toHaveLength(1);
   // The audit log outlives the meeting (packet 6): its row is detached and keeps the title.
-  expect(
-    d1(`select meeting_id, meeting_title from audit_events where id = 'demo-graph-a1'`),
-  ).toEqual([{ meeting_id: null, meeting_title: 'Møde med alt i' }]);
+  await expect
+    .poll(() => d1(`select meeting_id, meeting_title from audit_events where id = 'demo-graph-a1'`))
+    .toEqual([{ meeting_id: null, meeting_title: 'Møde med alt i' }]);
 });

@@ -1,6 +1,6 @@
 # mtxt Recorder
 
-The desktop recorder: microphone and system audio from a meeting, recorded to one file on the Mac, queued and uploaded to the company's own library. A local model can show a live transcript while the meeting runs; that text is a preview and never leaves the Mac. macOS 14.2 and later in this version; Windows comes in packet 10.
+The desktop recorder: microphone and system audio from a meeting, recorded to one file on the Mac, queued and uploaded to the company's own library. A local model can show a live transcript while the meeting runs; that text is a preview and never leaves the Mac. macOS 14.2 and later in this version; Windows comes later.
 
 The app calls itself by the install's product name ("Primux Møder") once it is connected. The bundle is "mtxt Recorder", bundle id `co.mtxt.recorder`; mtxt appears in About.
 

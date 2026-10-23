@@ -1,5 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   expect,
   request as playwrightRequest,
@@ -125,14 +127,61 @@ export async function signInHeaders(baseURL: string) {
 }
 
 /**
- * A read on the e2e run's local D1 (.wrangler/e2e, playwright.config.ts),
- * for checks the API rightly cannot make, such as rows of another install.
+ * The SQLite file behind one of Miniflare's local stores in the e2e run's
+ * state (.wrangler/e2e, playwright.config.ts): D1's database, or the R2
+ * bucket's object index. One store each in this install.
+ */
+function localStore(kind: 'd1/miniflare-D1DatabaseObject' | 'r2/miniflare-R2BucketObject') {
+  const dir = join('.wrangler/e2e/v3', kind);
+  const [file, ...more] = readdirSync(dir).filter((f) => /^[0-9a-f]{64}\.sqlite$/.test(f));
+  if (!file || more.length) throw new Error(`Expected one SQLite file in ${dir}`);
+  return join(dir, file);
+}
+
+/**
+ * Opens a local store's SQLite file beside the running Worker: read-only for
+ * an assertion, writable only for a fixture that changes rows. The Worker
+ * writes the file in WAL mode; a read or write that meets its lock waits for
+ * it (busy timeout, 10 s) instead of failing with SQLITE_BUSY. Opening the
+ * file costs milliseconds, where a `wrangler d1 execute` boots its own
+ * Miniflare for about 1.6 s and blocks the test's event loop meanwhile.
+ */
+export function withLocalStore<T>(
+  kind: Parameters<typeof localStore>[0],
+  mode: 'read' | 'write',
+  run: (db: DatabaseSync) => T,
+): T {
+  const db = new DatabaseSync(localStore(kind), {
+    readOnly: mode === 'read',
+    timeout: 10_000,
+  });
+  try {
+    return run(db);
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * A statement on the e2e run's local D1, for checks the API rightly cannot
+ * make, such as rows of another install. A single SELECT (or WITH ... SELECT)
+ * opens the file read-only, so an assertion can never change the install;
+ * anything else is a fixture and opens it writable, with foreign keys on as
+ * in D1. Several statements run as one script and return no rows.
  */
 export function d1<T = Record<string, unknown>>(sql: string): T[] {
-  const out = execFileSync(
-    'wrangler',
-    ['d1', 'execute', 'DB', '--local', '--persist-to', '.wrangler/e2e', '--json', '--command', sql],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  );
-  return JSON.parse(out)[0].results as T[];
+  const script = sql.trim().replace(/;$/, '').includes(';');
+  if (!script && /^\s*(select|with)\b/i.test(sql)) {
+    return withLocalStore('d1/miniflare-D1DatabaseObject', 'read', (db) =>
+      db.prepare(sql).all(),
+    ) as T[];
+  }
+  return withLocalStore('d1/miniflare-D1DatabaseObject', 'write', (db) => {
+    db.exec('PRAGMA foreign_keys = ON');
+    if (script) {
+      db.exec(sql);
+      return [];
+    }
+    return db.prepare(sql).all() as T[];
+  });
 }

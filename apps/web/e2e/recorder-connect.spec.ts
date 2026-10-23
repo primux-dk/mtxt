@@ -150,11 +150,13 @@ test('signed out, connect, sign in, approve; the recorder polls, uploads, and Di
     headers: bearer(body.token),
   });
   expect(complete.status()).toBe(200);
-  expect(
-    d1(
-      `select u.email from meetings m join users u on u.id = m.owner_id where m.id = '${recording.meeting_id}'`,
-    ),
-  ).toEqual([{ email: LONE.email }]);
+  await expect
+    .poll(() =>
+      d1(
+        `select u.email from meetings m join users u on u.id = m.owner_id where m.id = '${recording.meeting_id}'`,
+      ),
+    )
+    .toEqual([{ email: LONE.email }]);
 
   // The page now says it is connected; a reload never asks again.
   await page.reload();
@@ -188,15 +190,17 @@ test('signed out, connect, sign in, approve; the recorder polls, uploads, and Di
   expect((await refused.json()).error.code).toBe('unauthorized');
 
   // The audit log has both, with the device and no meeting.
-  expect(
-    d1(
-      `select a.action, a.meeting_id, a.details from audit_events a join users u on u.id = a.user_id
+  await expect
+    .poll(() =>
+      d1(
+        `select a.action, a.meeting_id, a.details from audit_events a join users u on u.id = a.user_id
        where u.email = '${LONE.email}' and a.action like 'recorder_%' order by a.at`,
-    ),
-  ).toEqual([
-    { action: 'recorder_connected', meeting_id: null, details: `{"device":"${device}"}` },
-    { action: 'recorder_disconnected', meeting_id: null, details: `{"device":"${device}"}` },
-  ]);
+      ),
+    )
+    .toEqual([
+      { action: 'recorder_connected', meeting_id: null, details: `{"device":"${device}"}` },
+      { action: 'recorder_disconnected', meeting_id: null, details: `{"device":"${device}"}` },
+    ]);
   // The token never reaches the Worker's log.
   expect(readFileSync('.wrangler/e2e-worker.log', 'utf8')).not.toContain(body.token);
 });
@@ -280,9 +284,9 @@ test('a wrong verifier, Cancel and an expired grant get 410 and a next step; a f
     headers: bearer(token),
   });
   expect(notSibling.status()).toBe(404);
-  expect(d1(`select revoked_at from recorder_tokens where id = '${sibling.token_id}'`)).toEqual([
-    { revoked_at: null },
-  ]);
+  await expect
+    .poll(() => d1(`select revoked_at from recorder_tokens where id = '${sibling.token_id}'`))
+    .toEqual([{ revoked_at: null }]);
   const self = await request.delete(`/api/v1/recorder/tokens/${token_id}`, {
     headers: bearer(token),
   });
@@ -372,7 +376,7 @@ test.describe('25 recorders and a 64-character device name (rule 13)', () => {
     await expectFocusRing(opener);
     await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Recorders' });
-    await expect(dialog.getByRole('heading', { name: 'Recorders' })).toBeFocused();
+    await expect(dialog.getByRole('heading', { name: 'Recorders', exact: true })).toBeFocused();
     const disconnects = dialog.getByRole('button', { name: /^Disconnect / });
     await expect(disconnects).toHaveCount(26);
     // The newest first: the keyboard laptop from the last test.
@@ -413,11 +417,13 @@ test.describe('25 recorders and a 64-character device name (rule 13)', () => {
     );
     await expect(dialog.getByRole('heading', { name: '25 recorders' })).toBeVisible();
     await expect(dialog.getByTestId('recorders-list').getByText(LONG_NAME)).toBeVisible();
-    expect(
-      d1(
-        `select count(*) as n from recorder_tokens where device_name = '${LONG_NAME}' and revoked_at is null`,
-      ),
-    ).toEqual([{ n: 1 }]);
+    await expect
+      .poll(() =>
+        d1(
+          `select count(*) as n from recorder_tokens where device_name = '${LONG_NAME}' and revoked_at is null`,
+        ),
+      )
+      .toEqual([{ n: 1 }]);
     await page.unroute('**/*');
   });
 });

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import type { StorageAdapter } from '../storage';
 import type { Db } from './index';
 import { foreignRowsSql } from './integrity';
@@ -87,9 +87,9 @@ export interface RetentionResult {
  *
  * - audio past `retention_audio_days`: `storage_path` is cleared and
  *   `delete_audio_at` records when, then the objects go from storage;
- * - past `retention_transcript_days`: segments, transcripts, recaps,
- *   versions, decisions and their search rows, then the recaps' docx and
- *   images;
+ * - past `retention_transcript_days`: segments, transcripts, speakers,
+ *   recaps, versions, decisions and their search rows, then the recaps'
+ *   docx and images;
  * - past both: the meeting keeps its row, with `deleted_at` set.
  *
  * Every write carries the whole eligibility in its WHERE (no `keep`, not
@@ -260,6 +260,12 @@ export async function retentionBatch(
             inArray(schema.transcripts.recordingId, recs),
           ),
         );
+      const spk = db
+        .select({ id: schema.speakers.id })
+        .from(schema.speakers)
+        .where(
+          and(eq(schema.speakers.installId, installId), eq(schema.speakers.meetingId, meeting.id)),
+        );
       const caps = db
         .select({ id: schema.recaps.id })
         .from(schema.recaps)
@@ -304,7 +310,10 @@ export async function retentionBatch(
           .where(
             and(
               eq(schema.segments.installId, installId),
-              inArray(schema.segments.transcriptId, trs),
+              or(
+                inArray(schema.segments.transcriptId, trs),
+                inArray(schema.segments.speakerId, spk),
+              ),
               guard,
             ),
           ),
@@ -318,6 +327,16 @@ export async function retentionBatch(
             ),
           )
           .returning({ id: schema.transcripts.id }),
+        // Without segments the meeting's speakers name nobody; delete takes them the same way.
+        db
+          .delete(schema.speakers)
+          .where(
+            and(
+              eq(schema.speakers.installId, installId),
+              eq(schema.speakers.meetingId, meeting.id),
+              guard,
+            ),
+          ),
         db
           .delete(meetingSearch)
           .where(
