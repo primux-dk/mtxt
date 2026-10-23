@@ -216,7 +216,20 @@ function localSecrets() {
   if (!values.OIDC_PROVIDER && values.OIDC_CLIENT_ID && settings.identityProvider) {
     values.OIDC_PROVIDER = settings.identityProvider;
   }
-  return { values, assemblyAiKey: pick('ASSEMBLYAI_KEY') };
+  return {
+    values,
+    sttKeys: { assemblyai: pick('ASSEMBLYAI_KEY'), elevenlabs: pick('ELEVENLABS_KEY') },
+  };
+}
+
+/**
+ * The speech-to-text provider the run sets on a row that has none, and its key.
+ * The config's provider wins; with none, an AssemblyAI key alone means AssemblyAI.
+ */
+function sttChoice(sttKeys) {
+  const provider = settings.sttProvider ?? (sttKeys.assemblyai ? 'assemblyai' : null);
+  const key = provider === 'assemblyai' || provider === 'elevenlabs' ? sttKeys[provider] : '';
+  return { provider, key };
 }
 
 // ---------------------------------------------------------------- inventory
@@ -533,7 +546,8 @@ async function main() {
   add(`Worker ${names.worker}`, found.worker ? 'update if the code or config changed' : 'create');
   add(`Custom domain ${hostname}`, found.domain ? 'reuse' : 'attach with the deploy');
 
-  const { values: local, assemblyAiKey } = localSecrets();
+  const { values: local, sttKeys } = localSecrets();
+  const stt = sttChoice(sttKeys);
   const toGenerate = ['AUTH_SECRET', 'SETTINGS_KEY'].filter(
     (n) => !local[n] && !found.secrets.includes(n),
   );
@@ -552,7 +566,9 @@ async function main() {
   }
   add(
     'Speech-to-text key',
-    assemblyAiKey ? 'seal into the settings row if it has no provider' : 'none given',
+    stt.key
+      ? `seal the ${stt.provider} key into the settings row if it has no provider`
+      : 'none given',
   );
   say(`\n  Secrets file: ${secretsFile}${existsSync(secretsFile) ? '' : ' (not there yet)'}`);
 
@@ -672,23 +688,23 @@ async function main() {
   const secrets = { ...local, ...generated };
 
   // The speech-to-text key is sealed here, under the same SETTINGS_KEY the Worker holds.
-  const sttWanted = settings.sttProvider ?? (assemblyAiKey ? 'assemblyai' : null);
+  // stt.provider is one of lib.mjs's allowed values, so it is safe in the statement.
   const row0 = d1Query(`SELECT stt_provider FROM settings WHERE install_id = '${installId}'`)[0];
   if (row0?.stt_provider) {
     row('Speech-to-text', `${row0.stt_provider} already chosen; left alone`);
-  } else if (sttWanted === 'assemblyai' && assemblyAiKey && secrets.SETTINGS_KEY) {
-    const sealed = await seal(assemblyAiKey, 'settings.stt_api_key', secrets.SETTINGS_KEY);
+  } else if (stt.key && secrets.SETTINGS_KEY) {
+    const sealed = await seal(stt.key, 'settings.stt_api_key', secrets.SETTINGS_KEY);
     d1File(
-      `UPDATE settings SET stt_provider = 'assemblyai', stt_api_key = '${sealed}', stt_region = NULL ` +
+      `UPDATE settings SET stt_provider = '${stt.provider}', stt_api_key = '${sealed}', stt_region = NULL ` +
         `WHERE install_id = '${installId}' AND stt_provider IS NULL;\n`,
     );
-    row('Speech-to-text', 'assemblyai, key sealed into the settings row');
-  } else if (sttWanted === 'workers-ai-whisper') {
+    row('Speech-to-text', `${stt.provider}, key sealed into the settings row`);
+  } else if (stt.provider === 'workers-ai-whisper') {
     d1File(
       `UPDATE settings SET stt_provider = 'workers-ai-whisper' WHERE install_id = '${installId}' AND stt_provider IS NULL;\n`,
     );
     row('Speech-to-text', 'workers-ai-whisper');
-  } else if (sttWanted === 'assemblyai' && assemblyAiKey) {
+  } else if (stt.key) {
     row('Speech-to-text', 'not set: SETTINGS_KEY is on the Worker but not in the secrets file');
   } else {
     row('Speech-to-text', 'not set: no key given; choose it on the settings page');
