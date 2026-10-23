@@ -29,7 +29,7 @@
   "library.search.label": "Search the meetings you can see",
   "library.uploadAudio": "Upload audio",
   "library.newMeeting": "New meeting",
-  "library.mine.subheading": "Meetings you recorded or uploaded.",
+  "library.archived.link": "Archived",
   "library.filters.label": "Filters",
   "library.filter.all": "All",
   "library.filter.thisWeek": "This week",

@@ -81,10 +81,24 @@ input[type=checkbox]{accent-color:var(--accent-strong);width:16px;height:16px;fl
 .nav-item[aria-current=page]{color:var(--sidebar-accent-foreground);background:var(--sidebar-accent);font-weight:550}
 .nav-item .icon{width:18px;height:18px}
 .sidebar-bottom{margin-top:auto;padding-top:24px;border-top:1px solid var(--sidebar-border);font-size:13px}
+.user-row{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:6px 8px;border:0;border-radius:var(--radius-control);background:transparent;text-align:left;font-size:13px;color:inherit}
+.user-row:hover{background:var(--secondary)}
+.user-row .grow>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-row .name{font-weight:550}
+.user-row .icon{width:16px;height:16px;color:var(--muted-foreground);flex-shrink:0}
+.sheet .sidebar-bottom{margin-top:24px}
 .mobilebar{display:none}
 .content{padding:32px;min-width:0}
 .content-top{margin-bottom:32px}
 .subheading{font-size:14px;color:var(--muted-foreground);margin-top:8px}
+.library-head{margin-bottom:16px;flex-wrap:wrap;row-gap:16px}
+.library-head .search{width:320px}
+.library-tools{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 24px;margin-bottom:24px}
+.library-filters{display:flex;align-items:center;gap:24px;min-width:0}
+.library-tools .filters{margin:0}
+.library-tools .list-head{margin:0;gap:12px;align-items:center}
+.quiet-link{display:inline-flex;align-items:center;gap:6px;min-height:40px;font-size:14px;color:var(--muted-foreground);white-space:nowrap}
+.quiet-link:hover{text-decoration:underline;text-underline-offset:4px}
 .search{display:flex;align-items:center;gap:8px;border:1px solid var(--input);border-radius:var(--radius-control);background:var(--card);padding:0 12px;height:40px;width:420px;max-width:100%;color:var(--muted-foreground)}
 .search input{border:0;background:transparent;outline:none;width:100%;min-width:0;font-size:14px}
 .search:focus-within{outline:2px solid var(--ring);outline-offset:2px}
@@ -258,7 +272,7 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 .sheet-top{display:flex;justify-content:space-between;align-items:center}
 .footnote{font-size:12px;color:var(--muted-foreground);margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
 
-@container (max-width:719px){.shell{grid-template-columns:1fr;min-height:820px}
+@container (max-width:719px){.shell{grid-template-columns:minmax(0,1fr);min-height:820px}
 .sidebar{display:none}
 .mobilebar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;min-height:56px;border-bottom:1px solid var(--border);background:var(--card)}
 .mobilebar .brand{font-size:14px}
@@ -269,6 +283,12 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 .library-title{margin-top:24px}
 .library-title .btn{font-size:12px;padding:8px 12px}
 .library-title h1{font-size:24px}
+.library-head .btn{font-size:12px;padding:8px 12px}
+.library-search{margin-bottom:16px}
+.library-tools{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:16px}
+.library-filters{overflow-x:auto;margin:-4px -20px;padding:4px 20px;scrollbar-width:none}
+.library-filters .filters{flex-wrap:nowrap}
+.quiet-link{min-height:44px}
 .search{width:100%;height:44px}
 .filters{gap:6px;margin:20px 0}
 .pill{font-size:12px;min-height:44px;padding:7px 12px}
@@ -367,6 +387,9 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </symbol>
 <symbol id="i-chevron" viewBox="0 0 24 24">
 <path d="m8 10 4 4 4-4"/>
+</symbol>
+<symbol id="i-chevrons" viewBox="0 0 24 24">
+<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>
 </symbol>
 <symbol id="i-arrow" viewBox="0 0 24 24">
 <path d="M19 12H5m6-6-6 6 6 6"/>
@@ -509,9 +532,8 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -521,32 +543,31 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <span class="avatar" aria-hidden="true">ML</span>
 </div>
 <div class="content">
-<div class="row between content-top">
+<div class="row between library-head">
+<h1 data-i18n="nav.myMeetings">My meetings</h1>
+<div class="row">
 <label class="search" for="search-desktop">
 <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
 <input id="search-desktop" type="search" data-i18n-attr="placeholder:library.search.placeholder,aria-label:library.search.label" placeholder="Search meetings and transcripts" aria-label="Search the meetings you can see">
 </label>
-<div class="desktop-action">
 <button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
-</div>
-</div>
-<div class="row between library-title">
-<div>
-<h1 data-i18n="nav.myMeetings">My meetings</h1>
-<p data-i18n="library.mine.subheading" class="subheading">Meetings you recorded or uploaded.</p>
-</div>
 <button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
 </div>
+</div>
+<div class="library-tools">
+<div class="library-filters">
 <div class="filters" role="group" data-i18n-attr="aria-label:library.filters.label" aria-label="Filters">
 <button class="pill" type="button" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="6">6</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.shared">Shared</span><span class="count" data-i18n-num="4">4</span></button>
 </div>
+<a class="quiet-link" href="#library"><span data-i18n="library.archived.link">Archived</span> <span data-i18n-num="3">3</span></a>
+</div>
 <div class="list-head">
 <span data-i18n="library.count" data-i18n-args='{"count":12}'>12 meetings</span>
 <span><span data-i18n="library.sort.newest">Newest first</span> <span aria-hidden="true">↓</span></span>
-</div>
+</div></div>
 <div class="meet-list">
 <article class="meet-row">
 <div>
@@ -598,7 +619,7 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 02. Meeting library, 1280 px. "New meeting" is the one primary action.</figcaption>
+<figcaption class="caption" lang="en">Figure 02. Meeting library, 1280 px. Two header rows: the title with search, Upload audio and "New meeting", the one primary action; then the pills with the quiet Archived link, the count and the sort. The user row at the foot of the sidebar opens a menu with Recorders and Sign out.</figcaption>
 </figure>
 </section>
 <section id="empty" aria-labelledby="label-empty">
@@ -621,9 +642,8 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -633,27 +653,27 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <span class="avatar" aria-hidden="true">ML</span>
 </div>
 <div class="content">
-<div class="row between content-top">
+<div class="row between library-head">
+<h1 data-i18n="nav.myMeetings">My meetings</h1>
+<div class="row">
 <label class="search" for="search-empty">
 <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
 <input id="search-empty" type="search" data-i18n-attr="placeholder:library.search.placeholder,aria-label:library.search.label" placeholder="Search meetings and transcripts" aria-label="Search the meetings you can see">
 </label>
-<div class="desktop-action">
 <button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
-</div>
-</div>
-<div class="row between library-title">
-<div>
-<h1 data-i18n="nav.myMeetings">My meetings</h1>
-<p data-i18n="library.mine.subheading" class="subheading">Meetings you recorded or uploaded.</p>
-</div>
 <button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
 </div>
+</div>
+<div class="library-tools">
+<div class="library-filters">
 <div class="filters" role="group" data-i18n-attr="aria-label:library.filters.label" aria-label="Filters">
 <button class="pill" type="button" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="0">0</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="0">0</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="0">0</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.shared">Shared</span><span class="count" data-i18n-num="0">0</span></button>
+</div>
+<a class="quiet-link" href="#library"><span data-i18n="library.archived.link">Archived</span></a>
+</div>
 </div>
 <div class="empty">
 <div>
@@ -671,7 +691,7 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 03. Empty library, 1280 px, first use. The two ways to add a meeting, per behaviour rule 8.</figcaption>
+<figcaption class="caption" lang="en">Figure 03. Empty library, 1280 px, first use. The same two header rows without count and sort. The two ways to add a meeting, per behaviour rule 8.</figcaption>
 </figure>
 </section>
 <section id="meeting" aria-labelledby="label-meeting">
@@ -694,9 +714,8 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -999,9 +1018,8 @@ meter::-webkit-meter-optimum-value{background:var(--accent-strong)}
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -1360,9 +1378,8 @@ ugeplan</textarea>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -1372,31 +1389,28 @@ ugeplan</textarea>
 <span class="avatar" aria-hidden="true">ML</span>
 </div>
 <div class="content">
-<div class="row between content-top">
-<label class="search" for="search-mobile">
+<div class="row between library-head">
+<h1 data-i18n="nav.myMeetings">My meetings</h1>
+<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
+</div>
+<label class="search library-search" for="search-mobile">
 <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
 <input id="search-mobile" type="search" data-i18n-attr="placeholder:library.search.placeholder,aria-label:library.search.label" placeholder="Search meetings and transcripts" aria-label="Search the meetings you can see">
 </label>
-<div class="desktop-action">
-<button type="button" class="btn"><svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg><span data-i18n="library.uploadAudio">Upload audio</span></button>
-</div>
-</div>
-<div class="row between library-title">
-<div>
-<h1 data-i18n="nav.myMeetings">My meetings</h1>
-<p data-i18n="library.mine.subheading" class="subheading">Meetings you recorded or uploaded.</p>
-</div>
-<button type="button" class="btn primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="library.newMeeting">New meeting</span></button>
-</div>
+<div class="library-tools">
+<div class="library-filters">
 <div class="filters" role="group" data-i18n-attr="aria-label:library.filters.label" aria-label="Filters">
 <button class="pill" type="button" aria-pressed="true"><span data-i18n="library.filter.all">All</span><span class="count" data-i18n-num="12">12</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.thisWeek">This week</span><span class="count" data-i18n-num="5">5</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.private">Private</span><span class="count" data-i18n-num="6">6</span></button>
 <button class="pill" type="button" aria-pressed="false"><span data-i18n="library.filter.shared">Shared</span><span class="count" data-i18n-num="4">4</span></button>
 </div>
+<a class="quiet-link" href="#library"><span data-i18n="library.archived.link">Archived</span> <span data-i18n-num="3">3</span></a>
+</div>
 <div class="list-head">
 <span data-i18n="library.count" data-i18n-args='{"count":12}'>12 meetings</span>
 <span><span data-i18n="library.sort.newest">Newest first</span> <span aria-hidden="true">↓</span></span>
+</div>
 </div>
 <div class="meet-list">
 <article class="meet-row">
@@ -1449,7 +1463,7 @@ ugeplan</textarea>
 </div>
 </div>
 </div>
-<figcaption class="caption" lang="en">Figure 09. Meeting library on a phone, 390 px. The menu button opens navigation.</figcaption>
+<figcaption class="caption" lang="en">Figure 09. Meeting library on a phone, 390 px. The menu button opens navigation. Four header rows: the title with "New meeting", the search, the pills scrolling sideways with Archived last, the count and the sort. Upload is in the New meeting menu and the empty state.</figcaption>
 </figure>
 </section>
 <section id="meeting-mobile" aria-labelledby="label-meeting-mobile">
@@ -1472,9 +1486,8 @@ ugeplan</textarea>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -1645,9 +1658,8 @@ ugeplan</textarea>
 <a class="nav-item" href="#library"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
-<div class="sidebar-bottom row">
-<span class="avatar" aria-hidden="true">ML</span>
-<div>Mette Lund<div class="small muted" lang="da">PRIMUX DIGITAL, S.L.</div></div>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
 </div>
 </aside>
 <div class="grow">
@@ -1763,6 +1775,9 @@ ugeplan</textarea>
 <a class="nav-item" href="#library-mobile"><svg class="icon" aria-hidden="true"><use href="#i-building"></use></svg><span data-i18n="nav.wholeCompany">Whole company</span></a>
 <a class="nav-item" href="#settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg><span data-i18n="nav.settings">Settings</span></a>
 </nav>
+<div class="sidebar-bottom">
+<button type="button" class="user-row" aria-haspopup="menu" aria-expanded="false"><span class="avatar" aria-hidden="true">ML</span><span class="grow"><span class="name">Mette Lund</span><span class="small muted" lang="da">PRIMUX DIGITAL, S.L.</span></span><svg class="icon" aria-hidden="true"><use href="#i-chevrons"></use></svg></button>
+</div>
 </dialog>
 <script>
 // Minimal ICU subset: {name} and {name, plural, =0 {...} one {...} other {...}} with #.

@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { asUser, d1, DESKTOP, PHONE, settle, shot } from './helpers';
+import { meetingWithAudio } from './access-helpers';
+import {
+  asUser,
+  d1,
+  DESKTOP,
+  expectFocusRing,
+  PHONE,
+  settle,
+  shot,
+  signIn,
+  tabTo,
+} from './helpers';
 
 test.beforeEach(async ({ context }) => asUser(context, 'dev'));
 
@@ -120,9 +131,86 @@ test.describe('library', () => {
     await expect(page.getByRole('heading', { name: 'No meetings yet' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Record in the browser' })).toBeVisible();
+    for (const viewport of [DESKTOP, PHONE]) {
+      await page.setViewportSize(viewport);
+      await settle(page);
+      await page.screenshot({ path: shot(`library-empty-${viewport.width}`), fullPage: true });
+    }
+  });
+
+  test('the Archived link counts archived meetings only when there are some; the archived view', async ({
+    page,
+    context,
+  }) => {
+    // A user of their own, so the count does not depend on what other specs archive.
+    await signIn(context.request, { email: 'asger.arkiv@example.com', name: 'Asger Arkiv' });
     await page.setViewportSize(DESKTOP);
-    await settle(page);
-    await page.screenshot({ path: shot('library-empty-1280'), fullPage: true });
+    await page.goto('/meetings');
+    const archived = page.getByRole('link', { name: /^Archived/ });
+    await expect(archived).toHaveAccessibleName('Archived');
+    await expect(archived).toHaveText('Archived');
+
+    for (const title of ['Budgetmøde, første udkast', 'Kvartalsmøde, 2. kvartal']) {
+      const { meetingId } = await meetingWithAudio(context.request, {}, title);
+      await page.goto(`/meetings/${meetingId}`);
+      await page.getByRole('button', { name: 'More actions' }).click();
+      await page.getByRole('menuitem', { name: 'Archive' }).click();
+      await expect(page.getByText('This meeting is archived.', { exact: false })).toBeVisible();
+    }
+    await page.goto('/meetings');
+    await expect(archived).toHaveAccessibleName('Archived 2');
+
+    // The archived view: its own title, the way back in the link's place, the pills apply.
+    await archived.click();
+    await expect(page).toHaveURL(/\/meetings\?view=archived$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Archived meetings' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Archived/ })).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(2);
+    await expect(page.getByTestId('result-count')).toHaveText('2 meetings');
+    await expect(page.getByRole('button', { name: /^All\s*2/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByRole('searchbox')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New meeting' })).toBeVisible();
+    for (const viewport of [DESKTOP, PHONE]) {
+      await page.setViewportSize(viewport);
+      await settle(page);
+      await page.screenshot({ path: shot(`library-archived-${viewport.width}`) });
+    }
+    await page.getByRole('link', { name: 'Back to My meetings' }).click();
+    await expect(page).toHaveURL(/\/meetings$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'My meetings' })).toBeVisible();
+  });
+
+  test('on a phone the header reads title and New meeting, search, pills and Archived, sort (rule 11)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('/meetings');
+    await tabTo(page, page.getByRole('button', { name: 'Open navigation' }));
+    const search = page.getByRole('searchbox');
+    for (const control of [
+      page.getByRole('button', { name: 'New meeting' }),
+      search,
+      page.getByRole('button', { name: /^All/ }),
+      page.getByRole('button', { name: /^Ready/ }),
+      page.getByRole('button', { name: /^In progress/ }),
+      page.getByRole('button', { name: /^Failed/ }),
+      page.getByRole('link', { name: /^Archived/ }),
+      page.getByRole('combobox', { name: 'Sort' }),
+    ]) {
+      await page.keyboard.press('Tab');
+      // The search field's ring is drawn by its label (focus-within), so the input is only focused.
+      if (control === search) await expect(control).toBeFocused();
+      else await expectFocusRing(control);
+    }
+    // The pills stay on one line and scroll; Upload audio is in New meeting's menu here.
+    const pills = await page.getByRole('group', { name: 'Filters' }).boundingBox();
+    expect(pills!.height).toBeLessThan(56);
+    await expect(page.getByRole('button', { name: 'Upload audio' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'New meeting' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Upload a file' })).toBeVisible();
   });
 
   test('the views show what the user may see, and nothing else', async ({ page }) => {

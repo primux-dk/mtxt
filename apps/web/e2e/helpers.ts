@@ -97,6 +97,18 @@ export async function tabTo(page: Page, locator: Locator, max = 30) {
   throw new Error('Did not reach the element with Tab');
 }
 
+/**
+ * Opens the user menu (packet 12): the row at the foot of the sidebar on a
+ * desktop, the same row inside the menu Sheet on a phone.
+ */
+export async function openUserMenu(page: Page) {
+  const phone = (page.viewportSize()?.width ?? DESKTOP.width) < 720;
+  if (phone) await page.getByRole('button', { name: 'Open navigation' }).click();
+  const scope = phone ? page.getByRole('dialog') : page.getByRole('complementary');
+  await scope.locator('button[aria-haspopup="menu"]').click();
+  return page.getByRole('menu');
+}
+
 export async function settle(page: Page) {
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() =>

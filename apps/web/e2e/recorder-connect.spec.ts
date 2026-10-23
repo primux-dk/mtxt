@@ -6,6 +6,7 @@ import {
   d1,
   DESKTOP,
   expectFocusRing,
+  openUserMenu,
   PHONE,
   settle,
   sha256,
@@ -49,13 +50,10 @@ const poll = (request: APIRequestContext, body: { challenge: string; verifier: s
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
-/** Opens Recorders from the user slot: the sidebar on a desktop, the menu sheet on a phone. */
+/** Opens Recorders from the user menu: the sidebar on a desktop, the menu sheet on a phone. */
 async function openRecorders(page: Page) {
-  const viewport = page.viewportSize();
-  if (viewport && viewport.width < 720) {
-    await page.getByRole('button', { name: 'Open navigation' }).click();
-  }
-  await page.getByRole('button', { name: 'Recorders', exact: true }).last().click();
+  const menu = await openUserMenu(page);
+  await menu.getByRole('menuitem', { name: 'Recorders' }).click();
   return page.getByRole('dialog', { name: 'Recorders' });
 }
 
@@ -371,9 +369,12 @@ test.describe('25 recorders and a 64-character device name (rule 13)', () => {
     await signIn(context.request, RASMUS);
     await page.setViewportSize(DESKTOP);
     await page.goto('/meetings');
-    const opener = page.getByRole('button', { name: 'Recorders', exact: true });
+    // The user row opens its menu with Enter; Recorders is the first item.
+    const opener = page.getByRole('complementary').getByRole('button', { name: /^Rasmus Krogh/ });
     await tabTo(page, opener);
     await expectFocusRing(opener);
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem', { name: 'Recorders' })).toBeFocused();
     await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog', { name: 'Recorders' });
     await expect(dialog.getByRole('heading', { name: 'Recorders', exact: true })).toBeFocused();

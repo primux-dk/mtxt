@@ -16,8 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import type { Colleague } from '@/lib/meetings/queries';
 import { safely } from '@/lib/safe-action';
-
-type SearchState = { state: 'idle' | 'loading' | 'failed' } | { state: 'done'; found: Colleague[] };
+import { searchLine, type SearchState } from './share-search-state';
 
 /**
  * Who a shared meeting is shared with (README component inventory: named
@@ -53,18 +52,28 @@ export function ShareDialog({
   const field = useRef<HTMLInputElement>(null);
   const asked = useRef(0);
 
-  const run = async (value: string) => {
+  /** `quiet` refreshes the answer after a share change without the "Searching…" line. */
+  const run = async (value: string, quiet = false) => {
     const n = ++asked.current;
-    setSearch({ state: 'loading' });
+    if (!quiet) setSearch({ state: 'loading' });
     let result: Awaited<ReturnType<typeof findColleagues>>;
     try {
       result = await findColleagues(meetingId, value);
     } catch {
       result = { ok: false, code: 'server' };
     }
-    // Only the latest question's answer is shown.
-    if (n !== asked.current) return;
-    setSearch(result.ok ? { state: 'done', found: result.colleagues } : { state: 'failed' });
+    // Only the latest question's answer is shown; a failed refresh keeps the answer on screen.
+    if (n !== asked.current || (quiet && !result.ok)) return;
+    setSearch(
+      result.ok
+        ? {
+            state: 'done',
+            found: result.colleagues,
+            others: result.others,
+            addable: result.addable,
+          }
+        : { state: 'failed' },
+    );
   };
 
   useEffect(() => {
@@ -104,7 +113,10 @@ export function ShareDialog({
     if (!result.ok) {
       onReaders((list) => list.filter((r) => r.id !== colleague.id));
       setError(t('addFailed', { name: colleague.name }));
+      return;
     }
+    // The server's list and count leave readers out, so they change with every share.
+    void run(text, true);
   };
 
   const remove = async (colleague: Colleague, index: number) => {
@@ -121,11 +133,14 @@ export function ShareDialog({
     if (!result.ok) {
       onReaders((list) => [...list, colleague].sort((a, b) => a.name.localeCompare(b.name)));
       setError(t('removeFailed', { name: colleague.name }));
+      return;
     }
+    void run(text, true);
   };
 
   const readerIds = new Set(readers.map((r) => r.id));
   const found = search.state === 'done' ? search.found.filter((c) => !readerIds.has(c.id)) : [];
+  const line = searchLine({ ready, search, text, candidates: found.length });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,17 +181,7 @@ export function ShareDialog({
             />
           </div>
           <p id="share-search-state" aria-live="polite" className="text-xs text-muted-foreground">
-            {!ready
-              ? t('search.saving')
-              : search.state === 'loading'
-                ? t('search.loading')
-                : search.state === 'failed'
-                  ? ''
-                  : search.state === 'done' && !found.length
-                    ? text
-                      ? t('search.none', { text })
-                      : t('search.everyone')
-                    : ''}
+            {line === 'none' ? t('search.none', { text }) : line ? t(`search.${line}`) : ''}
           </p>
           {search.state === 'failed' && (
             <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">

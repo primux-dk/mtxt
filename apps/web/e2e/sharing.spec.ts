@@ -10,6 +10,7 @@ import {
   SESSION_HEADERS,
   settle,
   shot,
+  signIn,
   signInHeaders,
   tabTo,
 } from './helpers';
@@ -255,7 +256,12 @@ test('keyboard walk of the share dialog: focus trapped, returned to its opener (
   await expect(dialog.getByRole('heading', { name: '40 people have access' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /^Remove / })).toHaveCount(40);
 
+  // Jonas is in the first answer already; wait for the search's own, or it replaces the list mid-walk.
+  const searched = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes('"jonas"'),
+  );
   await dialog.getByLabel('Find a colleague').fill('jonas');
+  await searched;
   await expect(dialog.getByRole('button', { name: 'Add Jonas Skov' })).toBeVisible();
   await page.keyboard.press('Tab');
   await expectFocusRing(dialog.getByRole('button', { name: 'Add Jonas Skov' }));
@@ -280,12 +286,51 @@ for (const viewport of [DESKTOP, PHONE]) {
     await page.goto('/meetings/demo-0001');
     await page.getByRole('button', { name: 'Shared with 40 people' }).click();
     const dialog = page.getByRole('dialog');
+    const searched = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes('"jonas"'),
+    );
     await dialog.getByLabel('Find a colleague').fill('jonas');
+    await searched;
     await expect(dialog.getByRole('button', { name: 'Add Jonas Skov' })).toBeVisible();
     await settle(page);
     await page.screenshot({ path: shot(`share-dialog-${viewport.width}`) });
   });
 }
+
+test('with no one else in the directory, the share search says so, not that everyone has access', async ({
+  page,
+  context,
+}) => {
+  // A single-user install: a user of their own, and everyone else parked in another install.
+  const solo = { email: 'solo@example.com', name: 'Sofie Solo', admin: false };
+  await signIn(context.request, solo);
+  const { meetingId } = await meetingWithAudio(context.request, {}, 'Alene');
+  const park = `update users set install_id = 'e2e-parked' where install_id = 'dev'
+    and email != '${solo.email}'`;
+  const unpark = `update users set install_id = 'dev' where install_id = 'e2e-parked'`;
+  d1(park);
+  try {
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`/meetings/${meetingId}`);
+    await page
+      .getByRole('combobox', { name: 'Visibility, only the owner can change it' })
+      .selectOption('shared');
+    const dialog = page.getByRole('dialog');
+    const field = dialog.getByLabel('Find a colleague');
+    const alone =
+      'No one else has signed in yet. Colleagues appear here after their first sign-in.';
+    await expect(field).toHaveAccessibleDescription(alone);
+    await expect(dialog.getByText('Everyone in the directory has access already.')).toHaveCount(0);
+    // A search says the same: there is no one to match.
+    await field.fill('jonas');
+    await expect(field).toHaveAccessibleDescription(alone);
+    await settle(page);
+    await page.screenshot({ path: shot('share-dialog-alone-1280') });
+  } finally {
+    d1(unpark);
+  }
+  expect(d1(`select id from users where install_id = 'e2e-parked'`)).toEqual([]);
+});
 
 test('a delete whose audit row fails changes nothing: the audio still plays; storage goes only after the commit', async ({
   page,

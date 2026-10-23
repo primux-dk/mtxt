@@ -57,9 +57,6 @@
     },
     "uploadAudio": "Overfør lyd",
     "newMeeting": "Nyt møde",
-    "mine": {
-      "subheading": "Møder, du har optaget eller overført."
-    },
     "filters": {
       "label": "Filtre"
     },
@@ -110,12 +107,6 @@
         "body": "Et arkiveret møde forlader biblioteket og venter her, til du gendanner det."
       }
     },
-    "shared": {
-      "subheading": "Møder, som kolleger har delt med dig."
-    },
-    "company": {
-      "subheading": "Møder, der er delt med hele virksomheden."
-    },
     "range": "{from}–{to} af {total, plural, one {# møde} other {# møder}}",
     "pagination": {
       "label": "Sider",
@@ -124,9 +115,9 @@
       "page": "Side {page}"
     },
     "archived": {
-      "title": "Arkiveret",
-      "subheading": "Uden for de andre visninger, indtil du gendanner dem.",
-      "link": "Arkiverede møder",
+      "title": "Arkiverede møder",
+      "link": "Arkiveret",
+      "back": "Tilbage til Mine møder",
       "restore": "Gendan",
       "restoreLabel": "Gendan {title}",
       "restoreFailed": "Ikke gendannet. Prøv igen."
@@ -721,6 +712,7 @@
       "placeholder": "Navn eller e-mail",
       "saving": "Gemmer synligheden først…",
       "loading": "Søger…",
+      "alone": "Ingen andre har logget ind endnu. Kolleger vises her efter deres første login.",
       "none": "Ingen kollega passer til “{text}”.",
       "everyone": "Alle i kataloget har allerede adgang.",
       "failed": "Kunne ikke søge i kataloget.",
