@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { searchLine, type SearchState } from '../components/meeting/share-search-state';
 
 const anne = { id: 'anne', name: 'Anne Holm', email: 'anne.holm@example.com' };
-const done = (others: boolean, found = others ? [anne] : []): SearchState => ({
-  state: 'done',
-  found,
-  others,
-});
+const done = (
+  others: boolean,
+  found = others ? [anne] : [],
+  addable = found.length,
+): SearchState => ({ state: 'done', found, others, addable });
 const line = (over: Partial<Parameters<typeof searchLine>[0]>) =>
   searchLine({ ready: true, search: done(true), text: '', candidates: 0, ...over });
 
@@ -18,8 +18,14 @@ describe('the line under the share search (packet 12)', () => {
   });
 
   it('says everyone has access when others exist and all of them are readers', () => {
-    expect(line({ search: done(true), candidates: 0 })).toBe('everyone');
-    expect(line({ search: done(true), text: '   ', candidates: 0 })).toBe('everyone');
+    expect(line({ search: done(true, [], 0), candidates: 0 })).toBe('everyone');
+    expect(line({ search: done(true, [], 0), text: '   ', candidates: 0 })).toBe('everyone');
+  });
+
+  it('does not say everyone while the directory still holds colleagues to add (Codex review)', () => {
+    // The answer lists none, or only people added a moment ago, but the count says 26 are left.
+    expect(line({ search: done(true, [], 26), candidates: 0 })).toBeNull();
+    expect(line({ search: done(true, [anne], 26), candidates: 0 })).toBeNull();
   });
 
   it('says no colleague matches when a search finds no one to add', () => {

@@ -256,7 +256,12 @@ test('keyboard walk of the share dialog: focus trapped, returned to its opener (
   await expect(dialog.getByRole('heading', { name: '40 people have access' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /^Remove / })).toHaveCount(40);
 
+  // Jonas is in the first answer already; wait for the search's own, or it replaces the list mid-walk.
+  const searched = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes('"jonas"'),
+  );
   await dialog.getByLabel('Find a colleague').fill('jonas');
+  await searched;
   await expect(dialog.getByRole('button', { name: 'Add Jonas Skov' })).toBeVisible();
   await page.keyboard.press('Tab');
   await expectFocusRing(dialog.getByRole('button', { name: 'Add Jonas Skov' }));
@@ -281,7 +286,11 @@ for (const viewport of [DESKTOP, PHONE]) {
     await page.goto('/meetings/demo-0001');
     await page.getByRole('button', { name: 'Shared with 40 people' }).click();
     const dialog = page.getByRole('dialog');
+    const searched = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && (r.request().postData() ?? '').includes('"jonas"'),
+    );
     await dialog.getByLabel('Find a colleague').fill('jonas');
+    await searched;
     await expect(dialog.getByRole('button', { name: 'Add Jonas Skov' })).toBeVisible();
     await settle(page);
     await page.screenshot({ path: shot(`share-dialog-${viewport.width}`) });

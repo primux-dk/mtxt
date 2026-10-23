@@ -2,8 +2,11 @@ import type { Colleague } from '@/lib/meetings/queries';
 
 export type SearchState =
   | { state: 'idle' | 'loading' | 'failed' }
-  /** `others`: the directory holds someone besides the signed-in user. */
-  | { state: 'done'; found: Colleague[]; others: boolean };
+  /**
+   * `others`: the directory holds someone besides the signed-in user.
+   * `addable`: how many of them do not have access yet, over the whole directory.
+   */
+  | { state: 'done'; found: Colleague[]; others: boolean; addable: number };
 
 /** The line under the share dialog's search field, as a key under `share.search`. */
 export type SearchLine = 'saving' | 'loading' | 'alone' | 'everyone' | 'none' | null;
@@ -32,5 +35,7 @@ export function searchLine({
   if (search.state === 'loading') return 'loading';
   if (search.state !== 'done' || candidates > 0) return null;
   if (!search.others) return 'alone';
-  return text.trim() ? 'none' : 'everyone';
+  if (text.trim()) return 'none';
+  // Counted over the whole directory, not the capped list: 20 readers in a list of 46 are not everyone.
+  return search.addable === 0 ? 'everyone' : null;
 }

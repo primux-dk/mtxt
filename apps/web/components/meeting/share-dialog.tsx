@@ -52,20 +52,26 @@ export function ShareDialog({
   const field = useRef<HTMLInputElement>(null);
   const asked = useRef(0);
 
-  const run = async (value: string) => {
+  /** `quiet` refreshes the answer after a share change without the "Searching…" line. */
+  const run = async (value: string, quiet = false) => {
     const n = ++asked.current;
-    setSearch({ state: 'loading' });
+    if (!quiet) setSearch({ state: 'loading' });
     let result: Awaited<ReturnType<typeof findColleagues>>;
     try {
       result = await findColleagues(meetingId, value);
     } catch {
       result = { ok: false, code: 'server' };
     }
-    // Only the latest question's answer is shown.
-    if (n !== asked.current) return;
+    // Only the latest question's answer is shown; a failed refresh keeps the answer on screen.
+    if (n !== asked.current || (quiet && !result.ok)) return;
     setSearch(
       result.ok
-        ? { state: 'done', found: result.colleagues, others: result.others }
+        ? {
+            state: 'done',
+            found: result.colleagues,
+            others: result.others,
+            addable: result.addable,
+          }
         : { state: 'failed' },
     );
   };
@@ -107,7 +113,10 @@ export function ShareDialog({
     if (!result.ok) {
       onReaders((list) => list.filter((r) => r.id !== colleague.id));
       setError(t('addFailed', { name: colleague.name }));
+      return;
     }
+    // The server's list and count leave readers out, so they change with every share.
+    void run(text, true);
   };
 
   const remove = async (colleague: Colleague, index: number) => {
@@ -124,7 +133,9 @@ export function ShareDialog({
     if (!result.ok) {
       onReaders((list) => [...list, colleague].sort((a, b) => a.name.localeCompare(b.name)));
       setError(t('removeFailed', { name: colleague.name }));
+      return;
     }
+    void run(text, true);
   };
 
   const readerIds = new Set(readers.map((r) => r.id));
