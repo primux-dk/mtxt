@@ -49,6 +49,8 @@ pub struct Inner {
     pub live: Option<LiveSession>,
     /// The running recording's live transcript, in memory only.
     pub live_text: LiveTranscript,
+    /// Live sessions started so far; the next one gets the next number.
+    pub live_sessions: u64,
     pub live_hidden: bool,
     /// The recording whose 7-day question is open.
     pub ask: Option<String>,
@@ -231,6 +233,7 @@ impl App {
                 downloads: HashMap::new(),
                 live: None,
                 live_text: LiveTranscript::default(),
+                live_sessions: 0,
                 live_hidden: false,
                 ask: None,
                 notice: None,
@@ -1364,7 +1367,12 @@ impl App {
             .map(|a| a.started.elapsed().as_secs_f64())
             .unwrap_or(0.0);
         let app = self.clone();
-        let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), offset_s, move |update| {
+        let id = {
+            let mut inner = self.lock();
+            inner.live_sessions += 1;
+            inner.live_sessions
+        };
+        let session = LiveSession::start(self.models_dir.clone(), model, self.live_feed.clone(), offset_s, id, move |update| {
             // Runs only while the session is alive (`LiveSession` guards it).
             app.lock().live_text.apply(&update);
             let _ = app.handle.emit_to("live", "live", &update);
@@ -1377,11 +1385,17 @@ impl App {
     /// which gets an empty `stopped` update. Nothing of it is kept.
     pub fn stop_live(&self) {
         let session = self.lock().live.take();
-        if let Some(s) = session {
-            s.stop();
-        }
-        self.lock().live_text = LiveTranscript::default();
-        let _ = self.handle.emit_to("live", "live", LiveUpdate::stopped());
+        // The stopped update is numbered after the session's last one, and the
+        // kept state says stopped too, so a window that opens now agrees.
+        let stopped = match session {
+            Some(s) => s.stop(),
+            None => {
+                let t = &self.lock().live_text;
+                LiveUpdate::stopped(t.session, t.seq + 1)
+            }
+        };
+        self.lock().live_text.apply(&stopped);
+        let _ = self.handle.emit_to("live", "live", &stopped);
         crate::windows::hide_live(&self.handle);
     }
 

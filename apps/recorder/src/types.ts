@@ -112,6 +112,8 @@ export interface LiveUpdate {
   append: LiveLine[];
   partial: LiveLine | null;
   reset: boolean;
+  session: number;
+  seq: number;
 }
 
 export interface LiveTranscript {
@@ -119,4 +121,7 @@ export interface LiveTranscript {
   reason: string | null;
   lines: LiveLine[];
   partial: LiveLine | null;
+  /** The session and the last update applied. */
+  session: number;
+  seq: number;
 }

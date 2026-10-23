@@ -61,15 +61,19 @@ pub struct LiveUpdate {
     pub partial: Option<LiveLine>,
     /// Drop what the window holds before applying this update.
     pub reset: bool,
+    /// Which live session this belongs to (one per start), and its order
+    /// within it, so a window that starts late can reconcile what it missed.
+    pub session: u64,
+    pub seq: u64,
 }
 
 impl LiveUpdate {
     /// The session ended: the window clears its text.
-    pub fn stopped() -> LiveUpdate {
-        LiveUpdate { state: "stopped", reason: None, append: Vec::new(), partial: None, reset: true }
+    pub fn stopped(session: u64, seq: u64) -> LiveUpdate {
+        LiveUpdate { state: "stopped", reason: None, append: Vec::new(), partial: None, reset: true, session, seq }
     }
     fn state(state: &'static str) -> LiveUpdate {
-        LiveUpdate { state, reason: None, append: Vec::new(), partial: None, reset: false }
+        LiveUpdate { state, reason: None, append: Vec::new(), partial: None, reset: false, session: 0, seq: 0 }
     }
 }
 
@@ -81,6 +85,9 @@ pub struct LiveTranscript {
     pub reason: Option<String>,
     pub lines: Vec<LiveLine>,
     pub partial: Option<LiveLine>,
+    /// The session and the last update applied.
+    pub session: u64,
+    pub seq: u64,
 }
 
 impl LiveTranscript {
@@ -88,6 +95,8 @@ impl LiveTranscript {
         if u.reset {
             *self = LiveTranscript::default();
         }
+        self.session = u.session;
+        self.seq = u.seq;
         self.state = u.state;
         self.reason = u.reason.clone();
         self.lines.extend(u.append.iter().cloned());
@@ -105,6 +114,8 @@ pub struct LiveSession {
     /// True while the session may emit. `halt` sets it false under the lock,
     /// so no update can leave the worker after `stop` returns.
     alive: Arc<Mutex<bool>>,
+    pub session: u64,
+    next_seq: Arc<std::sync::atomic::AtomicU64>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -117,10 +128,11 @@ impl LiveSession {
         model: String,
         feed: Arc<LiveFeed>,
         offset_s: f64,
+        session: u64,
         emit: impl Fn(LiveUpdate) + Send + 'static,
     ) -> LiveSession {
         let name = model.clone();
-        Self::spawn(name, Box::new(move || load_engine(&models_dir, &model)), feed, offset_s, emit)
+        Self::spawn(name, Box::new(move || load_engine(&models_dir, &model)), feed, offset_s, session, emit)
     }
 
     fn spawn(
@@ -128,13 +140,19 @@ impl LiveSession {
         load: Loader,
         feed: Arc<LiveFeed>,
         offset_s: f64,
+        session: u64,
         emit: impl Fn(LiveUpdate) + Send + 'static,
     ) -> LiveSession {
         let alive = Arc::new(Mutex::new(true));
         let alive2 = alive.clone();
-        let emit = move |u: LiveUpdate| {
+        let next_seq = Arc::new(std::sync::atomic::AtomicU64::new(1));
+        let seq_out = next_seq.clone();
+        // Every update leaves stamped with the session and the next number.
+        let emit = move |mut u: LiveUpdate| {
             let guard = alive2.lock().unwrap_or_else(|p| p.into_inner());
             if *guard {
+                u.session = session;
+                u.seq = next_seq.fetch_add(1, Ordering::SeqCst);
                 emit(u);
             }
         };
@@ -218,12 +236,14 @@ impl LiveSession {
                 }
             })
             .expect("live thread");
-        LiveSession { stop, paused, feed, alive, thread: Some(thread) }
+        LiveSession { stop, paused, feed, alive, session, next_seq: seq_out, thread: Some(thread) }
     }
 
-    /// Stop and drop the text. The model is unloaded with the thread.
-    pub fn stop(mut self) {
+    /// Stop and drop the text. The model is unloaded with the thread. The
+    /// stopped update to send, numbered after the session's last one.
+    pub fn stop(mut self) -> LiveUpdate {
         self.halt();
+        LiveUpdate::stopped(self.session, self.next_seq.fetch_add(1, Ordering::SeqCst))
     }
 
     fn halt(&mut self) {
@@ -265,7 +285,7 @@ mod tests {
         let feed = Arc::new(LiveFeed::default());
         let seen: Arc<Mutex<Vec<LiveUpdate>>> = Arc::default();
         let seen2 = seen.clone();
-        let session = LiveSession::spawn("fake".into(), Box::new(|| Ok(Box::new(Slow) as Box<dyn Engine>)), feed.clone(), 0.0, move |u| {
+        let session = LiveSession::spawn("fake".into(), Box::new(|| Ok(Box::new(Slow) as Box<dyn Engine>)), feed.clone(), 0.0, 1, move |u| {
             seen2.lock().unwrap().push(u)
         });
         // Speech, then stop while a decode runs.
@@ -281,7 +301,8 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert!(seen.lock().unwrap().iter().any(|u| u.partial.is_some()), "the fake engine was heard");
-        session.stop();
+        let stopped = session.stop();
+        assert_eq!(stopped.state, "stopped");
         let count = seen.lock().unwrap().len();
         assert!(!feed.enabled.load(Ordering::SeqCst));
         assert!(feed.sink.lock().unwrap().is_none());
@@ -294,7 +315,7 @@ mod tests {
         let feed = Arc::new(LiveFeed::default());
         let seen: Arc<Mutex<Vec<LiveUpdate>>> = Arc::default();
         let seen2 = seen.clone();
-        let session = LiveSession::spawn("t".into(), load, feed.clone(), offset_s, move |u| seen2.lock().unwrap().push(u));
+        let session = LiveSession::spawn("t".into(), load, feed.clone(), offset_s, 7, move |u| seen2.lock().unwrap().push(u));
         let t = Instant::now();
         while !seen.lock().unwrap().iter().any(|u| u.state == "listening" || u.state == "error") && t.elapsed() < Duration::from_secs(60) {
             std::thread::sleep(Duration::from_millis(20));
@@ -310,8 +331,13 @@ mod tests {
             std::thread::sleep(Duration::from_millis(100));
         }
         std::thread::sleep(Duration::from_millis(1500));
-        session.stop();
-        let out = seen.lock().unwrap().clone();
+        let stopped = session.stop();
+        let mut out = seen.lock().unwrap().clone();
+        // Numbered in order within the session, the stopped update last.
+        assert!(out.iter().all(|u| u.session == 7));
+        assert!(out.windows(2).all(|w| w[0].seq < w[1].seq));
+        assert!(out.last().is_none_or(|l| l.seq < stopped.seq));
+        out.push(stopped);
         out
     }
 
@@ -348,12 +374,14 @@ mod tests {
     fn the_transcript_appends_and_resets() {
         let mut t = LiveTranscript::default();
         let line = |at: f64, s: &str| LiveLine { at_s: at, text: s.into() };
-        t.apply(&LiveUpdate { state: "listening", reason: None, append: vec![line(1.0, "En")], partial: Some(line(3.0, "To")), reset: true });
-        t.apply(&LiveUpdate { state: "listening", reason: None, append: vec![line(3.0, "To tre")], partial: None, reset: false });
+        t.apply(&LiveUpdate { state: "listening", reason: None, append: vec![line(1.0, "En")], partial: Some(line(3.0, "To")), reset: true, session: 3, seq: 1 });
+        t.apply(&LiveUpdate { state: "listening", reason: None, append: vec![line(3.0, "To tre")], partial: None, reset: false, session: 3, seq: 2 });
         assert_eq!(t.lines.len(), 2);
         assert_eq!(t.partial, None);
-        t.apply(&LiveUpdate::stopped());
+        assert_eq!((t.session, t.seq), (3, 2));
+        t.apply(&LiveUpdate::stopped(3, 3));
         assert!(t.lines.is_empty() && t.state == "stopped");
+        assert_eq!((t.session, t.seq), (3, 3));
     }
 
     #[test]

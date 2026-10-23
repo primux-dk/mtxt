@@ -9,7 +9,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { duration } from './format';
-import { apply, atBottom, EMPTY, statusKey } from './liveText';
+import { accept, atBottom, EMPTY, reconcile, statusKey } from './liveText';
 import { setLanguage, t, translate } from './locale';
 import { applyTheme } from './theme';
 import type { LiveLine, LiveTranscript, LiveUpdate, Snapshot } from './types';
@@ -42,7 +42,10 @@ function renderSnapshot(s: Snapshot): void {
 }
 
 function set(next: LiveTranscript): void {
-  const reset = next.lines.length < rendered || (next.lines.length === 0 && rendered > 0);
+  const reset =
+    next.session !== shown.session ||
+    next.lines.length < rendered ||
+    (next.lines.length === 0 && rendered > 0);
   shown = next;
   if (reset) {
     $('lines').replaceChildren();
@@ -104,10 +107,18 @@ async function main(): Promise<void> {
     invoke('pause_live', { paused: shown.state !== 'paused' }),
   );
   $('hide').addEventListener('click', () => invoke('hide_live'));
-  renderSnapshot(await invoke<Snapshot>('snapshot'));
-  set(await invoke<LiveTranscript>('live_state'));
+  // Listen first, keep what arrives, then fetch the state and reconcile:
+  // a line or a Stop sent while the state was on its way is never lost.
+  let buffered: LiveUpdate[] | null = [];
+  await listen<LiveUpdate>('live', (e) => {
+    if (buffered) buffered.push(e.payload);
+    else set(accept(shown, e.payload));
+  });
   await listen<Snapshot>('snapshot', (e) => renderSnapshot(e.payload));
-  await listen<LiveUpdate>('live', (e) => set(apply(shown, e.payload)));
+  const state = await invoke<LiveTranscript>('live_state');
+  set(reconcile(state, buffered));
+  buffered = null;
+  renderSnapshot(await invoke<Snapshot>('snapshot'));
 }
 
 main();

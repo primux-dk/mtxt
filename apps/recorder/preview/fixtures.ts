@@ -311,7 +311,7 @@ const lines = [
   'Der er to forsinkelser, begge fra samme leverandør.',
 ].map((text, i) => ({ at_s: 62 + i * 14, text }));
 
-export const live: Record<string, LiveTranscript> = {
+export const live: Record<string, Omit<LiveTranscript, 'session' | 'seq'>> = {
   listening: {
     state: 'listening',
     reason: null,
