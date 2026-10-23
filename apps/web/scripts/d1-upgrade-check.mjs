@@ -85,7 +85,8 @@ try {
     INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json) VALUES ('t1', 'dev', 'r1', 'p', 'm', 'da', '{}');
     INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('s1', 'dev', 'm1', 'Speaker 1');
     INSERT INTO segments (id, install_id, transcript_id, speaker_id, start_ms, end_ms, text)
-      VALUES ('g1', 'dev', 't1', 's1', 0, 1, 'a'), ('g2', 'dev', 't1', 's1', 1, 2, 'b'), ('g3', 'dev', 't1', 's1', 2, 3, 'c');`);
+      VALUES ('g1', 'dev', 't1', 's1', 0, 1, 'a'), ('g2', 'dev', 't1', 's1', 1, 2, 'b'), ('g3', 'dev', 't1', 's1', 2, 3, 'c');
+    INSERT INTO audit_events (id, install_id, user_id, meeting_id, action, at) VALUES ('a1', 'dev', 'u1', 'm1', 'opened', 1000);`);
   const before = query(COUNT)[0];
   apply(all.slice(all.indexOf(from)));
   const after = query(COUNT)[0];
@@ -111,6 +112,26 @@ try {
     }
   }
   if (rows.length !== EXTENSIONS.length) throw new Error('A recording is missing.');
+  // Packet 6 (0006): the search index holds what was there, the audit row its meeting's title.
+  const index = query(
+    `SELECT kind, count(*) AS n FROM meeting_search WHERE meeting_id = 'm1' GROUP BY kind ORDER BY kind`,
+  );
+  console.log('search index', JSON.stringify(index));
+  if (
+    JSON.stringify(index) !==
+    JSON.stringify([
+      { kind: 'segment', n: 3 },
+      { kind: 'title', n: 1 },
+    ])
+  )
+    throw new Error('The search index was not backfilled right.');
+  const found = query(
+    `SELECT meeting_id FROM meeting_search WHERE meeting_search MATCH 'text : "ærø"'`,
+  );
+  if (found.length !== 1) throw new Error('The search index does not find the title.');
+  const audit = query(`SELECT meeting_title FROM audit_events WHERE id = 'a1'`)[0];
+  if (audit?.meeting_title !== 'MØDE ÆRØ ÅR')
+    throw new Error('The audit row has no meeting title.');
   console.log('D1 upgrade check passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });
