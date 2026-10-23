@@ -311,7 +311,7 @@ const FIGURE_04_RECAP = `# En rolig opstart på linje 2
 ## Beslutninger
 
 <!-- decisions -->
-- [ ] Test det nye skift torsdag. [@Jonas Skov](mtxt:user/dev-colleague)
+- [ ] Test det nye skift torsdag. [@Jonas Skov](mtxt:user/dev-colleague) ~2026-10-29
 - [x] Saml kapacitetstallene. [@Anne Holm](mtxt:user/dev-newcomer)
 <!-- /decisions -->
 
@@ -319,7 +319,7 @@ const FIGURE_04_RECAP = `# En rolig opstart på linje 2
 
 | Opgave | Ansvarlig | Frist |
 | --- | --- | --- |
-| Skiftetest | Jonas | 22. okt. |
+| Skiftetest | Jonas | 29. okt. |
 | Opdatér planen | Anne | 23. okt. |
 
 <details>
@@ -336,7 +336,7 @@ const FIGURE_04_TEXT = [
   'Test det nye skift torsdag. @Jonas Skov',
   'Saml kapacitetstallene. @Anne Holm',
   'Næste skridt',
-  'Opgave Ansvarlig Frist Skiftetest Jonas 22. okt. Opdatér planen Anne 23. okt.',
+  'Opgave Ansvarlig Frist Skiftetest Jonas 29. okt. Opdatér planen Anne 23. okt.',
   'Åbne spørgsmål til næste møde',
   'Kan det nye skift dække fredagens ekstra ordre?',
 ].join('\n');
@@ -405,7 +405,9 @@ function longRecap(): { md: string; text: string } {
   for (let i = 0; i < 40; i++) {
     const [id, name] = owners[i % 3]!;
     const item = `Beslutning ${i + 1}: ${pick(RECAP_VERBS)} ${pick(RECAP_WORDS)} inden ${pick(['fredag', 'mandag'])}.`;
-    md.push(`- [${i % 4 === 0 ? 'x' : ' '}] ${item} [@${name}](mtxt:user/${id})`);
+    // Every third decision has a due date, so the long list shows both kinds (packet 15).
+    const due = i % 3 === 1 ? ` ~2026-11-${String(2 + (i % 26)).padStart(2, '0')}` : '';
+    md.push(`- [${i % 4 === 0 ? 'x' : ' '}] ${item} [@${name}](mtxt:user/${id})${due}`);
     text.push(`${item} @${name}`);
   }
   md.push('<!-- /decisions -->', '');
@@ -459,7 +461,7 @@ export function demoRecapsSql(installId: string): string {
   );
   sql += insertRows(
     'decisions',
-    ['id', 'install_id', 'recap_id', 'position', 'text', 'owner_user_id', 'done'],
+    ['id', 'install_id', 'recap_id', 'position', 'text', 'owner_user_id', 'done', 'due_on'],
     [
       [
         "'demo-0000-d1'",
@@ -469,6 +471,7 @@ export function demoRecapsSql(installId: string): string {
         quote('Test det nye skift torsdag. @Jonas Skov'),
         "'dev-colleague'",
         '0',
+        "'2026-10-29'",
       ],
       [
         "'demo-0000-d2'",
@@ -478,6 +481,7 @@ export function demoRecapsSql(installId: string): string {
         quote('Saml kapacitetstallene. @Anne Holm'),
         "'dev-newcomer'",
         '1',
+        'NULL',
       ],
     ],
   );
@@ -489,7 +493,10 @@ export function demoRecapsSql(installId: string): string {
       const done = l.startsWith('- [x]');
       const name = /\[@([^\]]+)\]/.exec(l)![1]!;
       const owner = /mtxt:user\/([a-z-]+)/.exec(l)![1]!;
-      const item = l.replace(/^- \[[ x]\] /, '').replace(/ \[@[^\]]+\]\([^)]+\)$/, '');
+      const due = / ~(\d{4}-\d{2}-\d{2})$/.exec(l)?.[1];
+      const item = l
+        .replace(/^- \[[ x]\] /, '')
+        .replace(/ \[@[^\]]+\]\([^)]+\)( ~\d{4}-\d{2}-\d{2})?$/, '');
       return [
         quote(`demo-0001-d${i + 1}`),
         iid,
@@ -498,11 +505,12 @@ export function demoRecapsSql(installId: string): string {
         quote(`${item} @${name}`),
         quote(owner),
         done ? '1' : '0',
+        due ? quote(due) : 'NULL',
       ];
     });
   sql += insertRows(
     'decisions',
-    ['id', 'install_id', 'recap_id', 'position', 'text', 'owner_user_id', 'done'],
+    ['id', 'install_id', 'recap_id', 'position', 'text', 'owner_user_id', 'done', 'due_on'],
     rows,
   );
   return sql;

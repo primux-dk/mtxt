@@ -15,7 +15,7 @@ Meetings only. No dictation.
 5. **Swappable speech-to-text.** AssemblyAI, Azure Speech, ElevenLabs Scribe, or a local Whisper or Parakeet model. One per install, chosen by the company's own contract.
 6. **Keyterms and corrections.** A company dictionary. Danish first.
 7. **Speakers.** Diarization, renaming, and labels that can link to a colleague in the directory.
-8. **Recap.** The AI drafts it from a template; the owner finishes it in a Notion-style editor inside the platform. Markdown stored, a version per save, AI text and human edits told apart. Export markdown and docx.
+8. **Recap.** The AI drafts it from a template; the owner finishes it in a Notion-style editor inside the platform. Markdown stored, a version per save, AI text and human edits told apart. Decisions are a checklist with an owner and a due date: the draft fills in the date when the meeting said one ("på torsdag", "by Friday"), and the owner sets or clears it on the item. Export markdown and docx.
 9. **Private and shared.** Each meeting is private, shared with named colleagues, or company-wide. Search and MCP respect it.
 10. **Retention, audit, MCP.** Delete after N days per install with a keep flag per meeting. A log of who opened what. An MCP server with the same company login, scoped to what the user may see, with read and write tools.
 
@@ -126,7 +126,7 @@ curl -s "$MTXT/api/v1/meetings?limit=20" -H "Authorization: Bearer $TOKEN"
 curl -s "$MTXT/api/v1/meetings/$ID/transcript" -H "Authorization: Bearer $TOKEN"
 curl -s "$MTXT/api/v1/meetings/$ID/transcript?format=text" -H "Authorization: Bearer $TOKEN"
 
-# The recap: JSON (body, version, decisions), markdown, or Word.
+# The recap: JSON (body, version, decisions with owner and due_on), markdown, or Word.
 curl -s "$MTXT/api/v1/meetings/$ID/recap" -H "Authorization: Bearer $TOKEN"
 curl -s "$MTXT/api/v1/meetings/$ID/recap?format=markdown" -H "Authorization: Bearer $TOKEN"
 curl -s -o recap.docx "$MTXT/api/v1/meetings/$ID/recap?format=docx" -H "Authorization: Bearer $TOKEN"
