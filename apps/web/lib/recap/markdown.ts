@@ -571,8 +571,9 @@ const nodes: Record<string, NodeSerializer> = {
     // before the first hard break's `\`, or at the end when there is none.
     node.forEach((child, _, i) => {
       if (i === 0 && child.type.name === 'paragraph') {
+        // The node's own schema: in the browser it is the editor's, not recapSchema().
         const line = serializer()
-          .serialize(recapSchema().node('doc', null, [child]), { tightLists: true })
+          .serialize(child.type.schema.node('doc', null, [child]), { tightLists: true })
           .trimEnd();
         const marker = `${line ? ' ' : ''}~${due}`;
         const brk = line.indexOf('\\\n');

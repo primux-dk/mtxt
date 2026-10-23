@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { getSchema } from '@tiptap/core';
+import { recapExtensions } from '../lib/recap/extensions';
 import { normalizeMarkdown, parseMarkdown, plainText, toMarkdown } from '../lib/recap/markdown';
 
 const FIXTURE = readFileSync(new URL('./fixtures/recap-every-block.md', import.meta.url), 'utf8');
@@ -99,6 +101,15 @@ describe('recap markdown', () => {
     // A tilde typed into the text is escaped, so it stays text after a save.
     const typed = block('- [ ] Test \\~2026-10-30');
     expect(normalizeMarkdown(typed)).toBe(typed);
+  });
+
+  it("writes a due date for a document in the editor's own schema, not only the server's", () => {
+    // The editor builds its schema from its own extension list; a node of that schema must serialise too.
+    const editorSchema = getSchema(recapExtensions());
+    const md = '<!-- decisions -->\n- [ ] Test ~2026-10-30\n<!-- /decisions -->\n';
+    const doc = editorSchema.nodeFromJSON(parseMarkdown(md).toJSON());
+    expect(doc.type.schema).not.toBe(parseMarkdown(md).type.schema);
+    expect(toMarkdown(doc)).toBe(md);
   });
 
   it('reads plain text without markdown syntax', () => {
