@@ -1,14 +1,12 @@
 {
   "locale": {
-    "intl": "da-DK",
-    "name": "Dansk"
+    "intl": "da-DK"
   },
   "format": {
     "durationMinutes": "{minutes} min.",
     "others": "{count, plural, one {# anden} other {# andre}}",
     "rate": "{rate}×",
-    "durationHours": "{hours} t.{minutes, plural, =0 {} other { # min.}}",
-    "dateTime": "{date} · {time}"
+    "durationHours": "{hours} t.{minutes, plural, =0 {} other { # min.}}"
   },
   "common": {
     "save": "Gem",
@@ -33,8 +31,7 @@
     "myMeetings": "Mine møder",
     "sharedWithMe": "Delt med mig",
     "wholeCompany": "Hele virksomheden",
-    "settings": "Indstillinger",
-    "signedOut": "Ikke logget ind"
+    "settings": "Indstillinger"
   },
   "login": {
     "signInWith": "Log ind med {provider}",
@@ -81,8 +78,6 @@
       "label": "Sortering",
       "title": "Titel A–Å"
     },
-    "showing": "Viser {shown} af {total, plural, one {# møde} other {# møder}}",
-    "showMore": "Vis flere møder",
     "empty": {
       "first": {
         "title": "Ingen møder endnu",
@@ -152,7 +147,6 @@
       "label": "Behold mødet uden automatisk sletning",
       "failed": "Behold blev ikke gemt. Det er tilbage, som det var."
     },
-    "export": "Eksportér",
     "player": {
       "label": "Lydafspiller",
       "play": "Afspil optagelse",
@@ -384,31 +378,6 @@
     }
   },
   "recorder": {
-    "meetingTitle": "Mødetitel",
-    "stop": "Stop optagelse",
-    "capturing": "Optager mikrofon og systemlyd",
-    "mic": {
-      "text": "Mikrofon",
-      "level": "Mikrofonniveau"
-    },
-    "system": {
-      "text": "Systemlyd",
-      "level": "Systemlydniveau"
-    },
-    "live": "Live transskription",
-    "queue": {
-      "heading": "Seneste optagelser",
-      "count": "{count, plural, one {# fil} other {# filer}}",
-      "uploading": "Overfører {done}/{total}",
-      "confirmed": "Bekræftet",
-      "pendingNetwork": "Venter på netværk · Prøver igen",
-      "warn24h": "Advarsel: ikke overført i 24 timer · Prøv nu"
-    },
-    "model": {
-      "label": "Lokal model",
-      "downloaded": "{model} · Hentet",
-      "download": "{model} · Hent model"
-    },
     "web": {
       "title": "Optag i browseren",
       "subheading": "Til et møde ved denne computer. Optagelsen uploades, mens du optager.",
@@ -452,7 +421,6 @@
         "leave": "Forlad"
       },
       "openMeeting": "Åbn mødet",
-      "another": "Optag et nyt",
       "discard": {
         "action": "Kassér optagelsen",
         "title": "Kassér optagelsen?",
@@ -461,12 +429,6 @@
       }
     }
   },
-  "live": {
-    "label": "Live",
-    "pause": "Sæt teksten på pause",
-    "hide": "Skjul teksten",
-    "foot": "Lokal forhåndsvisning · Optagelsen fortsætter, når du skjuler teksten."
-  },
   "settings": {
     "title": "Indstillinger",
     "subheading": "Virksomhedens opsætning. Kun for administratorer.",
@@ -474,8 +436,7 @@
     "productName": {
       "heading": "Produktnavn",
       "help": "Navnet på loginsiden, i optageren og i menulinjen.",
-      "field": "Navn",
-      "required": "Skriv et produktnavn. Det vises på loginsiden og i optageren."
+      "field": "Navn"
     },
     "theme": {
       "heading": "Tema",

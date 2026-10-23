@@ -1,14 +1,12 @@
 {
   "locale": {
-    "intl": "en-GB",
-    "name": "English"
+    "intl": "en-GB"
   },
   "format": {
     "durationMinutes": "{minutes} min",
     "others": "{count, plural, one {# other} other {# others}}",
     "rate": "{rate}×",
-    "durationHours": "{hours} h{minutes, plural, =0 {} other { # min}}",
-    "dateTime": "{date} · {time}"
+    "durationHours": "{hours} h{minutes, plural, =0 {} other { # min}}"
   },
   "common": {
     "save": "Save",
@@ -33,8 +31,7 @@
     "myMeetings": "My meetings",
     "sharedWithMe": "Shared with me",
     "wholeCompany": "Whole company",
-    "settings": "Settings",
-    "signedOut": "Not signed in"
+    "settings": "Settings"
   },
   "login": {
     "signInWith": "Sign in with {provider}",
@@ -81,8 +78,6 @@
       "label": "Sort",
       "title": "Title A–Z"
     },
-    "showing": "Showing {shown} of {total, plural, one {# meeting} other {# meetings}}",
-    "showMore": "Show more meetings",
     "empty": {
       "first": {
         "title": "No meetings yet",
@@ -152,7 +147,6 @@
       "label": "Keep this meeting from automatic deletion",
       "failed": "Keep was not saved. It is back as it was."
     },
-    "export": "Export",
     "player": {
       "label": "Audio player",
       "play": "Play recording",
@@ -384,31 +378,6 @@
     }
   },
   "recorder": {
-    "meetingTitle": "Meeting title",
-    "stop": "Stop recording",
-    "capturing": "Recording microphone and system audio",
-    "mic": {
-      "text": "Microphone",
-      "level": "Microphone level"
-    },
-    "system": {
-      "text": "System audio",
-      "level": "System audio level"
-    },
-    "live": "Live transcript",
-    "queue": {
-      "heading": "Recent recordings",
-      "count": "{count, plural, one {# file} other {# files}}",
-      "uploading": "Uploading {done}/{total}",
-      "confirmed": "Confirmed",
-      "pendingNetwork": "Waiting for network · Retrying",
-      "warn24h": "Warning: not uploaded for 24 hours · Try now"
-    },
-    "model": {
-      "label": "Local model",
-      "downloaded": "{model} · Downloaded",
-      "download": "{model} · Download model"
-    },
     "web": {
       "title": "Record in the browser",
       "subheading": "For a meeting at this computer. The recording uploads while you record.",
@@ -452,7 +421,6 @@
         "leave": "Leave"
       },
       "openMeeting": "Open the meeting",
-      "another": "Record another",
       "discard": {
         "action": "Discard recording",
         "title": "Discard the recording?",
@@ -461,12 +429,6 @@
       }
     }
   },
-  "live": {
-    "label": "Live",
-    "pause": "Pause live text",
-    "hide": "Hide live text",
-    "foot": "Local preview · Recording continues when you hide the text."
-  },
   "settings": {
     "title": "Settings",
     "subheading": "The company's setup. Admins only.",
@@ -474,8 +436,7 @@
     "productName": {
       "heading": "Product name",
       "help": "The name on the login page, in the recorder and in the menu bar.",
-      "field": "Name",
-      "required": "Enter a product name. It appears on the login page and in the recorder."
+      "field": "Name"
     },
     "theme": {
       "heading": "Theme",
