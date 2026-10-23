@@ -10,7 +10,7 @@
   "recorder.disconnect.failed": "Kunne ikke nå {host} for at afbryde · Prøv igen, eller afbryd kun på denne pc og fjern den under Optagere i biblioteket",
   "recorder.disconnect.local": "Afbryd kun på denne pc",
   "recorder.permission.system.explain": "Systemlyd: de andre deltagere, fra de højttalere eller det headset, du lytter på.",
-  "recorder.permission.mic.denied": "Mikrofonen er ikke tilladt · Åbn Indstillinger → Beskyttelse af personlige oplysninger og sikkerhed → Mikrofon, og tillad skrivebordsapps",
+  "recorder.permission.mic.denied": "Mikrofonen er ikke tilladt for skrivebordsapps · Åbn Indstillinger",
   "recorder.permission.openSettings": "Åbn Indstillinger",
   "recorder.model.size": "{model} kræver en download på {size} og samme plads på denne pc. Den kører kun på denne pc.",
   "recorder.error.stateSave": "Køen kunne ikke gemmes på denne pc: {error}",

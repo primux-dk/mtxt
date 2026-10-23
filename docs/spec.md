@@ -115,7 +115,7 @@ A company's own systems (a CRM, a case system) read meetings, transcripts and re
 
 ## Local models in the recorder
 
-Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-4.0, includes Danish) is the default; Whisper large-v3-turbo (MIT) is the fallback. Both switchable in the recorder. The live transcript is discarded when the meeting ends.
+Downloaded from Hugging Face directly on first run. Parakeet TDT 0.6B v3 (CC-BY-4.0, includes Danish) is the default; Whisper large-v3-turbo (MIT) is the fallback, and the only model on an Intel Mac. Both run on Windows. Both switchable in the recorder. The live transcript is discarded when the meeting ends.
 
 ## Stack and deployment
 
@@ -253,6 +253,6 @@ An install can feed its meetings into a company's own systems (a CRM, a case sys
 ## Phases
 
 1. **v0.1 library, for the author's own use** in the Primux Cloudflare account. Login, upload, browser recorder, one speech-to-text adapter plus Workers AI Whisper tested on the same recording, keyterms, diarization with renaming, recap editor with templates, docx export, private and shared, retention. Built as of 2026-10-23 and running at `app.mtxt.co`.
-2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting. Built for macOS as of 2026-10-23; the Windows recorder is next.
+2. **v0.2 recorder.** Build the Tauri 2 recorder: capture, company login, the queued upload. Live transcript as the optional setting. Built for macOS as of 2026-10-23. The Windows recorder (WASAPI loopback, MSI and NSIS installers, unsigned) is built in packet 19; its CI waits for the workflow files to reach GitHub, and its checks on a real Windows machine are in `apps/recorder/README.md`.
 3. **v0.3.** MCP server, wrapping the REST API (personal API tokens and `/api/v1` built as of 2026-10-23, packet 16). OneDrive and Drive pickup. Next as of 2026-10-23, together with Workers AI Whisper in chunks, so that a recording over 25 MiB transcribes there too.
 4. **Release.** README, a wrangler deploy that targets any Cloudflare account, a short post. Customers come after the author has used it for a while. As of 2026-10-23 the deploy tooling exists (`deploy/`); the post and the first customer wait.

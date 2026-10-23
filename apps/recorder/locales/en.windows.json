@@ -10,7 +10,7 @@
   "recorder.disconnect.failed": "Could not reach {host} to disconnect · Try again, or disconnect this PC only and remove it under Recorders in the library",
   "recorder.disconnect.local": "Disconnect this PC only",
   "recorder.permission.system.explain": "System audio: the other participants, from the speakers or headset you listen on.",
-  "recorder.permission.mic.denied": "The microphone is not allowed · Open Settings → Privacy & security → Microphone and allow desktop apps",
+  "recorder.permission.mic.denied": "The microphone is not allowed for desktop apps · Open Settings",
   "recorder.permission.openSettings": "Open Settings",
   "recorder.model.size": "{model} needs a {size} download and the same space on this PC. It runs on this PC only.",
   "recorder.error.stateSave": "Could not save the queue on this PC: {error}",
