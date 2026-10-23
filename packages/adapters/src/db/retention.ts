@@ -81,9 +81,6 @@ export interface RetentionResult {
   more: boolean;
 }
 
-/** The most skipped meetings one report lists. */
-export const RETENTION_SKIPS_LISTED = 1000;
-
 /**
  * One batch of retention for one install, as of `now`. Picks up to `limit`
  * meetings without `keep` that have something past its deadline:
@@ -98,8 +95,8 @@ export const RETENTION_SKIPS_LISTED = 1000;
  * deleted, the deadline passed, no upload open, no rows of another install),
  * so a Keep set after selection wins. Storage is deleted only for the rows
  * that write changed; if the audio delete fails, the paths are put back
- * for the next try. With `reportSkips`, the meetings past a deadline that
- * are left alone are listed with the reason.
+ * for the next try. With `reportSkips`, every meeting past a deadline that
+ * is left alone is listed with the reason, paged, never cut off.
  */
 export async function retentionBatch(
   ctx: { db: Db; storage: Pick<StorageAdapter, 'delete'>; installId: string },
@@ -152,14 +149,23 @@ export async function retentionBatch(
   };
 
   if (options.reportSkips) {
-    result.skipped = await db.all<{ id: string; reason: RetentionSkipReason }>(sql`
-      select m.id, case when m.keep = 1 then 'keep'
-        when ${uploading(sql`m.id`)} then 'open_upload' else 'foreign_rows' end as reason
-      from meetings m
-      where ${due} and (m.keep = 1 or ${uploading(sql`m.id`)}
-        or ${foreignRowsSql(installId, sql`m.id`)} > 0)
-      order by m.started_at, m.id
-      limit ${RETENTION_SKIPS_LISTED}`);
+    // Every skipped meeting, a page of RETENTION_BATCH at a time, oldest first.
+    let after: { started_at: number; id: string } | null = null;
+    for (;;) {
+      const page: { id: string; started_at: number; reason: RetentionSkipReason }[] =
+        await db.all(sql`
+        select m.id, m.started_at, case when m.keep = 1 then 'keep'
+          when ${uploading(sql`m.id`)} then 'open_upload' else 'foreign_rows' end as reason
+        from meetings m
+        where ${due} and (m.keep = 1 or ${uploading(sql`m.id`)}
+          or ${foreignRowsSql(installId, sql`m.id`)} > 0)
+          ${after ? sql`and (m.started_at, m.id) > (${after.started_at}, ${after.id})` : sql``}
+        order by m.started_at, m.id
+        limit ${RETENTION_BATCH}`);
+      result.skipped.push(...page.map(({ id, reason }) => ({ id, reason })));
+      if (page.length < RETENTION_BATCH) break;
+      after = page.at(-1)!;
+    }
   }
 
   for (const meeting of picked) {

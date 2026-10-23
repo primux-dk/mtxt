@@ -280,4 +280,38 @@ describe('retentionBatch', () => {
       { id: 'uploading', reason: 'open_upload' },
     ]);
   });
+
+  it('lists every skip, past any page size, with exact counts per reason', async () => {
+    const t = setup();
+    // The reviewer's case: 1,004 kept, one open upload, one with foreign rows.
+    t.sqlite.exec('BEGIN');
+    for (let i = 0; i < 1004; i++) {
+      t.f.meeting(`k${String(i).padStart(4, '0')}`, {
+        owner: 'owner',
+        startedAt: ago(400 + (i % 7)),
+        keep: true,
+      });
+    }
+    t.sqlite.exec('COMMIT');
+    t.f.meeting('uploading', { owner: 'owner', startedAt: ago(400) });
+    t.f.recording('uploading-r', 'uploading', { status: 'uploading' });
+    t.f.meeting('mixed', { owner: 'owner', startedAt: ago(400) });
+    t.sqlite.exec(
+      "INSERT INTO speakers (id, install_id, meeting_id, label) VALUES ('foreign-s', 'other', 'mixed', 'X')",
+    );
+    const result = await retentionBatch(
+      { db: t.db, storage: { delete: async () => {} }, installId: INSTALL },
+      SETTINGS,
+      NOW,
+      100,
+      { reportSkips: true },
+    );
+    expect(result.skipped).toHaveLength(1006);
+    expect(new Set(result.skipped.map((s) => s.id)).size).toBe(1006);
+    const counts = result.skipped.reduce<Record<string, number>>(
+      (n, s) => ({ ...n, [s.reason]: (n[s.reason] ?? 0) + 1 }),
+      {},
+    );
+    expect(counts).toEqual({ keep: 1004, open_upload: 1, foreign_rows: 1 });
+  });
 });
