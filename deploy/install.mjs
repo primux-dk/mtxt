@@ -659,6 +659,7 @@ async function main() {
         companyName: settings.companyName,
         language: settings.language,
         interfaceLanguage: settings.interfaceLanguage,
+        timeZone: settings.timeZone,
         aiGatewayId: gatewayId,
       }),
     );

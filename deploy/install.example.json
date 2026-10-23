@@ -16,6 +16,7 @@
     "companyName": "Example A/S",
     "interfaceLanguage": "en",
     "language": "auto",
+    "timeZone": "Europe/Copenhagen",
     "identityProvider": "entra",
     "sttProvider": "assemblyai"
   }

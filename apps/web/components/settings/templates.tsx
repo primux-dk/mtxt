@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { controlClass, describedBy, FieldError } from './fields';
+import { controlClass, describedBy, FieldError, helpId } from './fields';
 import { useReportUnsaved } from './unsaved-guard';
 
 type Notice = { tone: 'status' | 'alert'; text: string } | null;
@@ -227,9 +227,13 @@ export function Templates({ initial }: { initial: TemplateRow[] }) {
               value={draft.bodyMd}
               onChange={(e) => setDraft({ ...draft, bodyMd: e.target.value })}
               aria-invalid={errors.bodyMd ? true : undefined}
-              aria-describedby={describedBy('template-body', false, errors.bodyMd)}
+              aria-describedby={describedBy('template-body', true, errors.bodyMd)}
               className={cn(controlClass, 'min-h-24 resize-y font-mono text-[13px]')}
             />
+            <p id={helpId('template-body')} className="text-xs text-muted-foreground">
+              {t('bodyHelp')}{' '}
+              <code className="font-mono text-[12px] text-foreground">{t('decisionLine')}</code>
+            </p>
             <FieldError id="template-body" error={errors.bodyMd} />
           </div>
           <div className="flex flex-wrap gap-2">

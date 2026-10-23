@@ -14,7 +14,10 @@ export default async function GeneralPage() {
         themeAccent: settings.themeAccent,
         themePrimary: settings.themePrimary,
         interfaceLanguage: settings.interfaceLanguage,
+        timeZone: settings.timeZone,
       }}
+      // UTC first, then the runtime's own list; the stored zone is always in it.
+      timeZones={[...new Set(['UTC', ...Intl.supportedValuesOf('timeZone'), settings.timeZone])]}
     />
   );
 }
