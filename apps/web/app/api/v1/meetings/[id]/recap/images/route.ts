@@ -38,9 +38,10 @@ export async function POST(request: Request, { params }: Params) {
     if (!ext)
       throw new HttpError(415, 'unsupported_media_type', 'Use a PNG, JPEG, GIF or WebP image.');
     const file = `${crypto.randomUUID()}.${ext}`;
-    await storage.put(imageKey(installId, meeting.id, file), bytes, {
-      contentType: imageType(ext),
-    });
+    const path = imageKey(installId, meeting.id, file);
+    // Registered before it is stored, so delete and retention always find it.
+    await db.insert(schema.recapImages).values({ installId, meetingId: meeting.id, path });
+    await storage.put(path, bytes, { contentType: imageType(ext) });
     return json({ src: imageSrc(meeting.id, file) }, 201);
   });
 }
