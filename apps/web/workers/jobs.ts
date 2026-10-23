@@ -50,6 +50,7 @@ export const handleJobs = routeJobs<CloudflareEnv>({
         job.transcript_id,
       );
     } else {
+      // TODO(packet 5): after writing the recap, syncSearch(db, installId, { meetingId, recap: { id, bodyMd } }).
       console.log('Recaps arrive in packet 5; acking the recap job for', job.meeting_id);
     }
     message.ack();

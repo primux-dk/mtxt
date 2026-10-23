@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import {
   ftsQuery,
+  meetingSegments,
   meetingKey,
   searchHitsSql,
   searchSnippets,
@@ -117,5 +118,18 @@ describe('the search index', () => {
     );
     // Only the meetings asked for.
     expect((await searchSnippets(db, INSTALL, ftsQuery('linje')!, ['m2'])).size).toBe(0);
+  });
+
+  it('meetingSegments leaves comparison transcripts out', async () => {
+    const { db, sqlite } = setup();
+    sqlite.exec(
+      "INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json, is_comparison) VALUES ('cmp', 'test', 'r1', 'workers-ai', 'whisper', 'da', '{}', 1)",
+    );
+    sqlite.exec(
+      "INSERT INTO segments (id, install_id, transcript_id, start_ms, end_ms, text) VALUES ('cmp-s', 'test', 'cmp', 0, 1, 'kun i sammenligningen')",
+    );
+    const list = await meetingSegments(db, INSTALL, 'm1');
+    expect(list).toHaveLength(3);
+    expect(list.some((g) => g.id === 'cmp-s')).toBe(false);
   });
 });

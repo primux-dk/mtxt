@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { Db } from './index';
+import * as schema from './schema';
 
 /**
  * The search index: `meeting_search`, an FTS5 table made by migration 0004
@@ -44,8 +45,12 @@ export interface SearchSync {
   recap?: { id: string; bodyMd: string } | null;
 }
 
-/** D1 binds at most 100 parameters per statement; a row takes 6. */
-const ROWS_PER_INSERT = 16;
+/**
+ * Rows go in as one JSON array per statement, read back with json_each, so
+ * a 4-hour transcript is a handful of statements, not hundreds. Each array
+ * stays under this many bytes, well inside D1's limit on a statement.
+ */
+const JSON_BYTES = 60_000;
 
 const s = meetingSearch;
 const ofMeeting = (installId: string, meetingId: string, kinds?: readonly SearchKind[]) =>
@@ -61,17 +66,29 @@ function statements(db: Db, installId: string, change: SearchSync) {
   const out = [];
   const clear = (kind: SearchKind) => db.delete(s).where(ofMeeting(installId, meetingId, [kind]));
   const insert = (rows: { kind: SearchKind; ref: string; text: string }[]) => {
-    for (let i = 0; i < rows.length; i += ROWS_PER_INSERT) {
+    const encoder = new TextEncoder();
+    let chunk: string[] = [];
+    let size = 2;
+    const flush = () => {
+      if (!chunk.length) return;
+      const json = `[${chunk.join(',')}]`;
       out.push(
-        db
-          .insert(s)
-          .values(
-            rows
-              .slice(i, i + ROWS_PER_INSERT)
-              .map((r) => ({ installId, meetingId, meetingKey: key, ...r })),
-          ),
+        db.insert(s).select(
+          sql`select ${installId}, ${meetingId}, ${key}, json_extract(value, '$[0]'),
+            json_extract(value, '$[1]'), json_extract(value, '$[2]') from json_each(${json})`,
+        ),
       );
+      chunk = [];
+      size = 2;
+    };
+    for (const r of rows) {
+      const row = JSON.stringify([r.kind, r.ref, r.text]);
+      const length = encoder.encode(row).length + 1;
+      if (chunk.length && size + length > JSON_BYTES) flush();
+      chunk.push(row);
+      size += length;
     }
+    flush();
   };
   if (change.title !== undefined) {
     out.push(clear('title'));
@@ -92,6 +109,27 @@ function statements(db: Db, installId: string, change: SearchSync) {
     }
   }
   return out;
+}
+
+/**
+ * Every segment of the meeting's transcripts that count, for syncSearch's
+ * `segments`: every recording's, but never a comparison transcript
+ * (`is_comparison`, pnpm stt:compare), which is not the meeting's record.
+ */
+export async function meetingSegments(db: Db, installId: string, meetingId: string) {
+  const g = schema.segments;
+  const t = schema.transcripts;
+  const r = schema.recordings;
+  return db
+    .select({ id: g.id, text: g.text })
+    .from(g)
+    .innerJoin(
+      t,
+      and(eq(t.id, g.transcriptId), eq(t.installId, installId), eq(t.isComparison, false)),
+    )
+    .innerJoin(r, and(eq(r.id, t.recordingId), eq(r.installId, installId)))
+    .where(and(eq(g.installId, installId), eq(r.meetingId, meetingId)))
+    .orderBy(r.id, g.startMs, g.id);
 }
 
 /**

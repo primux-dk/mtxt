@@ -8,8 +8,6 @@
 import { DEV_USERS } from './dev-seed.ts';
 
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
-/** The search index's meeting key (search.ts meetingKey), as SQL. */
-const meetingKeySql = (id: string) => `'m' || lower(hex(${quote(id)}))`;
 
 const FIRST = [
   'Sofie',
@@ -149,39 +147,6 @@ export function accessDemoSql(
         ),
       ].join('\n') + '\n';
   }
-
-  // The search index: every demo title, and the two transcripts.
-  const titled = [
-    ...meetings.map((m) => [m.id, m.title] as const),
-    ...Object.entries(SEARCH_MEETINGS).map(
-      ([v, id]) => [id, SEARCH_TITLES[v as keyof typeof SEARCH_TITLES]] as const,
-    ),
-    ['demo-graph', 'Møde med alt i'] as const,
-  ];
-  sql += insertRows(
-    'meeting_search',
-    ['install_id', 'meeting_id', 'meeting_key', 'kind', 'ref', 'text'],
-    [
-      ...titled.map(([id, title]) => [
-        iid,
-        quote(id),
-        meetingKeySql(id),
-        "'title'",
-        quote(id),
-        quote(title),
-      ]),
-      ...Object.values(SEARCH_MEETINGS).flatMap((id) =>
-        SEGMENTS.map((text, i) => [
-          iid,
-          quote(id),
-          meetingKeySql(id),
-          "'segment'",
-          quote(`${id}-g${i}`),
-          quote(text),
-        ]),
-      ),
-    ],
-  );
 
   // Old meetings for the retention batches: audio paths with no object behind them.
   const old = Array.from({ length: RETENTION_FIXTURES }, (_, i) => {
@@ -325,6 +290,18 @@ export function accessDemoSql(
       ]);
     }
   }
+  // The search index, as the app keeps it: every demo meeting's title and every segment
+  // of its transcripts, packet 4's included, never a comparison transcript's.
+  sql += `INSERT INTO meeting_search (install_id, meeting_id, meeting_key, kind, ref, text)
+  SELECT install_id, id, 'm' || lower(hex(id)), 'title', id, title FROM meetings
+  WHERE install_id = ${iid} AND id LIKE 'demo%';
+INSERT INTO meeting_search (install_id, meeting_id, meeting_key, kind, ref, text)
+  SELECT g.install_id, r.meeting_id, 'm' || lower(hex(r.meeting_id)), 'segment', g.id, g.text
+  FROM segments g
+  JOIN transcripts t ON t.id = g.transcript_id AND t.install_id = g.install_id AND t.is_comparison = 0
+  JOIN recordings r ON r.id = t.recording_id AND r.install_id = g.install_id
+  WHERE g.install_id = ${iid} AND r.meeting_id LIKE 'demo%' AND trim(g.text) != '';
+`;
   sql += insertRows(
     'audit_events',
     ['id', 'install_id', 'user_id', 'meeting_id', 'meeting_title', 'action', 'details', 'at'],

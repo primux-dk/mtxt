@@ -301,9 +301,16 @@ describe('dev seed', () => {
     // Packet 6: 10,000 audit rows plus the graph's one, 230 old meetings, the search index.
     expect(count(`SELECT count(*) AS n FROM audit_events WHERE install_id = 'dev'`)).toBe(10_001);
     expect(count(`SELECT count(*) AS n FROM meetings WHERE owner_id = 'dev-archivist'`)).toBe(230);
+    // The index holds every demo segment, packet 4's transcripts included, and every title.
+    expect(count(`SELECT count(*) AS n FROM meeting_search WHERE kind = 'segment'`)).toBe(
+      count(`SELECT count(*) AS n FROM segments g
+        JOIN transcripts t ON t.id = g.transcript_id AND t.is_comparison = 0
+        JOIN recordings r ON r.id = t.recording_id
+        WHERE g.install_id = 'dev' AND r.meeting_id LIKE 'demo%' AND trim(g.text) != ''`),
+    );
     expect(
       count(
-        `SELECT count(*) AS n FROM meeting_search WHERE meeting_search MATCH 'text : "ugeplanen"'`,
+        `SELECT count(DISTINCT meeting_id) AS n FROM meeting_search WHERE meeting_search MATCH 'text : "ugeplanen"' AND meeting_id LIKE 'demo-search-%'`,
       ),
     ).toBe(2);
     // The foreign-install fixtures: one meeting, one share, one recording.

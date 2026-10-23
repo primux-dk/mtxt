@@ -115,12 +115,12 @@ export async function runTranscribe(
     if (!done.written) log.log('Another delivery finished the transcript first', recordingId);
     // The outbox row is in D1 already; this sends it, and any later delivery would too.
     await sendOutbox(db, installId, deps.queue, { transcriptId: claim!.transcriptId });
-    // TODO(packet 6): syncSearch(db, installId, rec.meetingId) once the adapters export it.
+    // The search index got the segments in completeTranscript (indexSegments).
   };
 
   try {
     if (step === 'finish') {
-      await finishDone(db, installId, recordingId, transcript!.id);
+      await finishDone(db, installId, recordingId, transcript!.id, rec.meetingId);
       await sendOutbox(db, installId, deps.queue, { transcriptId: transcript!.id });
       return;
     }
