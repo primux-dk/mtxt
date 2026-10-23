@@ -206,29 +206,35 @@ export async function retentionBatch(
     }
 
     if (started <= textCutoff && Number(meeting.text)) {
-      const docx = await db.all<{ id: string; docx_path: string }>(sql`
-        select id, docx_path from recaps where install_id = ${installId}
-          and meeting_id = ${meeting.id} and docx_path is not null`);
+      // What the transcript batch takes along in storage: the recaps' docx and the
+      // providers' raw results (transcripts.raw_path), comparison transcripts included.
+      const objects = await db.all<{ path: string }>(sql`
+        select docx_path as path from recaps where install_id = ${installId}
+          and meeting_id = ${meeting.id} and docx_path is not null
+        union
+        select t.raw_path from transcripts t
+          join recordings r on r.id = t.recording_id and r.install_id = ${installId}
+          where t.install_id = ${installId} and r.meeting_id = ${meeting.id} and t.raw_path is not null`);
       const guard = eligible(meeting.id, textCutoff);
-      // One cleanup entry per docx, written in the batch only if the guard lets its recap go.
-      const cleanup = docx.map((d) => ({
-        id: crypto.randomUUID(),
-        path: d.docx_path,
-        recapId: d.id,
-      }));
-      const recordDocx = cleanup.map((e) =>
+      // One cleanup entry per object, written in the batch only if the guard lets the rows go.
+      const cleanup = objects.map((o) => ({ id: crypto.randomUUID(), path: o.path }));
+      const recordObjects = cleanup.map((e) =>
         db.insert(storageCleanup).select(
           db
             .select({
               id: sql<string>`${e.id}`.as('id'),
-              installId: schema.recaps.installId,
+              installId: schema.meetings.installId,
               path: sql<string>`${e.path}`.as('path'),
               createdAt: sql<number>`${t}`.as('created_at'),
               attempts: sql<number>`0`.as('attempts'),
             })
-            .from(schema.recaps)
+            .from(schema.meetings)
             .where(
-              and(eq(schema.recaps.id, e.recapId), eq(schema.recaps.installId, installId), guard),
+              and(
+                eq(schema.meetings.id, meeting.id),
+                eq(schema.meetings.installId, installId),
+                guard,
+              ),
             ),
         ),
       );
@@ -320,12 +326,12 @@ export async function retentionBatch(
           ),
       ] as const;
       // Recorded first: the inserts read the recaps the deletes then remove.
-      const results = (await db.batch([...recordDocx, ...deletes] as unknown as Parameters<
+      const results = (await db.batch([...recordObjects, ...deletes] as unknown as Parameters<
         typeof db.batch
       >[0])) as unknown as unknown[];
-      const gone = results[recordDocx.length + 3] as { id: string }[];
-      const dropped = results[recordDocx.length + 5] as { id: string }[];
-      // The docx of the recaps that went were recorded in the same batch; delete them now.
+      const gone = results[recordObjects.length + 3] as { id: string }[];
+      const dropped = results[recordObjects.length + 5] as { id: string }[];
+      // The objects were recorded in the same batch, only if it let the rows go; delete them now.
       const recorded = cleanup.length
         ? await db
             .select({ id: storageCleanup.id, path: storageCleanup.path })

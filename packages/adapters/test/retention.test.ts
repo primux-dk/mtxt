@@ -314,4 +314,26 @@ describe('retentionBatch', () => {
     );
     expect(counts).toEqual({ keep: 1004, open_upload: 1, foreign_rows: 1 });
   });
+
+  it("deletes the providers' raw results with the transcripts, comparison transcripts included", async () => {
+    const t = setup();
+    await t.full('raw', 400);
+    t.sqlite.exec(
+      "UPDATE transcripts SET raw_path = 'transcripts/test/raw-r/assemblyai-x.json' WHERE id = 'raw-t'",
+    );
+    t.sqlite.exec(
+      "INSERT INTO transcripts (id, install_id, recording_id, provider, model, language, raw_json, is_comparison, raw_path) VALUES ('raw-cmp', 'test', 'raw-r', 'workers-ai', 'whisper', 'da', '{}', 1, 'transcripts/test/raw-r/workers-ai-y.json')",
+    );
+    await t.run();
+    expect(t.deleted.sort()).toEqual([
+      'exports/raw.docx',
+      'recordings/test/raw/raw-r.webm',
+      'transcripts/test/raw-r/assemblyai-x.json',
+      'transcripts/test/raw-r/workers-ai-y.json',
+    ]);
+    expect(
+      rows(t.sqlite, "select count(*) as n from transcripts where recording_id = 'raw-r'"),
+    ).toEqual([{ n: 0 }]);
+    expect(rows(t.sqlite, 'select count(*) as n from storage_cleanup')).toEqual([{ n: 0 }]);
+  });
 });
