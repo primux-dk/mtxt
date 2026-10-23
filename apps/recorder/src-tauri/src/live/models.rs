@@ -17,6 +17,9 @@ pub struct ModelSpec {
     pub id: &'static str,
     pub label: &'static str,
     pub repo: &'static str,
+    /// The Hugging Face commit the files are fetched from: a fixed revision,
+    /// so the checksums below always describe what is downloaded.
+    pub revision: &'static str,
     pub files: &'static [ModelFile],
 }
 
@@ -31,6 +34,7 @@ pub const PARAKEET: ModelSpec = ModelSpec {
     id: "parakeet",
     label: "Parakeet",
     repo: "istupakov/parakeet-tdt-0.6b-v3-onnx",
+    revision: "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce",
     files: &[
         ModelFile {
             name: "config.json",
@@ -65,6 +69,7 @@ pub const WHISPER: ModelSpec = ModelSpec {
     id: "whisper",
     label: "Whisper",
     repo: "ggerganov/whisper.cpp",
+    revision: "5359861c739e955e79d9a303bcbc70fb988958b1",
     files: &[ModelFile {
         name: "ggml-large-v3-turbo-q5_0.bin",
         size: 574_041_195,
@@ -90,6 +95,10 @@ pub fn available() -> Vec<&'static ModelSpec> {
 pub fn usable(chosen: &str) -> &'static str {
     let have = available();
     have.iter().find(|s| s.id == chosen).or(have.first()).map(|s| s.id).unwrap_or("parakeet")
+}
+
+pub fn url(spec: &ModelSpec, file: &ModelFile) -> String {
+    format!("https://huggingface.co/{}/resolve/{}/{}", spec.repo, spec.revision, file.name)
 }
 
 pub fn spec(id: &str) -> Option<&'static ModelSpec> {
@@ -150,31 +159,33 @@ pub fn download(
         }
         let part = d.join(format!("{}.part", f.name));
         // Resume: hash what is already there, then ask for the rest.
-        let mut hasher = Sha256::new();
-        let mut have = 0u64;
-        if let Ok(mut existing) = std::fs::File::open(&part) {
-            let mut buf = vec![0u8; 1 << 20];
-            loop {
-                let n = existing.read(&mut buf)?;
-                if n == 0 {
-                    break;
-                }
-                hasher.update(&buf[..n]);
-                have += n as u64;
-            }
-        }
+        let (mut hasher, mut have) = hash_partial(&part)?;
         if have > f.size {
             std::fs::remove_file(&part)?;
             hasher = Sha256::new();
             have = 0;
         }
-        let url = format!("https://huggingface.co/{}/resolve/main/{}", spec.repo, f.name);
+        // A partial as large as the file (a crash before the rename): check
+        // it and install it, without asking the server for an empty range.
+        if have == f.size {
+            finish_file(&part, &target, hasher, f)?;
+            done_before += f.size;
+            progress(Progress { done: done_before, total });
+            continue;
+        }
+        let url = url(spec, f);
         let mut req = client.get(&url);
         if have > 0 {
             req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
         }
         let mut res = req.send().map_err(|e| DownloadError::Network(e.without_url().to_string()))?;
         let status = res.status();
+        if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+            // The server says the partial already holds everything it has:
+            // start this file again rather than trust it.
+            std::fs::remove_file(&part)?;
+            return Err(DownloadError::Network("HTTP 416; the file starts again on the next try".into()));
+        }
         if have > 0 && status == reqwest::StatusCode::OK {
             // The server ignored the range: start the file again.
             hasher = Sha256::new();
@@ -206,20 +217,84 @@ pub fn download(
         if have != f.size {
             return Err(DownloadError::Network(format!("{} ended at {have} of {} bytes", f.name, f.size)));
         }
-        if hex::encode(hasher.finalize()) != f.sha256 {
-            let _ = std::fs::remove_file(&part);
-            return Err(DownloadError::Checksum(f.name.into()));
-        }
-        std::fs::rename(&part, &target)?;
+        finish_file(&part, &target, hasher, f)?;
         done_before += f.size;
         progress(Progress { done: done_before, total });
     }
     Ok(())
 }
 
+fn hash_partial(part: &Path) -> Result<(Sha256, u64), DownloadError> {
+    let mut hasher = Sha256::new();
+    let mut have = 0u64;
+    if let Ok(mut existing) = std::fs::File::open(part) {
+        let mut buf = vec![0u8; 1 << 20];
+        loop {
+            let n = existing.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+            have += n as u64;
+        }
+    }
+    Ok((hasher, have))
+}
+
+/// Check the finished partial against the pinned SHA-256 and move it into place.
+fn finish_file(part: &Path, target: &Path, hasher: Sha256, f: &ModelFile) -> Result<(), DownloadError> {
+    if hex::encode(hasher.finalize()) != f.sha256 {
+        let _ = std::fs::remove_file(part);
+        return Err(DownloadError::Checksum(f.name.into()));
+    }
+    std::fs::rename(part, target)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_complete_partial_is_installed_without_a_request() {
+        // A model whose only file is already complete as a partial: the
+        // download finishes offline (the URL would fail if it were asked).
+        static TINY: ModelSpec = ModelSpec {
+            id: "tiny",
+            label: "Tiny",
+            repo: "nobody/nothing",
+            revision: "0000000000000000000000000000000000000000",
+            files: &[ModelFile {
+                name: "m.bin",
+                size: 5,
+                sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            }],
+        };
+        let tmp = tempfile::tempdir().unwrap();
+        let d = dir(tmp.path(), &TINY);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("m.bin.part"), b"hello").unwrap();
+        download(tmp.path(), &TINY, &AtomicBool::new(false), &mut |_| {}).unwrap();
+        assert_eq!(std::fs::read(d.join("m.bin")).unwrap(), b"hello");
+        assert!(!d.join("m.bin.part").exists());
+        // A complete partial with the wrong content is removed, not installed.
+        std::fs::remove_file(d.join("m.bin")).unwrap();
+        std::fs::write(d.join("m.bin.part"), b"jello").unwrap();
+        assert!(matches!(download(tmp.path(), &TINY, &AtomicBool::new(false), &mut |_| {}), Err(DownloadError::Checksum(_))));
+        assert!(!d.join("m.bin.part").exists() && !d.join("m.bin").exists());
+    }
+
+    #[test]
+    fn urls_are_pinned_to_a_revision() {
+        for spec in ALL {
+            for f in spec.files {
+                let u = url(spec, f);
+                assert!(u.contains(&format!("/resolve/{}/", spec.revision)), "{u}");
+                assert_eq!(spec.revision.len(), 40);
+                assert_eq!(f.sha256.len(), 64);
+            }
+        }
+    }
 
     #[test]
     fn sizes_and_lookup() {
