@@ -1,10 +1,10 @@
 'use client';
 
-import { Archive, ArchiveRestore, Ellipsis, Trash2, Upload } from 'lucide-react';
+import { Archive, ArchiveRestore, Ellipsis, Send, Trash2, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { deleteMeeting, setArchived } from '@/app/(app)/meetings/actions';
+import { deleteMeeting, sendToConnected, setArchived } from '@/app/(app)/meetings/actions';
 import { safely } from '@/lib/safe-action';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,9 +24,10 @@ import {
 import { UploadDialog } from '@/components/upload/upload-dialog';
 
 /**
- * The owner's overflow menu: upload another recording, Archive or Restore,
- * and Delete. Archive is not delete (behaviour.md rule 3): delete opens a
- * dialog that names what goes before anything goes.
+ * The owner's overflow menu: upload another recording, Send to connected
+ * systems when the install has an enabled webhook endpoint, Archive or
+ * Restore, and Delete. Archive is not delete (behaviour.md rule 3): delete
+ * opens a dialog that names what goes before anything goes.
  */
 export function MeetingMenu({
   meetingId,
@@ -34,12 +35,15 @@ export function MeetingMenu({
   recordings,
   hasRecap,
   canUpload,
+  connected,
 }: {
   meetingId: string;
   archived: boolean;
   recordings: number;
   hasRecap: boolean;
   canUpload: boolean;
+  /** The install has an enabled webhook endpoint; `label` names the system when they share one. */
+  connected: { label: string | null } | null;
 }) {
   const t = useTranslations('meeting');
   const common = useTranslations('common');
@@ -51,6 +55,19 @@ export function MeetingMenu({
   // Another install's rows depend on the meeting: a different message, no retry.
   const [conflict, setConflict] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [sent, setSent] = useState<'sending' | 'now' | 'later' | 'already' | 'failed' | null>(null);
+  const named = connected?.label
+    ? { hasName: 'yes', name: connected.label }
+    : { hasName: 'no', name: '' };
+
+  const send = () => {
+    setSent('sending');
+    startTransition(async () => {
+      const result = await sendToConnected(meetingId).catch(() => ({ ok: false as const }));
+      if (!result.ok) return setSent('failed');
+      setSent(result.queued > 0 ? 'now' : result.transcript || result.recap ? 'already' : 'later');
+    });
+  };
 
   const archive = (value: boolean) =>
     startTransition(async () => {
@@ -75,6 +92,12 @@ export function MeetingMenu({
               {t('uploadRecording')}
             </DropdownMenuItem>
           )}
+          {connected && (
+            <DropdownMenuItem onSelect={send}>
+              <Send aria-hidden="true" />
+              {t('webhook.send', named)}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => archive(!archived)}>
             {archived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
             {archived ? t('archive.restore') : t('archive.action')}
@@ -86,6 +109,17 @@ export function MeetingMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {sent && sent !== 'sending' && (
+        <span
+          role={sent === 'failed' ? 'alert' : 'status'}
+          className={
+            sent === 'failed' ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'
+          }
+          data-testid="webhook-sent"
+        >
+          {t(`webhook.${sent}`, named)}
+        </span>
+      )}
       {error === 'archive' && (
         <span role="alert" className="text-xs text-destructive">
           {conflict ? t('conflict') : t('archive.failed')}

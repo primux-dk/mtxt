@@ -49,13 +49,26 @@ export interface RetentionJob {
   batch?: number;
 }
 
-export type Job = TranscribeJob | RecapJob | DrainTranscriptionsJob | RetentionJob;
+/**
+ * One attempt of one webhook delivery (apps/web lib/webhooks/deliver.ts).
+ * `attempt` is the attempt this message is meant to make, from 1; a message
+ * whose attempt the delivery is already past is stale and does nothing.
+ */
+export interface WebhookJob {
+  type: 'webhook';
+  install_id: string;
+  delivery_id: string;
+  attempt: number;
+}
+
+export type Job = TranscribeJob | RecapJob | DrainTranscriptionsJob | RetentionJob | WebhookJob;
 export type JobType = Job['type'];
 export const JOB_TYPES = [
   'transcribe',
   'recap',
   'drain_transcriptions',
   'retention',
+  'webhook',
 ] as const satisfies readonly JobType[];
 
 export function isJob(value: unknown): value is Job {
@@ -79,6 +92,13 @@ export function isJob(value: unknown): value is Job {
     return job.after === undefined || typeof job.after === 'string';
   }
   if (job.type === 'retention') return Number.isFinite(job.now);
+  if (job.type === 'webhook') {
+    return (
+      typeof job.delivery_id === 'string' &&
+      Number.isInteger(job.attempt) &&
+      (job.attempt as number) >= 1
+    );
+  }
   return false;
 }
 

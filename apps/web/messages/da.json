@@ -209,7 +209,14 @@
       "meet": "Meet",
       "device": "Diktafon"
     },
-    "conflict": "Data fra en anden installation afhænger af mødet, så det er ikke ændret. Kontakt din administrator."
+    "conflict": "Data fra en anden installation afhænger af mødet, så det er ikke ændret. Kontakt din administrator.",
+    "webhook": {
+      "send": "{hasName, select, yes {Send til {name}} other {Send til forbundne systemer}}",
+      "now": "{hasName, select, yes {{name} får mødet nu.} other {De forbundne systemer får mødet nu.}}",
+      "later": "{hasName, select, yes {{name} får mødet, når transskriptionen er klar.} other {De forbundne systemer får mødet, når transskriptionen er klar.}}",
+      "already": "{hasName, select, yes {{name} har allerede mødet. Senere ændringer sendes af sig selv.} other {De forbundne systemer har allerede mødet. Senere ændringer sendes af sig selv.}}",
+      "failed": "Mødet blev ikke sendt. Prøv igen."
+    }
   },
   "transcript": {
     "head": "{language} · {count, plural, =0 {ingen talere} one {# taler} other {# talere}} · Klik på en taler for at omdøbe",
@@ -619,7 +626,13 @@
       "notAvailable": "Findes ikke i denne version.",
       "gatewayFormat": "Skriv gateway-id'et: bogstaver, tal, - og _.",
       "modelFormat": "Skriv et model-ID uden mellemrum, højst 200 tegn.",
-      "azureModel": "Skriv ressourcen og deployment som ressource/deployment, for eksempel acme-openai/referater."
+      "azureModel": "Skriv ressourcen og deployment som ressource/deployment, for eksempel acme-openai/referater.",
+      "urlInvalid": "Skriv en hel URL, for eksempel https://alex.example.com/hooks/mtxt.",
+      "urlNotHttps": "Brug en https-URL. Hændelser sendes aldrig over almindelig http.",
+      "urlCredentials": "Udelad brugernavn og adgangskode i URL'en. Signaturen viser, hvem der har sendt hændelsen.",
+      "urlPrivate": "Afvist: det er en lokal eller privat adresse. Brug det modtagende systems offentlige https-adresse.",
+      "atLeastOneEvent": "Vælg mindst én hændelse.",
+      "urlPort": "Brug standardporten for https, 443. Andre porte afvises."
     },
     "saved": "Indstillingerne er gemt.",
     "recap": {
@@ -637,6 +650,133 @@
       "modelHelpAzure": "Skriv Azure-ressourcen og deployment som ressource/deployment.",
       "apiKey": "API-nøgle",
       "noKey": "Workers AI kører i virksomhedens egen Cloudflare-konto og kræver ingen nøgle."
+    },
+    "webhooks": {
+      "heading": "Webhooks",
+      "help": "Send møder til virksomhedens andre systemer. Metadata og signerede links, aldrig selve teksten.",
+      "autoSend": "Send automatisk",
+      "autoSendHelp": "Private møder sendes aldrig automatisk. Ejeren sender et med Send til forbundne systemer på mødesiden.",
+      "autoSendOptions": {
+        "off": "Fra",
+        "company": "Møder for hele virksomheden",
+        "shared": "Alle delte møder (hele virksomheden og delte)"
+      },
+      "endpoints": "Endpoints",
+      "count": "{count} af {max}",
+      "add": "Tilføj endpoint",
+      "tooManyNote": "Højst fem endpoints. Slet et for at tilføje et nyt.",
+      "empty": "Ingen endpoints endnu. Tilføj et for at sende møder til et andet system.",
+      "unnamed": "Endpoint uden navn",
+      "enabled": "Slået til",
+      "disabled": "Slået fra",
+      "enable": "Slå til",
+      "disable": "Slå fra",
+      "enableLabel": "Slå {name} til",
+      "disableLabel": "Slå {name} fra",
+      "nowEnabled": "{name} er slået til.",
+      "nowDisabled": "{name} er slået fra. Dets links holder op med at virke.",
+      "changeFailed": "Ændringen blev ikke gemt. Prøv igen.",
+      "test": "Send testhændelse",
+      "testLabel": "Send en testhændelse til {name}",
+      "testQueued": "En testhændelse er på vej til {name}. Leveringsloggen viser svaret.",
+      "testQueuedHere": "Testhændelsen er sat i kø. Den vises herunder om et øjeblik.",
+      "testFailed": "Testhændelsen kunne ikke sættes i kø. Prøv igen.",
+      "log": "Leveringslog",
+      "logLabel": "Leveringslog for {name}",
+      "delete": "Slet",
+      "deleteLabel": "Slet {name}",
+      "deleteTitle": "Slet dette endpoint?",
+      "deleteBody": "{name} får ikke flere hændelser, leveringsloggen slettes, og de links, det har fået, holder op med at virke.",
+      "deleted": "{name} er slettet.",
+      "deleteFailed": "Endpointet kunne ikke slettes. Prøv igen.",
+      "added": "{name} er tilføjet.",
+      "addFailed": "Endpointet kunne ikke tilføjes. Prøv igen.",
+      "tooMany": "Installationen har allerede fem endpoints. Slet et for at tilføje et nyt.",
+      "eventNames": {
+        "transcribed": "Transskription klar",
+        "drafted": "Udkast til referat",
+        "saved": "Referat gemt",
+        "shared": "Møde delt",
+        "deleted": "Møde slettet",
+        "test": "Testhændelse"
+      },
+      "lastNone": "Ingen leveringer endnu",
+      "last": "Seneste levering: {status} · {answer} · <when></when>",
+      "lastShort": "Seneste levering: {status} · <when></when>",
+      "status": {
+        "queued": "I kø",
+        "pending": "Venter på nyt forsøg",
+        "sending": "Sender",
+        "delivered": "Leveret",
+        "parked": "Parkeret",
+        "cancelled": "Ikke sendt"
+      },
+      "answer": {
+        "ok": "HTTP {code}",
+        "none": "Intet svar endnu",
+        "http_status": "HTTP {code}",
+        "redirect": "Omdirigering ikke fulgt (HTTP {code})",
+        "timeout": "Intet svar inden for 10 sekunder",
+        "network": "Kunne ikke forbinde",
+        "private_address": "Afvist: værten er en privat adresse",
+        "dns": "Værtsnavnet kunne ikke slås op",
+        "config": "Installationens egne indstillinger er ufuldstændige",
+        "not_eligible": "Mødet må ikke længere sendes",
+        "meeting_gone": "Mødet findes ikke længere",
+        "endpoint_disabled": "Endpointet er slået fra",
+        "short_ttl": "Afvist: værtens DNS-svar har en TTL under et minut og skiftede ved andet opslag"
+      },
+      "dialog": {
+        "title": "Tilføj endpoint",
+        "body": "Hændelser sendes til denne URL som JSON, signeret med en hemmelighed, som kun denne installation og det modtagende system kender.",
+        "label": "Navn",
+        "labelHelp": "Valgfrit. Det modtagende systems navn, for eksempel Alex. Mødesiden siger så Send til Alex.",
+        "url": "URL",
+        "urlHelp": "Kun https på port 443, højst {max} tegn. Private og lokale adresser afvises.",
+        "events": "Hændelser der sendes",
+        "submit": "Tilføj endpoint",
+        "secretTitle": "Kopiér signeringshemmeligheden",
+        "secretBody": "{name} er tilføjet. Det er den eneste gang, hemmeligheden vises.",
+        "secret": "Signeringshemmelighed",
+        "secretNote": "Det modtagende system tjekker headeren X-Mtxt-Signature med den. Hvis den bliver væk, så slet endpointet og tilføj det igen.",
+        "copy": "Kopiér",
+        "copied": "Kopieret",
+        "done": "Færdig"
+      },
+      "logPage": {
+        "back": "Tilbage til indstillinger",
+        "title": "Leveringslog · {name}",
+        "subheading": "De seneste 50 leveringer til dette endpoint. En levering får seks forsøg, derefter parkeres den. Kun titler og svar, aldrig indhold.",
+        "url": "URL",
+        "count": "{count, plural, one {# levering} other {# leveringer}}",
+        "noMeeting": "Intet møde",
+        "noNext": "Intet",
+        "attempts": "{count} af {max}",
+        "retry": "Prøv igen nu",
+        "retryLabel": "Prøv igen nu: {event}, {meeting}",
+        "retried": "Sat i kø. Svaret vises her om et øjeblik.",
+        "retryFailed": "Det nye forsøg kunne ikke sættes i kø. Prøv igen.",
+        "table": {
+          "caption": "Leveringer til dette endpoint, nyeste først",
+          "time": "Tid",
+          "event": "Hændelse",
+          "meeting": "Møde",
+          "status": "Status",
+          "attempts": "Forsøg",
+          "answer": "Seneste svar",
+          "next": "Næste forsøg",
+          "action": "Handling"
+        },
+        "empty": {
+          "title": "Ingen leveringer endnu",
+          "body": "Hændelser til dette endpoint vises her. Brug Send testhændelse ovenfor for at tjekke forbindelsen."
+        },
+        "failed": {
+          "title": "Leveringsloggen kunne ikke hentes",
+          "body": "Loggen blev ikke hentet. Tjek forbindelsen, og prøv igen.",
+          "retry": "Prøv igen"
+        }
+      }
     }
   },
   "auth": {
@@ -790,7 +930,8 @@
       "mcp_read": "Læst via MCP",
       "mcp_write": "Ændret via MCP",
       "recorder_connected": "Optager forbundet",
-      "recorder_disconnected": "Optager afbrudt"
+      "recorder_disconnected": "Optager afbrudt",
+      "webhook_sent": "Sendt til et forbundet system"
     },
     "count": "{count, plural, one {# hændelse} other {# hændelser}}",
     "range": "{from}–{to} af {total, plural, one {# hændelse} other {# hændelser}}",
@@ -817,8 +958,12 @@
       "device": "Enhed: {device}",
       "format": {
         "md": "Markdown",
-        "docx": "Word"
-      }
+        "docx": "Word",
+        "transcript": "Transskription"
+      },
+      "unnamedEndpoint": "et endpoint uden navn",
+      "viaWebhook": "{format}, hentet af {endpoint}",
+      "webhook": "{endpoint} · {event}"
     },
     "empty": {
       "first": {

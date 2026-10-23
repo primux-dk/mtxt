@@ -11,8 +11,15 @@ export const EXPORT_TYPES: Record<ExportFormat, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 };
 
-/** "Produktionsmøde, uge 43 2026-10-22.docx": the title made safe for a file system, and the meeting's date. */
-export function exportFileName(title: string, startedAt: Date, format: ExportFormat): string {
+/**
+ * "Produktionsmøde, uge 43 2026-10-22.docx": the title made safe for a file
+ * system, and the meeting's date. `json` is a webhook's transcript link.
+ */
+export function exportFileName(
+  title: string,
+  startedAt: Date,
+  format: ExportFormat | 'json',
+): string {
   const safe = title
     .normalize('NFC')
     .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, ' ')

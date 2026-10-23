@@ -157,6 +157,15 @@ try {
     throw new Error('The decisions lost their order.');
   const recap = query(`SELECT status FROM recaps WHERE id = 'c1'`)[0];
   if (recap?.status !== 'ready') throw new Error('An existing recap is not ready.');
+  // Packet 13 (0009) rebuilds audit_events again for webhook_sent: every row stays.
+  const audits = query(`SELECT id FROM audit_events ORDER BY id`).map((r) => r.id);
+  if (JSON.stringify(audits) !== JSON.stringify(['a1', 'a2']))
+    throw new Error('The audit rows did not survive the webhook rebuild.');
+  query(
+    `INSERT INTO audit_events (id, install_id, user_id, action, details, at) VALUES ('a3', 'dev', 'u1', 'webhook_sent', '{"endpoint":"Alex"}', 3000)`,
+  );
+  const auto = query(`SELECT webhook_auto_send FROM settings LIMIT 1`)[0];
+  if (auto && auto.webhook_auto_send !== 'off') throw new Error('Send automatically is not off.');
   console.log('D1 upgrade check passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });

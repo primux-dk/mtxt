@@ -9,6 +9,7 @@ import { cloudflareConsumer } from '@mtxt/adapters/cloudflare';
 import { default as nextHandler } from './.open-next/worker.js';
 import {
   chunkTooLarge,
+  exportGuard,
   limitChunkBody,
   limitRecapBody,
   limitWebhookBody,
@@ -37,6 +38,9 @@ export default {
   async fetch(request, env, ctx) {
     // One accepted form per API path: a slash variant would pass the body bounds below.
     if (nonCanonicalApiPath(new URL(request.url).pathname)) return nonCanonicalNotFound();
+    // The signed export link: one exact path, GET or HEAD, no body (lib/chunk-guard.ts).
+    const exported = exportGuard(request);
+    if (exported) return exported;
     const chunk = limitChunkBody(request);
     if (chunk instanceof Response) return chunk;
     const guarded = limitWebhookBody(chunk.request);

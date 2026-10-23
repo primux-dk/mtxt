@@ -16,7 +16,14 @@
   reason. The model's own words are only ever the recap.
 */
 import { and, asc, desc, eq } from 'drizzle-orm';
-import { readSettings, schema, type Db, type RecapJob, type Settings } from '@mtxt/adapters';
+import {
+  readSettings,
+  schema,
+  type Db,
+  type QueueAdapter,
+  type RecapJob,
+  type Settings,
+} from '@mtxt/adapters';
 import { describeError } from '../stt/redact';
 import { keytermList } from '../transcription/job';
 import { liftDecisions, type MeetingSpeaker } from './decisions';
@@ -39,6 +46,7 @@ import {
   type PromptInput,
   type PromptSegment,
 } from './prompt';
+import { queueMeetingEventQuietly } from '../webhooks/store';
 import { beginDraft, failDraft, holdsDraft, writeVersion } from './store';
 
 export const MAX_ATTEMPTS = 3;
@@ -49,6 +57,8 @@ export interface RecapDeps {
   llm: (settings: Settings) => Promise<RecapLlm>;
   /** packet 4's guard: true the first time a transcript's recap job is taken. */
   takeOnce: (transcriptId: string) => Promise<boolean>;
+  /** For the `recap.drafted` webhook event; without it no event is queued. */
+  queue?: QueueAdapter;
   log?: Pick<Console, 'log' | 'error'>;
 }
 
@@ -273,7 +283,19 @@ export async function runRecap(deps: RecapDeps, job: RecapJob, attempt: number):
       draftToken: draft.token,
     });
     if (!written.ok) log.log('Recap draft superseded before it was written', job.meeting_id);
-    else log.log(`Recap drafted for ${meeting.id}: v${written.version.number}`);
+    else {
+      log.log(`Recap drafted for ${meeting.id}: v${written.version.number}`);
+      if (deps.queue) {
+        await queueMeetingEventQuietly(
+          { db, installId, queue: deps.queue, log },
+          {
+            event: 'recap.drafted',
+            meetingId: meeting.id,
+            dedupeKey: `drafted:${written.version.id}`,
+          },
+        );
+      }
+    }
   } catch (error) {
     const reason = error instanceof RecapError ? error : new RecapError('internal', true);
     if (reason.retryable && attempt < MAX_ATTEMPTS) {

@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { LocalTime } from '@/components/local-time';
 import type { AuditRow } from '@/lib/audit/queries';
+import { eventKey } from '@/lib/webhooks/labels';
 
 /** At most this many names in a "shared" row; the rest is a count. */
 const NAMES_SHOWN = 3;
@@ -20,6 +21,7 @@ export async function AuditTable({
 }) {
   const t = await getTranslations('audit');
   const tv = await getTranslations('visibility');
+  const tw = await getTranslations('settings.webhooks');
 
   const list = (ids: string[]) => {
     const shown = ids.slice(0, NAMES_SHOWN).map((id) => names[id] ?? t('details.unknownUser'));
@@ -59,8 +61,22 @@ export async function AuditTable({
         .filter(Boolean)
         .join(' · ');
     }
-    if (row.action === 'exported' && (d.format === 'md' || d.format === 'docx')) {
-      return t(`details.format.${d.format}`);
+    const endpoint = (value: unknown) =>
+      typeof value === 'string' && value ? value : t('details.unnamedEndpoint');
+    if (
+      row.action === 'exported' &&
+      (d.format === 'md' || d.format === 'docx' || d.format === 'transcript')
+    ) {
+      const format = t(`details.format.${d.format}`);
+      return d.via === 'webhook'
+        ? t('details.viaWebhook', { format, endpoint: endpoint(d.endpoint) })
+        : format;
+    }
+    if (row.action === 'webhook_sent' && typeof d.event === 'string') {
+      return t('details.webhook', {
+        endpoint: endpoint(d.endpoint),
+        event: tw(`eventNames.${eventKey(d.event)}`),
+      });
     }
     return null;
   };

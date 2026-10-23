@@ -179,3 +179,32 @@ export function limitRecapBody(request: Request): Guarded | Response {
   if (declared !== null && Number(declared) > bound.max) return recapTooLarge(request);
   return limitBody(request, bound.max);
 }
+
+/*
+  A webhook's signed export link (lib/webhooks/grant.ts) is open to anyone
+  with the token, so its route is held to one shape at the Worker entry,
+  before OpenNext reads anything: exactly `/api/v1/export/<token>`, one
+  segment, GET or HEAD, and no body at all. Any other path under it is 404,
+  any other method 405, and a request that carries a body is refused unread
+  (packet 13 review).
+*/
+export const EXPORT_PATH = /^\/api\/v1\/export\/[^/]+$/;
+
+export function exportGuard(request: Request): Response | null {
+  const path = guardPath(new URL(request.url).pathname);
+  if (path !== '/api/v1/export' && !path.startsWith('/api/v1/export/')) return null;
+  const refuse = (status: number, code: string, message: string, headers = {}) =>
+    Response.json(
+      { error: { code, message } },
+      { status, headers: { 'cache-control': 'no-store', ...headers } },
+    );
+  if (!EXPORT_PATH.test(path)) return refuse(404, 'not_found', 'No such export.');
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return refuse(405, 'method_not_allowed', 'An export link takes GET.', { allow: 'GET, HEAD' });
+  }
+  const length = request.headers.get('content-length');
+  if ((length !== null && length !== '0') || request.headers.has('transfer-encoding')) {
+    return refuse(400, 'invalid_request', 'An export link takes no body.');
+  }
+  return null;
+}

@@ -209,7 +209,14 @@
       "meet": "Meet",
       "device": "Voice recorder"
     },
-    "conflict": "Data from another installation depends on this meeting, so it was left as it is. Contact your admin."
+    "conflict": "Data from another installation depends on this meeting, so it was left as it is. Contact your admin.",
+    "webhook": {
+      "send": "{hasName, select, yes {Send to {name}} other {Send to connected systems}}",
+      "now": "{hasName, select, yes {{name} gets this meeting now.} other {The connected systems get this meeting now.}}",
+      "later": "{hasName, select, yes {{name} gets this meeting when the transcript is ready.} other {The connected systems get this meeting when the transcript is ready.}}",
+      "already": "{hasName, select, yes {{name} has this meeting already. Later changes go to it on their own.} other {The connected systems have this meeting already. Later changes go to them on their own.}}",
+      "failed": "The meeting was not sent. Try again."
+    }
   },
   "transcript": {
     "head": "{language} · {count, plural, =0 {no speakers} one {# speaker} other {# speakers}} · Click a speaker to rename",
@@ -619,7 +626,13 @@
       "notAvailable": "Not available in this version.",
       "gatewayFormat": "Enter the gateway ID: letters, digits, - and _.",
       "modelFormat": "Enter a model ID without spaces, at most 200 characters.",
-      "azureModel": "Write the resource and the deployment as resource/deployment, for example acme-openai/recaps."
+      "azureModel": "Write the resource and the deployment as resource/deployment, for example acme-openai/recaps.",
+      "urlInvalid": "Enter a full URL, for example https://alex.example.com/hooks/mtxt.",
+      "urlNotHttps": "Use an https URL. Events are never sent over plain http.",
+      "urlCredentials": "Leave the user name and password out of the URL. The signature proves who sent the event.",
+      "urlPrivate": "Refused: this is a local or private address. Use the receiving system's public https address.",
+      "atLeastOneEvent": "Choose at least one event.",
+      "urlPort": "Use the standard https port, 443. Other ports are refused."
     },
     "saved": "Settings saved.",
     "recap": {
@@ -637,6 +650,133 @@
       "modelHelpAzure": "Write the Azure resource and the deployment as resource/deployment.",
       "apiKey": "API key",
       "noKey": "Workers AI runs in the company's Cloudflare account and needs no key."
+    },
+    "webhooks": {
+      "heading": "Webhooks",
+      "help": "Send meetings to the company's other systems. Metadata and signed links, never the text itself.",
+      "autoSend": "Send automatically",
+      "autoSendHelp": "Private meetings are never sent automatically. Their owner sends one with Send to connected systems on the meeting page.",
+      "autoSendOptions": {
+        "off": "Off",
+        "company": "Company meetings",
+        "shared": "All shared meetings (company and shared)"
+      },
+      "endpoints": "Endpoints",
+      "count": "{count} of {max}",
+      "add": "Add endpoint",
+      "tooManyNote": "Up to five endpoints. Delete one to add another.",
+      "empty": "No endpoints yet. Add one to send meetings to another system.",
+      "unnamed": "Unnamed endpoint",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enable": "Enable",
+      "disable": "Disable",
+      "enableLabel": "Enable {name}",
+      "disableLabel": "Disable {name}",
+      "nowEnabled": "{name} is enabled.",
+      "nowDisabled": "{name} is disabled. Its links stop working.",
+      "changeFailed": "The change was not saved. Try again.",
+      "test": "Send test event",
+      "testLabel": "Send a test event to {name}",
+      "testQueued": "A test event is on its way to {name}. The delivery log shows the answer.",
+      "testQueuedHere": "Test event queued. It shows below in a moment.",
+      "testFailed": "The test event could not be queued. Try again.",
+      "log": "Delivery log",
+      "logLabel": "Delivery log of {name}",
+      "delete": "Delete",
+      "deleteLabel": "Delete {name}",
+      "deleteTitle": "Delete this endpoint?",
+      "deleteBody": "{name} gets no more events, its delivery log is deleted, and the links it was sent stop working.",
+      "deleted": "{name} is deleted.",
+      "deleteFailed": "The endpoint could not be deleted. Try again.",
+      "added": "{name} is added.",
+      "addFailed": "The endpoint could not be added. Try again.",
+      "tooMany": "This install has five endpoints already. Delete one to add another.",
+      "eventNames": {
+        "transcribed": "Transcript ready",
+        "drafted": "Recap drafted",
+        "saved": "Recap saved",
+        "shared": "Meeting shared",
+        "deleted": "Meeting deleted",
+        "test": "Test event"
+      },
+      "lastNone": "No deliveries yet",
+      "last": "Last delivery: {status} · {answer} · <when></when>",
+      "lastShort": "Last delivery: {status} · <when></when>",
+      "status": {
+        "queued": "Queued",
+        "pending": "Waiting to retry",
+        "sending": "Sending",
+        "delivered": "Delivered",
+        "parked": "Parked",
+        "cancelled": "Not sent"
+      },
+      "answer": {
+        "ok": "HTTP {code}",
+        "none": "No answer yet",
+        "http_status": "HTTP {code}",
+        "redirect": "Redirect not followed (HTTP {code})",
+        "timeout": "No answer within 10 seconds",
+        "network": "Could not connect",
+        "private_address": "Refused: the host is a private address",
+        "dns": "The host name did not resolve",
+        "config": "The install's own settings are incomplete",
+        "not_eligible": "The meeting may no longer be sent",
+        "meeting_gone": "The meeting is gone",
+        "endpoint_disabled": "The endpoint is disabled",
+        "short_ttl": "Refused: the host's DNS answer has a TTL under a minute and changed on a second look"
+      },
+      "dialog": {
+        "title": "Add endpoint",
+        "body": "Events go to this URL as JSON, signed with a secret that only this install and the receiving system know.",
+        "label": "Label",
+        "labelHelp": "Optional. The receiving system's name, for example Alex. The meeting page then says Send to Alex.",
+        "url": "URL",
+        "urlHelp": "https on port 443 only, at most {max} characters. Private and local addresses are refused.",
+        "events": "Events to send",
+        "submit": "Add endpoint",
+        "secretTitle": "Copy the signing secret",
+        "secretBody": "{name} is added. This is the only time the secret is shown.",
+        "secret": "Signing secret",
+        "secretNote": "The receiving system checks the X-Mtxt-Signature header with it. If it is lost, delete the endpoint and add it again.",
+        "copy": "Copy",
+        "copied": "Copied",
+        "done": "Done"
+      },
+      "logPage": {
+        "back": "Back to settings",
+        "title": "Delivery log · {name}",
+        "subheading": "The last 50 deliveries to this endpoint. A delivery gets six attempts, then it is parked. Titles and answers only, never content.",
+        "url": "URL",
+        "count": "{count, plural, one {# delivery} other {# deliveries}}",
+        "noMeeting": "No meeting",
+        "noNext": "None",
+        "attempts": "{count} of {max}",
+        "retry": "Retry now",
+        "retryLabel": "Retry now: {event}, {meeting}",
+        "retried": "Queued. The answer shows here in a moment.",
+        "retryFailed": "The retry could not be queued. Try again.",
+        "table": {
+          "caption": "Deliveries to this endpoint, newest first",
+          "time": "Time",
+          "event": "Event",
+          "meeting": "Meeting",
+          "status": "Status",
+          "attempts": "Attempts",
+          "answer": "Last answer",
+          "next": "Next attempt",
+          "action": "Action"
+        },
+        "empty": {
+          "title": "No deliveries yet",
+          "body": "Events to this endpoint show here. Use Send test event above to check the connection."
+        },
+        "failed": {
+          "title": "Could not load the delivery log",
+          "body": "The log did not load. Check the connection and try again.",
+          "retry": "Try again"
+        }
+      }
     }
   },
   "auth": {
@@ -790,7 +930,8 @@
       "mcp_read": "Read through MCP",
       "mcp_write": "Changed through MCP",
       "recorder_connected": "Recorder connected",
-      "recorder_disconnected": "Recorder disconnected"
+      "recorder_disconnected": "Recorder disconnected",
+      "webhook_sent": "Sent to a connected system"
     },
     "count": "{count, plural, one {# event} other {# events}}",
     "range": "{from}–{to} of {total, plural, one {# event} other {# events}}",
@@ -817,8 +958,12 @@
       "device": "Device: {device}",
       "format": {
         "md": "Markdown",
-        "docx": "Word"
-      }
+        "docx": "Word",
+        "transcript": "Transcript"
+      },
+      "unnamedEndpoint": "an unnamed endpoint",
+      "viaWebhook": "{format}, fetched by {endpoint}",
+      "webhook": "{endpoint} · {event}"
     },
     "empty": {
       "first": {

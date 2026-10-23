@@ -22,6 +22,7 @@ import {
 } from '@mtxt/adapters';
 import { describeError } from '../stt/redact';
 import { SttError, type SttProvider, type SttResult } from '../stt/types';
+import { queueMeetingEventQuietly } from '../webhooks/store';
 import { nextStep } from './state';
 import {
   claimTranscript,
@@ -116,12 +117,25 @@ export async function runTranscribe(
     // The outbox row is in D1 already; this sends it, and any later delivery would too.
     await sendOutbox(db, installId, deps.queue, { transcriptId: claim!.transcriptId });
     // The search index got the segments in completeTranscript (indexSegments).
+    await transcribedEvent(claim!.transcriptId);
   };
+  /** `meeting.transcribed` to the endpoints that may have the meeting; once per transcript and endpoint. */
+  const transcribedEvent = (transcriptId: string) =>
+    queueMeetingEventQuietly(
+      { db, installId, queue: deps.queue, log },
+      {
+        event: 'meeting.transcribed',
+        meetingId: rec.meetingId,
+        dedupeKey: `transcribed:${transcriptId}`,
+      },
+    );
 
   try {
     if (step === 'finish') {
       await finishDone(db, installId, recordingId, transcript!.id, rec.meetingId);
       await sendOutbox(db, installId, deps.queue, { transcriptId: transcript!.id });
+      // A delivery that died before the event went out: the dedupe key makes this harmless.
+      await transcribedEvent(transcript!.id);
       return;
     }
 

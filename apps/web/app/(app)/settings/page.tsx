@@ -7,6 +7,7 @@ import { PROVIDER_IDS } from '@/lib/auth/provider';
 import { getAdapters, getInstallSettings } from '@/lib/install';
 import { formatKeyterms } from '@/lib/settings/keyterms';
 import { TRANSCRIPTION_LANGUAGES } from '@/lib/settings/validate';
+import { endpointRows } from '@/lib/webhooks/rows';
 
 /**
  * Figure 07: the whole admin surface, every row of the spec's settings table
@@ -21,9 +22,10 @@ export default async function SettingsPage() {
     getTranslations('settings'),
     headers(),
   ]);
-  const [terms, templates] = await Promise.all([
+  const [terms, templates, endpoints] = await Promise.all([
     listKeyterms(db, installId),
     listTemplates(db, installId),
+    endpointRows(),
   ]);
 
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost';
@@ -59,6 +61,7 @@ export default async function SettingsPage() {
       retentionAudioDays: settings.retentionAudioDays,
       retentionTranscriptDays: settings.retentionTranscriptDays,
       mcpEnabled: settings.mcpEnabled,
+      webhookAutoSend: settings.webhookAutoSend,
       adminEmails: settings.adminEmails.join('\n'),
     },
     // Whether a secret is stored, never the secret.
@@ -73,6 +76,7 @@ export default async function SettingsPage() {
       bodyMd,
       isDefault,
     })),
+    endpoints,
   };
 
   return <SettingsForm {...props} />;

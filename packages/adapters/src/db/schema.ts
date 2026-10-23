@@ -50,6 +50,7 @@ export const AUDIT_ACTIONS = [
   'mcp_write',
   'recorder_connected',
   'recorder_disconnected',
+  'webhook_sent',
 ] as const;
 export const IDENTITY_PROVIDERS = ['entra', 'google'] as const;
 export const STT_PROVIDERS = [
@@ -69,6 +70,25 @@ export const RECAP_STATUSES = ['drafting', 'ready', 'failed'] as const;
 export const TRANSCRIPT_STATUSES = ['pending', 'done', 'failed'] as const;
 /** A recorder grant: approved on /connect and waiting for the poll, cancelled there, or exchanged for a token. */
 export const RECORDER_GRANT_STATUSES = ['approved', 'denied', 'redeemed'] as const;
+/** The events an endpoint can take (docs/spec.md "Webhooks"). `webhook.test` is sent only by "Send test event". */
+export const WEBHOOK_EVENTS = [
+  'meeting.transcribed',
+  'recap.drafted',
+  'recap.saved',
+  'meeting.shared',
+  'meeting.deleted',
+] as const;
+export const WEBHOOK_TEST_EVENT = 'webhook.test';
+/** "Send automatically": nothing, company meetings, or company and shared ones. Never private. */
+export const WEBHOOK_AUTO_SEND = ['off', 'company', 'shared'] as const;
+/** A delivery waits for its next attempt, is being sent, went through, gave up, or was not sent. */
+export const WEBHOOK_DELIVERY_STATUSES = [
+  'pending',
+  'sending',
+  'delivered',
+  'parked',
+  'cancelled',
+] as const;
 /** The settings page's "Recording sources": where a meeting may come from. */
 export const CAPTURE_SOURCES = ['desktop', 'upload', 'browser', 'teams', 'meet'] as const;
 
@@ -148,6 +168,12 @@ export const meetings = sqliteTable(
     /** Archive is not delete (behaviour.md rule 3): hidden from library views, restorable. */
     archivedAt: timestamp('archived_at'),
     deletedAt: timestamp('deleted_at'),
+    /**
+     * The owner's "Send to connected systems": the meeting may go to the
+     * install's webhook endpoints whatever its visibility. Cleared when the
+     * meeting is set to private.
+     */
+    webhookConsentAt: timestamp('webhook_consent_at'),
   },
   (t) => [
     index('meetings_owner').on(t.ownerId),
@@ -554,6 +580,10 @@ export const settings = sqliteTable(
       .default(sql`'[]'`),
     /** Set by the first sign-in's admin claim, or the first save of the list. The claim never runs again. */
     adminBootstrapClaimedAt: timestamp('admin_bootstrap_claimed_at'),
+    /** WEBHOOK_AUTO_SEND. Checked by the app; a CHECK would rebuild the table. */
+    webhookAutoSend: text('webhook_auto_send', { enum: WEBHOOK_AUTO_SEND })
+      .notNull()
+      .default('off'),
   },
   () => [
     inValues('settings', 'identity_provider', IDENTITY_PROVIDERS),
@@ -668,6 +698,73 @@ export const recorderGrants = sqliteTable(
   ],
 );
 
+/**
+ * An outbound webhook endpoint (docs/spec.md "Webhooks"), at most five per
+ * install. The signing secret is sealed under SETTINGS_KEY with the context
+ * `webhook_endpoints.secret`; it is shown once, when the endpoint is added.
+ */
+export const webhookEndpoints = sqliteTable(
+  'webhook_endpoints',
+  {
+    id: id(),
+    installId: installId(),
+    /** The receiving system's name ("Alex"); null when none was given. */
+    label: text('label'),
+    url: text('url').notNull(),
+    /** Sealed. */
+    secret: text('secret').notNull(),
+    /** JSON array of WEBHOOK_EVENTS. */
+    events: text('events', { mode: 'json' })
+      .$type<readonly (typeof WEBHOOK_EVENTS)[number][]>()
+      .notNull(),
+    enabled: bool('enabled').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index('webhook_endpoints_install').on(t.installId, t.createdAt)],
+);
+
+/**
+ * One event for one endpoint, sent by a `webhook` queue job and retried
+ * with backoff. `meeting_id` has no foreign key: the log outlives the
+ * meeting, and `payload` keeps its title as it was when the event was
+ * queued. While `sending`, `next_attempt_at` is the attempt's lease.
+ */
+export const webhookDeliveries = sqliteTable(
+  'webhook_deliveries',
+  {
+    id: id(),
+    installId: installId(),
+    endpointId: text('endpoint_id')
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+    /** WEBHOOK_EVENTS or WEBHOOK_TEST_EVENT. */
+    event: text('event').notNull(),
+    meetingId: text('meeting_id'),
+    /** The event and the meeting's metadata when it was queued (lib/webhooks/payload.ts). Never content. */
+    payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at').notNull(),
+    /** WEBHOOK_DELIVERY_STATUSES, checked by the app. */
+    status: text('status', { enum: WEBHOOK_DELIVERY_STATUSES }).notNull().default('pending'),
+    lastStatusCode: integer('last_status_code'),
+    /** A fixed reason (`timeout`, `network`, `private_address`, `http_status`...), never the consumer's own words. */
+    lastError: text('last_error'),
+    lastAttemptAt: timestamp('last_attempt_at'),
+    /** `transcribed:<transcript id>`, `drafted:<version id>`, `deleted:<meeting id>`: sent once per endpoint. */
+    dedupeKey: text('dedupe_key'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('webhook_deliveries_endpoint_id').on(t.endpointId),
+    index('webhook_deliveries_endpoint').on(t.installId, t.endpointId, t.createdAt),
+    index('webhook_deliveries_status').on(t.installId, t.status, t.nextAttemptAt),
+    index('webhook_deliveries_meeting').on(t.installId, t.meetingId),
+    uniqueIndex('webhook_deliveries_dedupe')
+      .on(t.installId, t.endpointId, t.dedupeKey)
+      .where(sql`"dedupe_key" is not null`),
+  ],
+);
+
 export type Settings = typeof settings.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type Recording = typeof recordings.$inferSelect;
@@ -695,3 +792,8 @@ export type Decision = typeof decisions.$inferSelect;
 export type RecorderToken = typeof recorderTokens.$inferSelect;
 export type RecorderGrant = typeof recorderGrants.$inferSelect;
 export type RecorderGrantStatus = (typeof RECORDER_GRANT_STATUSES)[number];
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+export type WebhookAutoSend = (typeof WEBHOOK_AUTO_SEND)[number];
+export type WebhookDeliveryStatus = (typeof WEBHOOK_DELIVERY_STATUSES)[number];
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

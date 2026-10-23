@@ -12,13 +12,17 @@ import { transcriptionDeps } from '../lib/transcription/deps';
 import { drainStep } from '../lib/transcription/store';
 import { recapDeps } from '../lib/recap/deps';
 import { runRecap } from '../lib/recap/job';
+import { runWebhook } from '../lib/webhooks/deliver';
+import { webhookDeps } from '../lib/webhooks/deps';
+import { sweepDeliveries } from '../lib/webhooks/store';
 
 /**
  * The queue consumer, routed by job type. A transcribe job runs the
  * install's speech-to-text provider (lib/transcription/job.ts); a throw
  * puts the message back on the queue. A drain job queues the recordings
  * that waited for a provider, 100 at a time. A recap job drafts the recap
- * with the install's recap model (lib/recap/job.ts).
+ * with the install's recap model (lib/recap/job.ts). A webhook job makes
+ * one attempt of one delivery (lib/webhooks/deliver.ts).
  */
 export const handleJobs = routeJobs<CloudflareEnv>({
   async transcribe(job, message, env) {
@@ -68,6 +72,16 @@ export const handleJobs = routeJobs<CloudflareEnv>({
     await runRetention(job, env);
     message.ack();
   },
+  async webhook(job, message, env) {
+    if (job.install_id !== env.INSTALL_ID) {
+      console.error('Dropping a webhook job for another install', job.install_id);
+      message.ack();
+      return;
+    }
+    // An unexpected error throws and the router puts the message back; the claim stops a double send.
+    await runWebhook(webhookDeps(env), job);
+    message.ack();
+  },
 });
 
 /**
@@ -89,6 +103,9 @@ export async function runRetention(job: RetentionJob, env: CloudflareEnv) {
     // Recorder grants that expired over a day ago, tokens revoked or expired over 90 days ago.
     const pruned = await pruneRecorderRows(db, installId, new Date(job.now));
     console.log(`Recorder rows: ${pruned.grants} grants, ${pruned.tokens} tokens deleted`);
+    // Webhook deliveries finished over 30 days ago go; one whose message was lost is sent again.
+    const swept = await sweepDeliveries({ db, installId, queue }, new Date(job.now));
+    console.log(`Webhook deliveries: ${swept.pruned} pruned, ${swept.requeued} queued again`);
   }
   // The night's first batch lists what is past a deadline and left alone; later ones add what changed meanwhile.
   const result = await retentionBatch(

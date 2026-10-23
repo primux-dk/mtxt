@@ -33,6 +33,8 @@ import {
 } from './fields';
 import { Templates } from './templates';
 import { ThemeFields } from './theme-fields';
+import { Webhooks } from './webhooks';
+import type { EndpointRow } from '@/lib/webhooks/rows';
 
 const STT_PROVIDERS: SttProvider[] = [
   'assemblyai',
@@ -80,6 +82,7 @@ export interface SettingsFormProps {
     retentionAudioDays: number;
     retentionTranscriptDays: number;
     mcpEnabled: boolean;
+    webhookAutoSend: 'off' | 'company' | 'shared';
     adminEmails: string;
   };
   hasClientSecret: boolean;
@@ -88,6 +91,7 @@ export interface SettingsFormProps {
   redirectUris: Record<IdentityProvider, string>;
   languages: { code: string; name: string }[];
   templates: TemplateRow[];
+  endpoints: EndpointRow[];
 }
 
 /** The control each field's summary link moves focus to. */
@@ -107,6 +111,7 @@ export function SettingsForm({
   redirectUris,
   languages,
   templates,
+  endpoints,
 }: SettingsFormProps) {
   const t = useTranslations('settings');
   const tAll = useTranslations();
@@ -167,6 +172,7 @@ export function SettingsForm({
     recordingSources: t('sources.heading'),
     retentionAudioDays: t('retention.audio'),
     retentionTranscriptDays: t('retention.text'),
+    webhookAutoSend: t('webhooks.autoSend'),
     adminEmails: t('admins.field'),
   };
 
@@ -769,6 +775,26 @@ export function SettingsForm({
             pressed={mcp}
             onChange={setMcp}
           />
+        </Section>
+
+        <Section id="webhooks" heading={t('webhooks.heading')} help={t('webhooks.help')}>
+          <div className="grid gap-6">
+            <Field
+              id="webhookAutoSend"
+              label={t('webhooks.autoSend')}
+              help={t('webhooks.autoSendHelp')}
+              error={errors.webhookAutoSend}
+            >
+              <select {...select('webhookAutoSend', true)} defaultValue={values.webhookAutoSend}>
+                {(['off', 'company', 'shared'] as const).map((v) => (
+                  <option key={v} value={v}>
+                    {t(`webhooks.autoSendOptions.${v}`)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Webhooks initial={endpoints} />
+          </div>
         </Section>
 
         <Section id="admins" heading={t('admins.heading')} help={t('admins.help')}>

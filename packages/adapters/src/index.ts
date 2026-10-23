@@ -3,6 +3,7 @@ export type * from './queue';
 export type * from './uploads';
 export type * from './speech';
 export type * from './language';
+export type * from './dns';
 export { isJob, JOB_TYPES, routeJobs } from './jobs';
 export type {
   DrainTranscriptionsJob,
@@ -12,6 +13,7 @@ export type {
   RecapJob,
   RetentionJob,
   TranscribeJob,
+  WebhookJob,
 } from './jobs';
 export { createDb, schema, type Db } from './db';
 export { DEFAULT_SETTINGS } from './db/defaults';
@@ -52,6 +54,10 @@ export {
   STT_PROVIDERS,
   TRANSCRIPT_STATUSES,
   VISIBILITIES,
+  WEBHOOK_AUTO_SEND,
+  WEBHOOK_DELIVERY_STATUSES,
+  WEBHOOK_EVENTS,
+  WEBHOOK_TEST_EVENT,
 } from './db/schema';
 export type {
   CaptureSource,
@@ -79,6 +85,11 @@ export type {
   Speaker,
   Transcript,
   TranscriptStatus,
+  WebhookAutoSend,
+  WebhookDelivery,
+  WebhookDeliveryStatus,
+  WebhookEndpoint,
+  WebhookEvent,
 } from './db/schema';
 export { AUDIT_ACTIONS } from './db/schema';
 export {
@@ -128,6 +139,7 @@ export {
   cloudflareAdapters,
   cloudflareConsumer,
   cloudflareQueue,
+  dohResolver,
   durableObjectUploadSessions,
   r2Storage,
   WHISPER_MODEL,

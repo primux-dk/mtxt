@@ -13,6 +13,8 @@ export const isPublicPath = (path: string) =>
   path === '/api/v1/webhooks/assemblyai' ||
   // The recorder's token poll stands on the code verifier; it has no token yet.
   path === '/api/v1/recorder/token' ||
+  // A webhook's signed export link is its own grant (lib/webhooks/grant.ts): this one shape only.
+  /^\/api\/v1\/export\/[^/]+$/.test(path) ||
   // Only an e2e build has the test sign-in (lib/auth/test-sign-in.ts); the flag is inlined at build time.
   (process.env.MTXT_E2E_BUILD === '1' &&
     (path === '/api/test/sign-in' ||
@@ -22,7 +24,9 @@ export const isPublicPath = (path: string) =>
       path === '/api/test/fake-workers-ai' ||
       // And the fake recap model (lib/recap/test-hooks.ts).
       path === '/api/test/fake-recap' ||
-      path === '/api/test/fake-recap/control'));
+      path === '/api/test/fake-recap/control' ||
+      // And the webhook receiver the Worker posts deliveries to (lib/webhooks/fake-receiver.ts).
+      path === '/api/test/webhook-receiver'));
 
 /**
  * API paths a desktop recorder calls with its bearer token. With an

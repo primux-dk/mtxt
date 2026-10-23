@@ -31,6 +31,8 @@ import { requireUser } from '@/lib/auth/session';
 import { keytermList } from '@/lib/transcription/job';
 import { isSttFailure, parseReason } from '@/lib/stt/types';
 import { loadTranscript } from '@/lib/transcript/queries';
+import { connectedLabel } from '@/lib/webhooks/rules';
+import { listEndpoints } from '@/lib/webhooks/store';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -110,6 +112,9 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     keytermList(db, installId),
     getTranslations('recap'),
   ]);
+  // The owner's "Send to connected systems" shows only while an endpoint is enabled.
+  const endpoints = access === 'owner' ? await listEndpoints(db, installId) : [];
+  const connected = endpoints.some((e) => e.enabled) ? { label: connectedLabel(endpoints) } : null;
   const recapData = await recapPanelData(
     db,
     installId,
@@ -347,6 +352,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
               recordings={recordings.length}
               hasRecap={hasRecap}
               canUpload={canUpload}
+              connected={connected}
             />
           )}
         </div>
