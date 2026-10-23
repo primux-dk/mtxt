@@ -7,7 +7,10 @@ import { cn } from 'cn';
 export const controlClass =
   'min-h-10 w-full min-w-0 rounded-control border border-input bg-card px-3 py-2 text-sm leading-[1.5] transition-[border-color] aria-invalid:border-destructive max-shell:min-h-11';
 
-/** Figure 07's row: the label column on the left, the controls on the right; stacked on a phone. */
+/**
+ * Figure 07's row: the label column on the left, the controls on the right;
+ * stacked on a phone. The first on a tab has no rule, since the tab strip has one.
+ */
 export function Section({
   id,
   heading,
@@ -22,7 +25,7 @@ export function Section({
   return (
     <section
       aria-labelledby={`${id}-heading`}
-      className="grid grid-cols-[204px_minmax(0,1fr)] gap-8 border-t border-border py-6 max-shell:grid-cols-1 max-shell:gap-4"
+      className="grid grid-cols-[204px_minmax(0,1fr)] gap-8 border-t border-border py-6 first-of-type:border-t-0 first-of-type:pt-0 max-shell:grid-cols-1 max-shell:gap-4"
     >
       <div>
         <h2 id={`${id}-heading`} className="text-base">

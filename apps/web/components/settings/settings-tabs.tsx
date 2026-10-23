@@ -35,6 +35,8 @@ export function SettingsTabs({ children }: { children: React.ReactNode }) {
   const [dirty, setDirty] = useState(false);
   const [leaving, setLeaving] = useState<SettingsTab | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // The tab that opened the dialog: focus goes back to it whichever way the dialog closes.
+  const opener = useRef<SettingsTab | null>(null);
 
   useEffect(() => {
     const list = listRef.current;
@@ -50,26 +52,30 @@ export function SettingsTabs({ children }: { children: React.ReactNode }) {
     }
   }, [current]);
 
+  // Without scroll: false the router would move focus to the new tab's content; it stays on the tab.
   const open = (tab: string) => {
     const next = tab as SettingsTab;
     if (next === current) return;
+    opener.current = next;
     if (dirty) setLeaving(next);
-    else router.push(tabHref(next));
+    else router.push(tabHref(next), { scroll: false });
   };
 
   return (
     <UnsavedContext.Provider value={setDirty}>
       <TabsPrimitive.Root value={current ?? ''} onValueChange={open} activationMode="manual">
+        {/* The baseline is a shadow, not a border: the strip scrolls, and a scroller clips a tab's underline laid over its border. */}
         <TabsPrimitive.List
           ref={listRef}
           aria-label={t('label')}
-          className="mb-6 flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none] max-shell:-mx-5 max-shell:mb-5 max-shell:px-5"
+          className="mb-6 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)] [scrollbar-width:none] max-shell:-mx-5 max-shell:mb-5 max-shell:px-5"
         >
           {SETTINGS_TABS.map((tab) => (
             <TabsPrimitive.Trigger
               key={tab}
               value={tab}
-              className="-mb-px inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 border-transparent px-3.5 py-2.5 text-sm whitespace-nowrap text-muted-foreground transition-[color,border-color] hover:text-foreground data-[state=active]:border-accent-strong data-[state=active]:text-foreground max-shell:px-3"
+              data-tab={tab}
+              className="inline-flex min-h-11 shrink-0 outline-offset-[-2px] items-center gap-2 border-b-2 border-transparent px-3.5 py-2.5 text-sm whitespace-nowrap text-muted-foreground transition-[color,border-color] hover:text-foreground data-[state=active]:border-accent-strong data-[state=active]:text-foreground max-shell:px-3"
             >
               {t(tab)}
               {dirty && tab === current && (
@@ -84,7 +90,7 @@ export function SettingsTabs({ children }: { children: React.ReactNode }) {
           ))}
         </TabsPrimitive.List>
         {current ? (
-          <TabsPrimitive.Content value={current} className="min-w-0 outline-none">
+          <TabsPrimitive.Content value={current} className="min-w-0">
             {children}
           </TabsPrimitive.Content>
         ) : (
@@ -93,7 +99,14 @@ export function SettingsTabs({ children }: { children: React.ReactNode }) {
       </TabsPrimitive.Root>
 
       <Dialog open={leaving !== null} onOpenChange={(o) => !o && setLeaving(null)}>
-        <DialogContent closeLabel={tc('close')}>
+        <DialogContent
+          closeLabel={tc('close')}
+          onCloseAutoFocus={(e) => {
+            // A click opens the dialog before the tab takes focus, so Radix has no opener to return to.
+            e.preventDefault();
+            listRef.current?.querySelector<HTMLElement>(`[data-tab="${opener.current}"]`)?.focus();
+          }}
+        >
           <DialogTitle>{t('discard.title')}</DialogTitle>
           <DialogDescription>
             {current && leaving && t('discard.body', { tab: t(current), next: t(leaving) })}
@@ -108,7 +121,7 @@ export function SettingsTabs({ children }: { children: React.ReactNode }) {
                 const next = leaving!;
                 setLeaving(null);
                 setDirty(false);
-                router.push(tabHref(next));
+                router.push(tabHref(next), { scroll: false });
               }}
             >
               {t('discard.confirm')}
