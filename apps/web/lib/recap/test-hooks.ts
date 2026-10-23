@@ -15,7 +15,7 @@ export interface RecapTestEnv {
 }
 
 /** The fake recap model, in a test run only. */
-export function fakeRecapLlm(env: RecapTestEnv): RecapLlm | undefined {
+function fakeRecapLlm(env: RecapTestEnv): RecapLlm | undefined {
   if (env.AUTH_TEST_MODE !== '1' || !env.RECAP_FAKE_URL) return undefined;
   let url: URL;
   try {
@@ -38,4 +38,9 @@ export function fakeRecapLlm(env: RecapTestEnv): RecapLlm | undefined {
       return (await response.json()) as { text: string; truncated: boolean };
     },
   };
+}
+
+/** The override for lib/recap/deps.ts, named apart from the fake so `check:no-fakes` sees only the module. */
+export function e2eRecapOverride(env: RecapTestEnv) {
+  return fakeRecapLlm(env);
 }

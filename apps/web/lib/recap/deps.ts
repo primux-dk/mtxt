@@ -19,7 +19,7 @@ export async function recapDeps(env: CloudflareEnv): Promise<RecapDeps> {
   // condition itself folds to false.
   const fake: RecapLlm | undefined =
     typeof MTXT_E2E_BUILD !== 'undefined' && MTXT_E2E_BUILD === '1'
-      ? (await import('./test-hooks')).fakeRecapLlm(env)
+      ? (await import('./test-hooks')).e2eRecapOverride(env)
       : undefined;
   return {
     db,
