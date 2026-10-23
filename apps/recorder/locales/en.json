@@ -135,5 +135,8 @@
   "macos.audioCaptureUsage": "The recorder records the meeting audio your Mac plays, so the other participants are in the recording.",
   "recorder.queue.unsaved": "Not saved on this Mac: {error}",
   "recorder.queue.interrupted": "Interrupted recording",
-  "recorder.queue.upload": "Upload"
+  "recorder.queue.upload": "Upload",
+  "live.errorReason": "The local model could not run: {reason} · Live text is off, the recording continues",
+  "live.jump": "Jump to latest",
+  "live.lines": "Live transcript"
 }

@@ -135,5 +135,8 @@
   "macos.audioCaptureUsage": "Optageren optager den mødelyd, din Mac afspiller, så de andre deltagere kommer med i optagelsen.",
   "recorder.queue.unsaved": "Ikke gemt på denne Mac: {error}",
   "recorder.queue.interrupted": "Afbrudt optagelse",
-  "recorder.queue.upload": "Overfør"
+  "recorder.queue.upload": "Overfør",
+  "live.errorReason": "Den lokale model kunne ikke køre: {reason} · Live tekst er slået fra, optagelsen fortsætter",
+  "live.jump": "Gå til det nyeste",
+  "live.lines": "Live transskription"
 }

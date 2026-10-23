@@ -99,8 +99,22 @@ export interface Snapshot {
   version: string;
 }
 
+export interface LiveLine {
+  at_s: number;
+  text: string;
+}
+
 export interface LiveUpdate {
   state: 'loading' | 'listening' | 'paused' | 'needs_model' | 'error' | 'stopped';
-  lines: string[];
-  partial: string;
+  reason: string | null;
+  append: LiveLine[];
+  partial: LiveLine | null;
+  reset: boolean;
+}
+
+export interface LiveTranscript {
+  state: LiveUpdate['state'] | '';
+  reason: string | null;
+  lines: LiveLine[];
+  partial: LiveLine | null;
 }

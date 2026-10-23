@@ -1,41 +1,49 @@
-// What the live window shows for an update: the last finished line (muted)
-// and the line in progress, or a status line. A `stopped` update, or a
-// snapshot with no live session, clears everything: the preview is never
-// kept after the recording stops.
+// The live transcript as the window holds it: every finished line of the
+// running recording with where it starts, the line in progress, and the
+// state. Updates from Rust append; `reset` clears first. A `stopped`
+// update, or a snapshot with no live session, clears everything: the
+// preview is never kept after the recording stops.
 
-import type { LiveUpdate } from './types';
+import type { LiveLine, LiveTranscript, LiveUpdate } from './types';
 
-export interface LiveText {
-  prev: string;
-  current: string;
-  /** The locale key of a status line instead of text. */
-  status: string | null;
-  paused: boolean;
+export const EMPTY: LiveTranscript = { state: 'loading', reason: null, lines: [], partial: null };
+
+export function apply(t: LiveTranscript, u: LiveUpdate): LiveTranscript {
+  if (u.state === 'stopped') return { ...EMPTY, state: 'stopped' };
+  const base = u.reset ? EMPTY : t;
+  return {
+    state: u.state,
+    reason: u.reason,
+    lines: u.append.length ? [...base.lines, ...u.append] : base.lines,
+    partial: u.partial,
+  };
 }
 
-export const EMPTY: LiveText = { prev: '', current: '', status: null, paused: false };
-
-export function view(u: LiveUpdate | null): LiveText {
-  if (!u || u.state === 'stopped') return EMPTY;
-  const status = (key: string, paused = false): LiveText => ({
-    prev: '',
-    current: '',
-    status: key,
-    paused,
-  });
-  switch (u.state) {
+/** The status line shown under the text, as a locale key, or null. */
+export function statusKey(t: LiveTranscript): string | null {
+  switch (t.state) {
     case 'loading':
-      return status('live.loading');
+      return 'live.loading';
     case 'needs_model':
-      return status('live.needsModel');
+      return 'live.needsModel';
     case 'error':
-      return status('live.error');
+      return t.reason ? 'live.errorReason' : 'live.error';
     case 'paused':
-      return status('live.paused', true);
+      return 'live.paused';
+    case 'listening':
+      return t.lines.length || t.partial ? null : 'live.listening';
+    default:
+      return null;
   }
-  const lines = [...u.lines];
-  if (u.partial) lines.push(u.partial);
-  if (lines.length === 0) return status('live.listening');
-  const current = lines.pop() ?? '';
-  return { prev: lines.pop() ?? '', current, status: null, paused: false };
 }
+
+/** The list is at its end (within a few pixels): new lines keep it there. */
+export function atBottom(el: {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+}
+
+export type { LiveLine };
