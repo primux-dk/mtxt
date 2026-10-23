@@ -641,9 +641,11 @@ async function main() {
     if (!flags['skip-build']) {
       say('  Building with OpenNext (a minute or two)...');
       run('pnpm', ['build:cf'], { show: false });
-      run('pnpm', ['check:no-fakes'], { show: false });
-      row('Build', 'done; no fake providers in the bundle');
+      row('Build', 'done');
     }
+    // Also with --skip-build: .open-next may hold an e2e build with its fake providers.
+    run('pnpm', ['check:no-fakes'], { show: false });
+    row('Bundle', 'no fake providers');
     // A build from uncommitted files never matches a later run's tag.
     const deployTag = dirty ? `${tag.slice(0, 12)}-dirty000` : tag;
     run(
