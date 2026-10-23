@@ -75,8 +75,8 @@ const likeContains = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c
 
 /**
  * The permission rule as SQL, per view. A meeting retention has emptied
- * (`deleted_at`) shows only in its owner's own view, as a muted row, until
- * the owner removes it.
+ * (`deleted_at`) shows only to its owner, as a muted row, in My meetings or,
+ * when it was archived, in Archived, until the owner removes it.
  */
 function viewScope(installId: string, user: CurrentUser, params: LibraryParams): SQL {
   const own = sql`m.install_id = ${installId}`;
@@ -90,8 +90,9 @@ function viewScope(installId: string, user: CurrentUser, params: LibraryParams):
           where s.install_id = ${installId} and s.meeting_id = m.id and s.user_id = ${user.id})`;
     case 'company':
       return sql`${base} and m.archived_at is null and m.visibility = 'company'`;
+    // An archived meeting retention has emptied stays here, its owner's only way to Remove it.
     case 'archived':
-      return sql`${base} and m.archived_at is not null and m.owner_id = ${user.id}`;
+      return sql`${own} and m.archived_at is not null and m.owner_id = ${user.id}`;
   }
 }
 

@@ -168,6 +168,35 @@ describe('the permission matrix', () => {
     expect(await loadMeeting(db, INSTALL, user('owner'), 'gone')).toBeNull();
   });
 
+  it("keeps an archived meeting that retention emptied in its owner's Archived view, with Remove", async () => {
+    const { db, sqlite } = setup();
+    sqlite
+      .prepare(
+        'INSERT INTO meetings (id, install_id, owner_id, title, title_folded, started_at, visibility, archived_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run('arch-gone', INSTALL, 'owner', 'Arkiveret', 'arkiveret', 1, 'private', 2, 3);
+    const views = async () =>
+      Object.fromEntries(
+        await Promise.all(
+          (['mine', 'shared', 'company', 'archived'] as const).map(async (view) => [
+            view,
+            (await listMeetings(db, INSTALL, user('owner'), parseLibraryParams({ view }))).rows
+              .filter((r) => r.id === 'arch-gone')
+              .map((r) => Boolean(r.deletedAt)),
+          ]),
+        ),
+      );
+    expect(await views()).toEqual({ mine: [], shared: [], company: [], archived: [true] });
+    // Nobody else sees it, in any view.
+    const other = await listMeetings(
+      db,
+      INSTALL,
+      user('member'),
+      parseLibraryParams({ view: 'archived' }),
+    );
+    expect(other.rows.some((r) => r.id === 'arch-gone')).toBe(false);
+  });
+
   it('documents the user may not see change neither the count nor the order of those they may', async () => {
     const { db, sqlite } = setup();
     const f = fixtures(sqlite);
