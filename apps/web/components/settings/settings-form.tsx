@@ -4,7 +4,12 @@ import { TriangleAlert, Upload } from 'lucide-react';
 import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from 'cn';
-import type { IdentityProvider, SttProvider, Visibility } from '@mtxt/adapters/db/schema';
+import type {
+  IdentityProvider,
+  RecapProvider,
+  SttProvider,
+  Visibility,
+} from '@mtxt/adapters/db/schema';
 import {
   saveSettingsAction,
   type SaveResult,
@@ -15,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatKeyterms, mergeKeyterms, parseKeyterms } from '@/lib/settings/keyterms';
 import { STT_AVAILABLE, type Field as FieldName } from '@/lib/settings/validate';
+import { DEFAULT_RECAP_MODEL, NEEDS_RECAP_KEY, RECAP_PROVIDER_IDS } from '@/lib/recap/models';
 import { DataFlow } from './data-flow';
 import {
   controlClass,
@@ -64,6 +70,8 @@ export interface SettingsFormProps {
     sttRegion: string;
     aiGatewayId: string;
     language: string;
+    recapProvider: RecapProvider;
+    recapModel: string;
     interfaceLanguage: 'en' | 'da';
     keyterms: string;
     liveTranscriptDefault: boolean;
@@ -76,6 +84,7 @@ export interface SettingsFormProps {
   };
   hasClientSecret: boolean;
   hasSttKey: boolean;
+  hasRecapKey: boolean;
   redirectUris: Record<IdentityProvider, string>;
   languages: { code: string; name: string }[];
   templates: TemplateRow[];
@@ -94,6 +103,7 @@ export function SettingsForm({
   values,
   hasClientSecret,
   hasSttKey,
+  hasRecapKey,
   redirectUris,
   languages,
   templates,
@@ -113,6 +123,8 @@ export function SettingsForm({
   const [primary, setPrimary] = useState(values.themePrimary);
   const [idp, setIdp] = useState<IdentityProvider | ''>(values.identityProvider ?? '');
   const [stt, setStt] = useState<SttProvider | ''>(values.sttProvider ?? '');
+  const [recap, setRecap] = useState<RecapProvider>(values.recapProvider);
+  const [gateway, setGateway] = useState(values.aiGatewayId);
   const [live, setLive] = useState(values.liveTranscriptDefault);
   const [mcp, setMcp] = useState(values.mcpEnabled);
   const [audioDays, setAudioDays] = useState(String(values.retentionAudioDays));
@@ -127,6 +139,10 @@ export function SettingsForm({
       : p === 'local-parakeet'
         ? t('stt.local', { model: 'Parakeet' })
         : t(`stt.providers.${p === 'workers-ai-whisper' ? 'workersAi' : p}`);
+  const recapName = (p: RecapProvider) =>
+    t(
+      `recap.providers.${p === 'workers-ai' ? 'workersAi' : p === 'azure-openai' ? 'azureOpenai' : p}`,
+    );
 
   const LABELS: Record<FieldName, string> = {
     productName: t('productName.heading'),
@@ -142,6 +158,9 @@ export function SettingsForm({
     sttRegion: t('stt.region'),
     aiGatewayId: tAll('stt.gateway.field'),
     language: t('stt.language'),
+    recapProvider: t('recap.provider'),
+    recapModel: t('recap.model'),
+    recapApiKey: t('recap.apiKey'),
     interfaceLanguage: t('interfaceLanguage.field'),
     keyterms: t('keyterms.field'),
     defaultVisibility: t('defaults.visibility'),
@@ -475,7 +494,8 @@ export function SettingsForm({
               <Input
                 id="aiGatewayId"
                 name="aiGatewayId"
-                defaultValue={values.aiGatewayId}
+                value={gateway}
+                onChange={(e) => setGateway(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
                 aria-invalid={invalid('aiGatewayId')}
@@ -496,6 +516,80 @@ export function SettingsForm({
                 ))}
               </select>
             </Field>
+          </div>
+        </Section>
+
+        <Section id="recap" heading={t('recap.heading')} help={t('recap.help')}>
+          <div className="grid grid-cols-2 gap-4 max-shell:grid-cols-1">
+            <Field
+              id="recapProvider"
+              label={t('recap.provider')}
+              error={errors.recapProvider}
+              className="col-span-full"
+            >
+              <select
+                {...select('recapProvider')}
+                value={recap}
+                onChange={(e) => setRecap(e.target.value as RecapProvider)}
+              >
+                {RECAP_PROVIDER_IDS.map((p) => (
+                  <option key={p} value={p}>
+                    {recapName(p)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              id="recapModel"
+              label={t('recap.model')}
+              help={
+                recap === 'azure-openai'
+                  ? t('recap.modelHelpAzure')
+                  : t('recap.modelHelp', { model: DEFAULT_RECAP_MODEL[recap] })
+              }
+              error={errors.recapModel}
+            >
+              <Input
+                key={recap}
+                id="recapModel"
+                name="recapModel"
+                defaultValue={recap === values.recapProvider ? values.recapModel : ''}
+                placeholder={DEFAULT_RECAP_MODEL[recap] || 'resource/deployment'}
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={invalid('recapModel')}
+                aria-describedby={describedBy('recapModel', true, errors.recapModel)}
+              />
+            </Field>
+            {NEEDS_RECAP_KEY.includes(recap) ? (
+              <Field
+                id="recapApiKey"
+                label={t('recap.apiKey')}
+                extra={
+                  <SecretStatus
+                    set={hasRecapKey && recap === values.recapProvider}
+                    labels={{ set: t('secret.set'), notSet: t('secret.notSet') }}
+                  />
+                }
+                help={t('login.secretHelp')}
+                error={errors.recapApiKey}
+              >
+                <Input
+                  key={`${secretsKey}-${recap}`}
+                  id="recapApiKey"
+                  name="recapApiKey"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={
+                    hasRecapKey && recap === values.recapProvider ? t('secret.replace') : undefined
+                  }
+                  aria-invalid={invalid('recapApiKey')}
+                  aria-describedby={describedBy('recapApiKey', true, errors.recapApiKey)}
+                />
+              </Field>
+            ) : (
+              <p className="self-center text-sm text-muted-foreground">{t('recap.noKey')}</p>
+            )}
           </div>
         </Section>
 
@@ -709,6 +803,8 @@ export function SettingsForm({
         <DataFlow
           provider={stt || null}
           providerName={stt ? providerName(stt) : ''}
+          recapName={recapName(recap)}
+          recapGateway={Boolean(gateway.trim())}
           supported={STT_AVAILABLE.map(providerName)}
           audioDays={Number(audioDays) || 0}
           textDays={Number(textDays) || 0}

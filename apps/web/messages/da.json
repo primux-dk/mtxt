@@ -560,14 +560,15 @@
       "heading": "Dataflow",
       "step1": "Optageren sender lyd til virksomhedens egen Cloudflare-konto. Lyd i R2 lagres med EU-jurisdiktion, og uploadsessioner i Durable Objects bruger jurisdiktionen eu. Begge dele er tilgængelige uden Enterprise.",
       "step2": "{provider} modtager lyd og nøgleord direkte og sender tekst og talere tilbage.",
-      "step3": "Den valgte sprogmodel skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
+      "step3": "{provider} skriver referatet ud fra transskriptionen, og forespørgslerne går gennem AI Gateway. Mødedata gemmes i D1.",
       "step4": "Lyd slettes efter {audioDays, plural, one {# dag} other {# dage}}. Transskriptioner og referater slettes efter {textDays, plural, one {# dag} other {# dage}}. Behold forhindrer begge sletninger.",
       "promise": "Det er ikke garanteret, at al behandling sker i EU.",
       "caveats": "D1 har ingen indstilling for jurisdiktion. Placeringen af Worker-kode sker efter bedste evne, normalt i datacentret nærmest forespørgslen. Geografiske begrænsninger kræver Data Localization Suite, som kun fås med Enterprise. Workers AI og AI Gateway er ikke dækket af Regional Services.",
       "local": "En lokal live transskription bliver på computeren og kasseres, når mødet slutter. Når serveren har bekræftet en optagelse, gemmer optageren lyden lokalt i 7 dage. Uden bekræftelse beholder den filen og prøver igen.",
       "step2Gateway": "{provider} modtager lyd og nøgleord gennem AI Gateway og sender tekst og talere tilbage.",
       "step2Local": "{provider} kører inde i installationen; lyden sendes ikke til et firma, der laver tale til tekst.",
-      "step2None": "Der er ikke valgt en udbyder af tale til tekst endnu. Lyden gemmes, og transskriptionen venter, til der er valgt en."
+      "step2None": "Der er ikke valgt en udbyder af tale til tekst endnu. Lyden gemmes, og transskriptionen venter, til der er valgt en.",
+      "step3Direct": "{provider} skriver referatet ud fra transskriptionen. Der er ikke angivet et AI Gateway-ID, så forespørgslerne går direkte til {provider}. Mødedata gemmes i D1."
     },
     "footer": "Ændringer gælder for denne installation.",
     "save": "Gem indstillinger",
@@ -611,9 +612,27 @@
       "saveFailed": "Indstillingerne kunne ikke gemmes, og intet blev ændret. Prøv igen.",
       "unterminatedQuote": "Post {record}: et anførselstegn åbnes og lukkes aldrig. Intet blev importeret.",
       "notAvailable": "Findes ikke i denne version.",
-      "gatewayFormat": "Skriv gateway-id'et: bogstaver, tal, - og _."
+      "gatewayFormat": "Skriv gateway-id'et: bogstaver, tal, - og _.",
+      "modelFormat": "Skriv et model-ID uden mellemrum, højst 200 tegn.",
+      "azureModel": "Skriv ressourcen og deployment som ressource/deployment, for eksempel acme-openai/referater."
     },
-    "saved": "Indstillingerne er gemt."
+    "saved": "Indstillingerne er gemt.",
+    "recap": {
+      "heading": "Referatmodel",
+      "help": "Sprogmodellen, der skriver udkastet til hvert referat ud fra transskriptionen og skabelonen. Én for hele installationen.",
+      "provider": "Udbyder",
+      "providers": {
+        "workersAi": "Workers AI",
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "azureOpenai": "Azure OpenAI"
+      },
+      "model": "Model-ID",
+      "modelHelp": "Lad feltet stå tomt for standardmodellen, {model}.",
+      "modelHelpAzure": "Skriv Azure-ressourcen og deployment som ressource/deployment.",
+      "apiKey": "API-nøgle",
+      "noKey": "Workers AI kører i virksomhedens egen Cloudflare-konto og kræver ingen nøgle."
+    }
   },
   "auth": {
     "signOut": "Log ud",
@@ -675,7 +694,7 @@
     "supported": "Denne version transskriberer med {providers}. AssemblyAI kører Universal-3.5 Pro, og Universal-2 for et sprog, Universal-3.5 Pro ikke har. De andre udbydere på listen kommer senere.",
     "gateway": {
       "field": "AI Gateway-id",
-      "help": "Kald til Workers AI, og senere til referatmodellen, går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde Workers AI direkte."
+      "help": "Forespørgsler til Workers AI og til referatmodellen går gennem denne gateway i virksomhedens Cloudflare-konto. Lad feltet stå tomt for at kalde dem direkte."
     },
     "drainFailed": "Indstillingerne blev gemt, men de optagelser, der venter på en udbyder, blev ikke sat i kø. Gem igen for at sætte dem i kø."
   },

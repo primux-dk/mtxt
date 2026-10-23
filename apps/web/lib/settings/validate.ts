@@ -5,6 +5,8 @@
   the reader's language. The server never trusts the browser's own checks.
 */
 import {
+  RECAP_PROVIDERS,
+  type RecapProvider,
   CAPTURE_SOURCES,
   IDENTITY_PROVIDERS,
   INTERFACE_LANGUAGES,
@@ -18,6 +20,7 @@ import {
 import { isTenantGuid } from '../auth/identity';
 import { HEX, themeFailures, type ContrastPair, type ThemeMode } from '../theme/contrast';
 import { parseKeyterms, type Keyterm, type KeytermError } from './keyterms';
+import { AZURE_MODEL, MODEL_ID, NEEDS_RECAP_KEY } from '../recap/models';
 
 export const MAX_NAME = 120;
 export const MAX_RETENTION_DAYS = 3650;
@@ -58,6 +61,9 @@ export const FIELDS = [
   'sttRegion',
   'aiGatewayId',
   'language',
+  'recapProvider',
+  'recapModel',
+  'recapApiKey',
   'interfaceLanguage',
   'keyterms',
   'defaultVisibility',
@@ -80,6 +86,8 @@ export type FieldError =
   | { code: 'regionFormat' }
   | { code: 'notAvailable' }
   | { code: 'gatewayFormat' }
+  | { code: 'modelFormat' }
+  | { code: 'azureModel' }
   | KeytermError
   | { code: 'atLeastOneSource' }
   | { code: 'range'; min: number; max: number }
@@ -101,6 +109,9 @@ export interface SettingsPatch {
   sttRegion: string | null;
   aiGatewayId: string | null;
   language: string;
+  recapProvider: RecapProvider;
+  /** Null means the provider's default model. */
+  recapModel: string | null;
   interfaceLanguage: Settings['interfaceLanguage'];
   liveTranscriptDefault: boolean;
   defaultVisibility: Settings['defaultVisibility'];
@@ -117,9 +128,11 @@ export type Validated =
       patch: SettingsPatch;
       keyterms: Keyterm[];
       /** New plain-text secrets to seal; absent when the field was left blank. */
-      secrets: { oidcClientSecret?: string; sttApiKey?: string };
+      secrets: { oidcClientSecret?: string; sttApiKey?: string; recapApiKey?: string };
       /** True when the STT provider no longer takes a key, so the stored one is cleared. */
       clearSttKey: boolean;
+      /** True when the recap provider changed or takes no key: the stored key belonged to another one. */
+      clearRecapKey: boolean;
     }
   | { ok: false; errors: Errors };
 
@@ -129,6 +142,8 @@ export interface Current {
   hasClientSecret: boolean;
   sttProvider: SttProvider | null;
   hasSttKey: boolean;
+  recapProvider: RecapProvider;
+  hasRecapKey: boolean;
 }
 
 // An Entra tenant is pinned by its GUID (not `common`, `organizations` or `consumers`);
@@ -221,6 +236,23 @@ export function validateSettings(
   const aiGatewayId = text('aiGatewayId');
   if (aiGatewayId && !GATEWAY_ID.test(aiGatewayId)) errors.aiGatewayId = { code: 'gatewayFormat' };
 
+  const recapProviderText = text('recapProvider') || 'workers-ai';
+  const recapModelText = text('recapModel');
+  const recapApiKey = text('recapApiKey');
+  let recapProvider: RecapProvider = 'workers-ai';
+  if (!oneOf(RECAP_PROVIDERS, recapProviderText)) errors.recapProvider = { code: 'invalid' };
+  else {
+    recapProvider = recapProviderText;
+    if (recapModelText && !MODEL_ID.test(recapModelText))
+      errors.recapModel = { code: 'modelFormat' };
+    else if (recapProvider === 'azure-openai' && !AZURE_MODEL.test(recapModelText))
+      errors.recapModel = { code: 'azureModel' };
+    // A key belongs to one provider; a new provider needs its own.
+    const keepsKey = current.hasRecapKey && current.recapProvider === recapProvider;
+    if (NEEDS_RECAP_KEY.includes(recapProvider) && !recapApiKey && !keepsKey)
+      errors.recapApiKey = { code: 'secretRequired' };
+  }
+
   const language = text('language');
   if (!oneOf(TRANSCRIPTION_LANGUAGES, language)) errors.language = { code: 'invalid' };
   const interfaceLanguage = text('interfaceLanguage');
@@ -280,6 +312,8 @@ export function validateSettings(
       sttRegion,
       aiGatewayId: aiGatewayId || null,
       language,
+      recapProvider,
+      recapModel: recapModelText || null,
       interfaceLanguage: interfaceLanguage as Settings['interfaceLanguage'],
       liveTranscriptDefault: form.get('liveTranscriptDefault') === 'on',
       defaultVisibility: defaultVisibility as Settings['defaultVisibility'],
@@ -293,8 +327,11 @@ export function validateSettings(
     secrets: {
       ...(oidcClientSecret ? { oidcClientSecret } : {}),
       ...(sttApiKey && sttProvider && STT_NEEDS_KEY.includes(sttProvider) ? { sttApiKey } : {}),
+      ...(recapApiKey && NEEDS_RECAP_KEY.includes(recapProvider) ? { recapApiKey } : {}),
     },
     clearSttKey: !sttProvider || !STT_NEEDS_KEY.includes(sttProvider),
+    clearRecapKey:
+      !NEEDS_RECAP_KEY.includes(recapProvider) || current.recapProvider !== recapProvider,
   };
 }
 
