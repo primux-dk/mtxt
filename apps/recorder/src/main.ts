@@ -119,11 +119,19 @@ function renderReady(s: Snapshot): void {
       ? 'recorder.stopping'
       : rec.starting
         ? 'recorder.starting'
-        : rec.sources.microphone === 'on' && rec.sources.system_audio === 'on'
-          ? 'recorder.capturing'
-          : rec.sources.microphone === 'on'
-            ? 'recorder.capturingMicOnly'
-            : 'recorder.capturingSystemOnly';
+        : rec.sources.microphone === 'lost' && rec.sources.system_audio !== 'on'
+          ? 'recorder.source.bothLost'
+          : rec.sources.system_audio === 'lost' && rec.sources.microphone !== 'on'
+            ? 'recorder.source.bothLost'
+            : rec.sources.microphone === 'lost'
+              ? 'recorder.source.micLost'
+              : rec.sources.system_audio === 'lost'
+                ? 'recorder.source.systemLost'
+                : rec.sources.microphone === 'on' && rec.sources.system_audio === 'on'
+                  ? 'recorder.capturing'
+                  : rec.sources.microphone === 'on'
+                    ? 'recorder.capturingMicOnly'
+                    : 'recorder.capturingSystemOnly';
     state.append(el('span', { className: 'dot' }), t(key));
     $('clock').textContent = clock(rec.elapsed_s);
   } else {
@@ -163,7 +171,15 @@ function renderBanners(s: Snapshot): void {
     b.append(icon(iconName), body);
     box.append(b);
   };
-  if (s.notice) {
+  if (s.notice?.key === 'recorder.error.stateSave') {
+    banner(
+      'warn',
+      'warning',
+      notice(s.notice),
+      [t('common.tryAgain'), () => invoke('retry_save')],
+      'notice',
+    );
+  } else if (s.notice) {
     banner(
       'warn',
       'warning',
@@ -266,11 +282,26 @@ interface StatusView {
   icon: string;
   cls: string;
   text: string;
+  /** The whole text is the action (the design's "Warning: … · Try now"). */
   action?: () => void;
+  /** Separate actions after the text: "Recorded by … · Save elsewhere". */
+  extra?: { text: string; run: () => void }[];
+}
+
+function saveElsewhere(id: string, title: string, damaged = false): void {
+  invoke<boolean>('save_elsewhere', {
+    id,
+    title,
+    dialogTitle: t('recorder.ask.saveTitle'),
+    damaged,
+  }).catch((e) => showError(e));
 }
 
 export function statusOf(q: QueueItem): StatusView {
   const reason = q.reason;
+  const save = q.can_save
+    ? [{ text: t('recorder.queue.saveElsewhere'), run: () => saveElsewhere(q.id, q.title) }]
+    : [];
   const rejected = (): StatusView =>
     reason?.kind === 'rejected' && reason.code === 'file_missing'
       ? {
@@ -279,10 +310,59 @@ export function statusOf(q: QueueItem): StatusView {
           text: t('recorder.queue.fileMissing'),
           action: () => invoke('remove_recording', { id: q.id }),
         }
-      : { icon: 'warning', cls: 'warn', text: t('recorder.queue.rejected') };
+      : { icon: 'warning', cls: 'warn', text: t('recorder.queue.rejected'), extra: save };
+  // A waiting recording that this connection may not upload says why first.
+  if (q.blocked && q.status !== 'ask_user') {
+    switch (q.blocked.kind) {
+      case 'other_host':
+        return {
+          icon: 'info',
+          cls: 'muted',
+          text: t('recorder.queue.otherHost', { host: q.blocked.host }),
+          extra: save,
+        };
+      case 'other_user':
+        return {
+          icon: 'info',
+          cls: 'muted',
+          text: t('recorder.queue.otherUser', { email: q.blocked.email }),
+          extra: save,
+        };
+      case 'no_owner':
+        return {
+          icon: 'info',
+          cls: 'muted',
+          text: t('recorder.queue.noOwner'),
+          extra: [
+            {
+              text: t('recorder.queue.uploadAsMe'),
+              run: () => invoke('claim', { id: q.id }).catch(showError),
+            },
+            ...save,
+          ],
+        };
+    }
+  }
   switch (q.status) {
     case 'recording':
       return { icon: 'dot', cls: 'warn', text: t('recorder.queue.recording') };
+    case 'failed_local':
+      return {
+        icon: 'warning',
+        cls: 'warn',
+        text: t('recorder.queue.failedLocal', { error: q.local_error ?? '' }),
+        extra: save,
+      };
+    case 'unreadable':
+      return {
+        icon: 'warning',
+        cls: 'warn',
+        text: t('recorder.queue.unreadable', { error: q.local_error ?? '' }),
+        extra: [
+          { text: t('common.tryAgain'), run: () => invoke('retry_unreadable', { id: q.id }) },
+          ...save,
+        ],
+      };
     case 'uploading':
       return {
         icon: 'upload',
@@ -317,6 +397,13 @@ export function statusOf(q: QueueItem): StatusView {
         action: () => openAsk(q, true),
       };
     case 'confirmed':
+      if (q.server_status === 'failed')
+        return {
+          icon: 'warning',
+          cls: 'warn',
+          text: t('recorder.queue.transcriptionFailed'),
+          action: q.meeting_url ? () => invoke('open_url', { url: q.meeting_url }) : undefined,
+        };
       return {
         icon: 'check',
         cls: 'accent-fg',
@@ -333,6 +420,35 @@ export function statusOf(q: QueueItem): StatusView {
   }
 }
 
+function statusNode(v: StatusView, key: string): HTMLElement {
+  const status = el('span', { className: `queue-status ${v.cls}` }, icon(v.icon));
+  if (v.action) {
+    const b = el('button', {
+      type: 'button',
+      className: 'queue-action',
+      textContent: v.text,
+      title: v.text,
+    });
+    b.dataset.focusKey = `act-${key}`;
+    b.addEventListener('click', v.action);
+    status.append(b);
+  } else {
+    status.append(el('span', { textContent: v.text, title: v.text }));
+  }
+  (v.extra ?? []).forEach((a, i) => {
+    const b = el('button', {
+      type: 'button',
+      className: 'queue-action',
+      textContent: a.text,
+      title: a.text,
+    });
+    b.dataset.focusKey = `extra-${key}-${i}`;
+    b.addEventListener('click', a.run);
+    status.append(el('span', { textContent: '·' }), b);
+  });
+  return status;
+}
+
 function renderQueue(s: Snapshot): void {
   const list = $('queue-list');
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
@@ -343,6 +459,8 @@ function renderQueue(s: Snapshot): void {
       dateTime(q.started_at),
       q.duration_s ? duration(q.duration_s) : '',
       q.size_bytes ? size(q.size_bytes) : '',
+      q.gaps ? t('recorder.queue.gaps', { count: q.gaps }) : '',
+      q.local_error ?? '',
     ]
       .filter(Boolean)
       .join(' · ');
@@ -362,28 +480,34 @@ function renderQueue(s: Snapshot): void {
       titleNode = el('span', { className: 'queue-title', textContent: q.title, title: meta });
     }
     titleNode.lang = '';
-    const v = statusOf(q);
-    const status = el('span', { className: `queue-status ${v.cls}` }, icon(v.icon));
-    if (v.action) {
-      const b = el('button', {
-        type: 'button',
-        className: 'queue-action',
-        textContent: v.text,
-        title: v.text,
-      });
-      b.dataset.focusKey = `act-${q.id}`;
-      b.addEventListener('click', v.action);
-      status.append(b);
-    } else {
-      status.append(el('span', { textContent: v.text, title: v.text }));
-    }
-    list.append(el('li', { className: 'queue-row' }, titleNode, status));
+    list.append(el('li', { className: 'queue-row' }, titleNode, statusNode(statusOf(q), q.id)));
   }
-  $('queue-count').textContent = s.queue.length
-    ? t('recorder.queue.count', { count: s.queue.length })
-    : '';
-  $('queue-empty').hidden = s.queue.length > 0;
-  if (focusKey) list.querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
+  const damaged = $('damaged-list');
+  damaged.replaceChildren();
+  for (const d of s.damaged) {
+    const extra = [
+      ...(d.has_audio
+        ? [{ text: t('recorder.queue.saveElsewhere'), run: () => saveElsewhere(d.id, d.id, true) }]
+        : []),
+      { text: t('common.tryAgain'), run: () => invoke('retry_damaged', { id: d.id }) },
+    ];
+    const title = t('recorder.queue.damaged', { id: d.id.slice(0, 8) });
+    damaged.append(
+      el(
+        'li',
+        { className: 'queue-row' },
+        el('span', { className: 'queue-title', textContent: title, title: d.error }),
+        statusNode(
+          { icon: 'warning', cls: 'warn', text: t('recorder.queue.damagedStatus'), extra },
+          `damaged-${d.id}`,
+        ),
+      ),
+    );
+  }
+  const count = s.queue.length + s.damaged.length;
+  $('queue-count').textContent = count ? t('recorder.queue.count', { count }) : '';
+  $('queue-empty').hidden = count > 0;
+  if (focusKey) $('app').querySelector<HTMLElement>(`[data-focus-key="${focusKey}"]`)?.focus();
 }
 
 function renderFooter(s: Snapshot): void {

@@ -18,7 +18,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Productivity",
     "copyright": "Primux (PRIMUX DIGITAL, S.L.). PolyForm Noncommercial 1.0.0.",
     "shortDescription": "Meeting recorder",
@@ -33,14 +36,21 @@
     "resources": {
       "../../../docs/design/fonts/LICENSE-mona-sans.txt": "licenses/LICENSE-mona-sans.txt",
       "../../../NOTICE.md": "licenses/NOTICE.md",
-      "../../../LICENSE.md": "licenses/LICENSE.md"
+      "../../../LICENSE.md": "licenses/LICENSE.md",
+      "locales/en.lproj/InfoPlist.strings": "en.lproj/InfoPlist.strings",
+      "locales/da.lproj/InfoPlist.strings": "da.lproj/InfoPlist.strings"
     },
     "macOS": {
       "minimumSystemVersion": "14.2",
       "infoPlist": "Info.plist",
       "entitlements": "entitlements.plist",
       "signingIdentity": "-",
-      "dmg": { "windowSize": { "width": 540, "height": 380 } }
+      "dmg": {
+        "windowSize": {
+          "width": 540,
+          "height": 380
+        }
+      }
     }
   }
 }

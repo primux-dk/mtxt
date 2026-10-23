@@ -1,72 +1,52 @@
 // The live window: the last finished line, muted, and the utterance in
 // progress. Pause stops the text, not the recording; Hide hides the window.
+// When the session ends, the text is dropped from the page and from memory.
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { EMPTY, view, type LiveText } from './liveText';
 import { setLanguage, t, translate } from './locale';
 import { applyTheme } from './theme';
 import type { LiveUpdate, Snapshot } from './types';
 
 const $ = (id: string) => document.getElementById(id)!;
-let paused = false;
-let last: LiveUpdate | null = null;
+let shown: LiveText = EMPTY;
 
 function renderSnapshot(s: Snapshot): void {
   setLanguage(s.language);
   translate();
   applyTheme(s.connection?.theme_accent, s.connection?.theme_primary);
   $('product').textContent = s.connection?.product_name ?? '';
-  renderPause();
-  if (last) renderText(last);
+  // No session: nothing of the last one stays on the page.
+  if (!s.live.running) shown = EMPTY;
+  render();
 }
 
-function renderPause(): void {
+function render(): void {
   const b = $('pause');
-  const key = paused ? 'live.resume' : 'live.pause';
+  const key = shown.paused ? 'live.resume' : 'live.pause';
   b.setAttribute('aria-label', t(key));
   b.title = t(key);
-  b.setAttribute('aria-pressed', String(paused));
-  b.querySelector('use')!.setAttribute('href', paused ? '#i-play' : '#i-pause');
-}
-
-function renderText(u: LiveUpdate): void {
-  last = u;
-  paused = u.state === 'paused';
-  renderPause();
-  const prev = $('prev');
+  b.setAttribute('aria-pressed', String(shown.paused));
+  b.querySelector('use')!.setAttribute('href', shown.paused ? '#i-play' : '#i-pause');
   const current = $('current');
-  current.classList.remove('status');
-  const status = (key: string) => {
-    prev.textContent = '';
-    current.textContent = t(key);
-    current.classList.add('status');
-  };
-  switch (u.state) {
-    case 'loading':
-      return status('live.loading');
-    case 'needs_model':
-      return status('live.needsModel');
-    case 'error':
-      return status('live.error');
-    case 'paused':
-      return status('live.paused');
-  }
-  const lines = [...u.lines];
-  if (u.partial) lines.push(u.partial);
-  if (lines.length === 0) return status('live.listening');
-  current.textContent = lines.pop() ?? '';
-  prev.textContent = lines.pop() ?? '';
+  $('prev').textContent = shown.prev;
+  current.textContent = shown.status ? t(shown.status) : shown.current;
+  current.classList.toggle('status', !!shown.status);
 }
 
 async function main(): Promise<void> {
   // The new state comes back as a live update within 100 ms.
-  $('pause').addEventListener('click', () => invoke('pause_live', { paused: !paused }));
+  $('pause').addEventListener('click', () => invoke('pause_live', { paused: !shown.paused }));
   $('hide').addEventListener('click', () => invoke('hide_live'));
   renderSnapshot(await invoke<Snapshot>('snapshot'));
-  const state = await invoke<LiveUpdate | null>('live_state');
-  if (state) renderText(state);
+  shown = view(await invoke<LiveUpdate | null>('live_state'));
+  render();
   await listen<Snapshot>('snapshot', (e) => renderSnapshot(e.payload));
-  await listen<LiveUpdate>('live', (e) => renderText(e.payload));
+  await listen<LiveUpdate>('live', (e) => {
+    shown = view(e.payload);
+    render();
+  });
 }
 
 main();

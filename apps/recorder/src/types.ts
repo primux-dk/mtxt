@@ -2,6 +2,8 @@
 
 export type Permission = 'granted' | 'denied' | 'not_determined' | 'unsupported';
 export type Status =
+  | 'failed_local'
+  | 'unreadable'
   | 'recording'
   | 'uploading'
   | 'pending'
@@ -34,6 +36,22 @@ export interface QueueItem {
   server_status: string | null;
   meeting_url: string | null;
   active: boolean;
+  blocked: Blocked | null;
+  local_error: string | null;
+  can_save: boolean;
+  recovered: boolean;
+  gaps: number;
+}
+
+export type Blocked =
+  | { kind: 'other_host'; host: string }
+  | { kind: 'other_user'; email: string }
+  | { kind: 'no_owner' };
+
+export interface DamagedEntry {
+  id: string;
+  error: string;
+  has_audio: boolean;
 }
 
 export interface ModelView {
@@ -75,11 +93,12 @@ export interface Snapshot {
   live: { enabled: boolean; model: string; models: ModelView[]; hidden: boolean; running: boolean };
   ask: QueueItem | null;
   notice: Notice | null;
+  damaged: DamagedEntry[];
   version: string;
 }
 
 export interface LiveUpdate {
-  state: 'loading' | 'listening' | 'paused' | 'needs_model' | 'error';
+  state: 'loading' | 'listening' | 'paused' | 'needs_model' | 'error' | 'stopped';
   lines: string[];
   partial: string;
 }
