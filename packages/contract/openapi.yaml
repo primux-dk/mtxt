@@ -1,8 +1,12 @@
 openapi: 3.1.0
 info:
-  title: mtxt recorder-to-server contract
-  version: 0.1.0
+  title: mtxt API, the recorder contract and the REST API
+  version: 0.2.0
   description: |
+    Two clients share this file: the desktop recorder (the `recorder` tag)
+    and a company's own systems reading meetings through the REST API (the
+    `api` tag, below).
+
     How a recording reaches the library (docs/spec.md). The recorder announces a
     recording, uploads it in 8 MB chunks that can be resent, asks the server to
     verify the whole file, and polls until the transcript exists.
@@ -76,6 +80,54 @@ info:
 
     The recorder and the server share only this file and the types generated
     from it.
+
+    ## REST API
+
+    A company's own system (a CRM, a case system) reads meetings,
+    transcripts and recaps as one user, with that user's personal API token
+    (docs/spec.md "API"). Webhooks say when something changed; these calls
+    fetch it.
+
+    1. **Token.** The user makes one in the library under the user menu,
+       "API tokens": a name, a scope (`read` or `read_write`) and a
+       lifetime (30 days, 90 days or 1 year). It is shown once:
+       `mtxt_` and 43 base64url characters. Send it on every call as
+       `Authorization: Bearer <token>`. It sees exactly what its user sees;
+       an admin's token sees nothing more. A missing, unknown, expired or
+       revoked token is 401 `unauthorized`. A recorder's token is 403
+       `forbidden` here, and an API token is 403 on the recorder's paths.
+    2. **Scope.** `read` may call every GET. `read_write` may also call
+       `PUT /meetings/{id}/recap`, `PATCH /meetings/{id}`,
+       `POST /meetings/{id}/shares` and `DELETE /meetings/{id}/shares/{userId}`.
+       A write with a `read` token is 403 `insufficient_scope`.
+    3. **Permission.** A meeting the user may not read is 404 `not_found`,
+       the same as one that does not exist. A write the meeting's owner
+       alone may make (all four of them) is 403 `forbidden` for a reader.
+    4. **Rate limit.** 60 requests a minute per token, in a window that
+       starts with the minute's first request. Every answer carries
+       `X-RateLimit-Limit` and `X-RateLimit-Remaining`; the 61st is 429
+       `rate_limited` with `Retry-After` (seconds) and `retry_after` in the
+       body. Wait that long.
+    5. **Pages.** `GET /meetings` and `GET /search` answer a page and
+       `next_cursor`. Pass it back as `cursor`, with the same other
+       parameters, until it is null. A cursor is opaque; one from another
+       query is 400. `limit` is 1 to 100, 50 by default.
+    6. **ETag.** Every GET's 200 carries a strong `ETag` over its body. Send
+       it back as `If-None-Match` to get 304 with no body when nothing
+       changed. A 304 counts against the rate limit and writes no audit row.
+    7. **Audit.** Each read of one meeting (`GET /meetings/{id}`, its
+       transcript, its recap) is in the install's audit log as the user,
+       with `via: api` and the token's name. Lists and search are not.
+    8. **Errors** are `{"error": {"code": "...", "message": "..."}}`; the
+       message is English for logs. Unknown query parameters and fields are
+       400 `invalid_request`, not ignored.
+
+    The MCP tools of v0.3 wrap these calls one to one: `list_meetings` is
+    `GET /meetings`, `get_transcript` is `GET /meetings/{id}/transcript`,
+    `get_minutes` is `GET /meetings/{id}/recap`, `search` is `GET /search`,
+    `save_minutes` is `PUT /meetings/{id}/recap`, `set_visibility` is
+    `PATCH /meetings/{id}` with `visibility`, and `share` is
+    `POST /meetings/{id}/shares` or `DELETE /meetings/{id}/shares/{userId}`.
   license:
     name: PolyForm Noncommercial 1.0.0
     url: https://polyformproject.org/licenses/noncommercial/1.0.0/
@@ -119,10 +171,32 @@ servers:
 security:
   - bearerAuth: []
   - sessionCookie: []
+tags:
+  - name: recorder
+    description: The desktop recorder's calls, with a recorder token.
+  - name: api
+    description: The REST API, with a personal API token.
+x-api:
+  token_header: 'Authorization: Bearer <token>'
+  token_pattern: '^mtxt_[A-Za-z0-9_-]{43}$'
+  scopes: [read, read_write]
+  token_lifetimes_days: [30, 90, 365]
+  rate_limit_per_minute: 60
+  page_size_default: 50
+  page_size_max: 100
+  mcp_tools:
+    list_meetings: GET /meetings
+    get_transcript: GET /meetings/{id}/transcript
+    get_minutes: GET /meetings/{id}/recap
+    search: GET /search
+    save_minutes: PUT /meetings/{id}/recap
+    set_visibility: PATCH /meetings/{id}
+    share: POST /meetings/{id}/shares, DELETE /meetings/{id}/shares/{userId}
 paths:
   /recorder/token:
     post:
       operationId: pollRecorderToken
+      tags: [recorder]
       summary: Exchange an approved connection for a bearer token. Poll until 200 or 410.
       description: |
         The recorder opened `/connect?challenge=<challenge>&name=<device name>`
@@ -206,6 +280,7 @@ paths:
           type: string
     delete:
       operationId: revokeRecorderToken
+      tags: [recorder]
       summary: Disconnect a recorder. The token stops working at once.
       description: |
         The recorder disconnects itself with its own `token_id` (a "Sign out"
@@ -220,6 +295,8 @@ paths:
           description: Revoked.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: With a bearer token, `{id}` is not the calling token; with the session, no recorder token with this id belongs to the caller (`not_found`).
           content:
@@ -231,6 +308,7 @@ paths:
   /recordings:
     post:
       operationId: createRecording
+      tags: [recorder]
       summary: Announce a recording and get an upload session.
       requestBody:
         required: true
@@ -277,6 +355,7 @@ paths:
           minimum: 1
     put:
       operationId: uploadChunk
+      tags: [recorder]
       summary: Upload one chunk. Sending the same chunk again replaces it.
       description: |
         Every chunk but the last is exactly `chunk_size_bytes`. Chunks may arrive
@@ -347,6 +426,7 @@ paths:
       - $ref: '#/components/parameters/RecordingId'
     post:
       operationId: completeRecording
+      tags: [recorder]
       summary: Ask the server to verify the whole file against the announced SHA-256.
       description: |
         Idempotent. Calling it again on a confirmed recording returns the
@@ -409,6 +489,7 @@ paths:
       - $ref: '#/components/parameters/RecordingId'
     get:
       operationId: getRecording
+      tags: [recorder]
       summary: Poll the state of a recording.
       responses:
         '200':
@@ -419,33 +500,586 @@ paths:
                 $ref: '#/components/schemas/Recording'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/Internal'
         '404':
           $ref: '#/components/responses/NotFound'
+  /meetings:
+    get:
+      operationId: listMeetings
+      tags: [api]
+      summary: The meetings the token's user may read, newest first, a page at a time.
+      description: |
+        `view` picks the set: `all` (default) is every meeting the user may
+        read (their own, archived ones included; company-wide ones; shared
+        ones that name them), `mine` their own not archived, `shared` the
+        ones shared with them, `company` the company-wide ones, `archived`
+        their own archived ones. `mine` and `archived` also show a meeting
+        retention has emptied, with `deleted_at` set; nothing can be fetched
+        from it. `q` searches titles, transcripts and recaps (the order stays
+        newest first; `GET /search` ranks by match). Writes no audit row.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [all, mine, shared, company, archived]
+            default: all
+        - name: q
+          in: query
+          description: Words to find in titles, transcripts and recaps, at most 200 characters.
+          schema:
+            type: string
+            maxLength: 200
+        - name: status
+          in: query
+          description: '`transcribing` also covers meetings still uploading.'
+          schema:
+            type: string
+            enum: [ready, transcribing, failed]
+        - name: since
+          in: query
+          description: Meetings that started at or after this time (RFC 3339, or a date taken as UTC midnight).
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A page of meetings.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingList'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiForbidden'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /meetings/{id}:
+    parameters:
+      - $ref: '#/components/parameters/MeetingId'
+    get:
+      operationId: getMeeting
+      tags: [api]
+      summary: One meeting, with its recordings, transcript and recap state.
+      description: |
+        `shares` lists the readers for the meeting's owner and is null for
+        anyone else. Served with 200, it is an `opened` audit row with
+        `via: api` (at most one per user, meeting and hour).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The meeting.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingDetail'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiForbidden'
+        '404':
+          $ref: '#/components/responses/MeetingNotFound'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    patch:
+      operationId: updateMeeting
+      tags: [api]
+      summary: The owner sets the title, the visibility or the keep flag. Needs `read_write`.
+      description: |
+        Each field sets a value, so sending the same body twice changes
+        nothing the second time. Leaving `shared` removes every reader;
+        `private` also takes back the owner's consent to send the meeting to
+        connected systems. A visibility change is a `visibility_changed`
+        audit row with `via: api`. Answers with the meeting as it is now.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingUpdate'
+      responses:
+        '200':
+          description: The meeting after the change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiOwnerOnly'
+        '404':
+          $ref: '#/components/responses/MeetingNotFound'
+        '409':
+          description: The visibility changed meanwhile (`conflict`). Read the meeting and try again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/ApiTooLarge'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /meetings/{id}/transcript:
+    parameters:
+      - $ref: '#/components/parameters/MeetingId'
+    get:
+      operationId: getTranscript
+      tags: [api]
+      summary: The meeting's transcript, as JSON or plain text.
+      description: |
+        The primary recording's transcript, else the newest one. JSON (the
+        default) is the shape a webhook's transcript link gives: language,
+        speakers by the linked colleague's name or their label, and segments
+        in time order. `format=text` is one line per segment,
+        `[h:mm:ss] Name: text`. Served with 200, it is an `exported` audit
+        row with the format and `via: api`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, text]
+            default: json
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The transcript.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transcript'
+            text/plain:
+              schema:
+                type: string
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiForbidden'
+        '404':
+          description: No such meeting the user may read, or it has no finished transcript yet (`not_found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /meetings/{id}/recap:
+    parameters:
+      - $ref: '#/components/parameters/MeetingId'
+    get:
+      operationId: getRecap
+      tags: [api]
+      summary: The recap's current version, as JSON, markdown or Word.
+      description: |
+        `json` (the default) gives the version, the markdown body and the
+        decisions block's items. `markdown` is the stored body, `docx` the
+        Word file the library's export button gives. Served with 200, it is
+        an `exported` audit row with the format and `via: api`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, markdown, docx]
+            default: json
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The recap.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recap'
+            text/markdown:
+              schema:
+                type: string
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                contentMediaType: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiForbidden'
+        '404':
+          description: No such meeting the user may read, or its recap has no version yet (`not_found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+    put:
+      operationId: saveRecap
+      tags: [api]
+      summary: The owner saves a new version of the recap on the version it was made from. Needs `read_write`.
+      description: |
+        Read the recap first (`GET` with `format=json`), change `body_md`, and
+        send it with `base_version_id` set to the version you read. A save
+        whose base is no longer the current version is 409 with the version
+        that is current: read again, merge, and save on that. The server may
+        store slightly different text (a mention of someone outside the
+        install becomes plain text, an image from elsewhere its alt text);
+        the answer carries what it stored. Also the library editor's own
+        save, with the session cookie. A save is not an audit row; the
+        version names its author.
+      security:
+        - bearerAuth: []
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecapSave'
+      responses:
+        '200':
+          description: Saved as a new version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecapSaved'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiOwnerOnly'
+        '404':
+          description: No such meeting the user may read, or it has no recap yet (`not_found`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The base is no longer the current version (`conflict`); `current` is the version that is.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecapConflict'
+        '413':
+          description: |
+            The body is over 512 KiB (`too_large`), or the recap over 500,000
+            characters (`too_large` with `reason` `recap_too_long`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TooLarge'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /meetings/{id}/shares:
+    parameters:
+      - $ref: '#/components/parameters/MeetingId'
+    post:
+      operationId: addShare
+      tags: [api]
+      summary: The owner adds a reader, by user id or address. Needs `read_write`.
+      description: |
+        The meeting must be `shared` first (`PATCH` its visibility). Adding
+        someone who already reads it changes nothing. A change is a `shared`
+        audit row with `via: api`. Answers with every reader.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareRequest'
+      responses:
+        '200':
+          description: The readers now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareList'
+        '400':
+          description: A bad body, a colleague not in this install, the owner themselves, or a meeting that is not `shared` (`invalid_request`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiOwnerOnly'
+        '404':
+          $ref: '#/components/responses/MeetingNotFound'
+        '413':
+          $ref: '#/components/responses/ApiTooLarge'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /meetings/{id}/shares/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/MeetingId'
+      - name: userId
+        in: path
+        required: true
+        description: The reader's user id, from `shares` in `GET /meetings/{id}`.
+        schema:
+          type: string
+    delete:
+      operationId: removeShare
+      tags: [api]
+      summary: The owner removes a reader. Needs `read_write`.
+      description: 'Removing someone who does not read it changes nothing and is 204 too. A change is a `shared` audit row with `via: api`.'
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Not a reader now.
+        '400':
+          description: No such user in this install, or the owner themselves (`invalid_request`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiOwnerOnly'
+        '404':
+          $ref: '#/components/responses/MeetingNotFound'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /search:
+    get:
+      operationId: search
+      tags: [api]
+      summary: Titles, transcripts and recaps of the meetings the user may read, best match first.
+      description: |
+        A meeting found by its title has `match` `title` and no snippet. One
+        found in its recap or transcript has a snippet of its best place, as
+        parts of plain text with the matched words marked `hit`; a
+        transcript hit has the second it starts at. Writes no audit row.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A page of results.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/RateLimitLimit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/RateLimitRemaining'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ApiForbidden'
+        '429':
+          $ref: '#/components/responses/ApiRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       description: |
-        A desktop recorder's token from `POST /recorder/token`: `mtxt_` and 43
-        base64url characters, valid 180 days, bound to one user and one
-        device. A missing, unknown, expired or revoked token is 401 with code
-        `unauthorized`; the recorder then connects again.
+        `mtxt_` and 43 base64url characters. Either a desktop recorder's
+        token from `POST /recorder/token` (valid 180 days, bound to one user
+        and one device), for the `recorder` paths, or a personal API token
+        made in the library (a name, a scope, a lifetime), for the `api`
+        paths. A missing, unknown, expired or revoked token is 401 with code
+        `unauthorized`; a token of the other kind is 403 `forbidden`.
     sessionCookie:
       type: apiKey
       in: cookie
       name: __Secure-authjs.session-token
       description: The library's own session, for the browser recorder and upload in the library. Not for the desktop recorder.
   parameters:
+    MeetingId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    Cursor:
+      name: cursor
+      in: query
+      description: '`next_cursor` from the previous page, with the same other parameters. Opaque.'
+      schema:
+        type: string
+        maxLength: 400
+    Limit:
+      name: limit
+      in: query
+      description: Items per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      description: The `ETag` of an earlier answer; 304 when the answer would be the same.
+      schema:
+        type: string
     RecordingId:
       name: id
       in: path
       required: true
       schema:
         type: string
+  headers:
+    ETag:
+      description: A strong validator over the body. Send it as `If-None-Match`.
+      schema:
+        type: string
+    RateLimitLimit:
+      description: Requests a token may make per minute (60).
+      schema:
+        type: integer
+    RateLimitRemaining:
+      description: Requests left in this token's current minute.
+      schema:
+        type: integer
   responses:
+    NotModified:
+      description: The `If-None-Match` ETag still matches. No body.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+    ApiForbidden:
+      description: A recorder's token on the REST API (`forbidden`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ApiOwnerOnly:
+      description: |
+        `insufficient_scope`: the token's scope is `read`. `forbidden`: a
+        recorder's token, or the user reads the meeting but does not own it.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    MeetingNotFound:
+      description: No meeting with this id that the user may read (`not_found`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ApiTooLarge:
+      description: The body is larger than the call takes (`too_large`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ApiRateLimited:
+      description: Over 60 requests this minute for the token (`rate_limited`). Wait `Retry-After` seconds.
+      headers:
+        Retry-After:
+          description: Seconds until the token's minute ends.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RateLimited'
     BadRequest:
       description: The request is malformed.
       content:
@@ -465,7 +1099,7 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     Forbidden:
-      description: The caller may see the meeting but does not own it. Only the owner uploads (`forbidden`).
+      description: The caller may see the meeting but does not own it, since only the owner uploads; or the bearer token is a personal API token, which the recorder's paths refuse (`forbidden`).
       content:
         application/json:
           schema:
@@ -477,6 +1111,389 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    Visibility:
+      type: string
+      description: '`private`: the owner only. `shared`: the owner and the named readers. `company`: everyone in the install.'
+      enum: [private, shared, company]
+    MeetingState:
+      type: string
+      description: From the primary recording, else the newest. `none` when there is no recording.
+      enum: [ready, transcribing, uploading, failed, none]
+    Person:
+      type: object
+      additionalProperties: false
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+    NamedUser:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    MeetingSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          id,
+          title,
+          started_at,
+          visibility,
+          access,
+          owner,
+          state,
+          duration_s,
+          archived,
+          keep,
+          deleted_at,
+          speakers,
+          has_transcript,
+          has_recap,
+        ]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        access:
+          type: string
+          enum: [owner, reader]
+          description: '`owner` may write (with a `read_write` token); `reader` only reads.'
+        owner:
+          $ref: '#/components/schemas/Person'
+        state:
+          $ref: '#/components/schemas/MeetingState'
+        duration_s:
+          type: [integer, 'null']
+          description: Seconds, from the primary or newest recording; null without one.
+        archived:
+          type: boolean
+        keep:
+          type: boolean
+          description: Retention leaves the meeting alone.
+        deleted_at:
+          type: [string, 'null']
+          format: date-time
+          description: Set when retention has deleted the audio and transcript; only in the owner's `mine` and `archived` views.
+        speakers:
+          type: array
+          description: "Who spoke, in speaking order: the linked colleague's name, else the label."
+          items:
+            type: string
+        has_transcript:
+          type: boolean
+        has_recap:
+          type: boolean
+          description: The recap has a version to fetch.
+    MeetingList:
+      type: object
+      additionalProperties: false
+      required: [meetings, next_cursor]
+      properties:
+        meetings:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeetingSummary'
+        next_cursor:
+          type: [string, 'null']
+          description: Null on the last page.
+    RecordingSummary:
+      type: object
+      additionalProperties: false
+      required: [id, status, source, duration_s, is_primary, created_at, confirmed_at]
+      properties:
+        id:
+          type: string
+        status:
+          $ref: '#/components/schemas/RecordingStatus'
+        source:
+          $ref: '#/components/schemas/RecordingSource'
+        duration_s:
+          type: integer
+        is_primary:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        confirmed_at:
+          type: [string, 'null']
+          format: date-time
+    RecapVersion:
+      type: object
+      additionalProperties: false
+      required: [id, number, author, created_at, note]
+      properties:
+        id:
+          type: string
+          description: The `base_version_id` of a save made on this version.
+        number:
+          type: integer
+          minimum: 1
+        author:
+          oneOf:
+            - $ref: '#/components/schemas/NamedUser'
+            - type: 'null'
+          description: Null for a version the AI wrote.
+        created_at:
+          type: string
+          format: date-time
+        note:
+          type: [string, 'null']
+          description: '`restored:<n>` for a restore, `chunked:<parts>` for a draft made from summaries; else null.'
+    RecapStatus:
+      type: string
+      description: '`drafting` while the AI writes, `ready` with a version, `failed` when the last draft failed.'
+      enum: [drafting, ready, failed]
+    MeetingDetail:
+      allOf:
+        - $ref: '#/components/schemas/MeetingSummary'
+        - type: object
+          required: [recordings, transcript, recap, shares]
+          properties:
+            recordings:
+              type: array
+              description: Primary first, then newest first.
+              items:
+                $ref: '#/components/schemas/RecordingSummary'
+            transcript:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [status, language]
+                  properties:
+                    status:
+                      type: string
+                      enum: [pending, done, failed]
+                    language:
+                      type: string
+                - type: 'null'
+              description: The primary recording's transcript, else the newest; null before transcription starts.
+            recap:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [status, version]
+                  properties:
+                    status:
+                      $ref: '#/components/schemas/RecapStatus'
+                    version:
+                      oneOf:
+                        - $ref: '#/components/schemas/RecapVersion'
+                        - type: 'null'
+                - type: 'null'
+            shares:
+              type: [array, 'null']
+              description: The readers, for the owner; null for anyone else.
+              items:
+                $ref: '#/components/schemas/Person'
+      unevaluatedProperties: false
+    MeetingUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Trimmed before it is stored.
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        keep:
+          type: boolean
+    Transcript:
+      type: object
+      additionalProperties: false
+      required: [meeting_id, language, speakers, segments]
+      properties:
+        meeting_id:
+          type: string
+        language:
+          type: string
+          description: ISO 639-1 where one exists, as the provider detected or the install set.
+        speakers:
+          type: array
+          items:
+            $ref: '#/components/schemas/NamedUser'
+          description: '`id` is the speaker''s id in this meeting; `name` the linked colleague''s name, else the label ("Speaker 1").'
+        segments:
+          type: array
+          description: In time order.
+          items:
+            type: object
+            additionalProperties: false
+            required: [start_ms, end_ms, speaker_id, text]
+            properties:
+              start_ms:
+                type: integer
+                minimum: 0
+              end_ms:
+                type: integer
+                minimum: 0
+              speaker_id:
+                type: [string, 'null']
+              text:
+                type: string
+    Decision:
+      type: object
+      additionalProperties: false
+      required: [position, text, done, owner]
+      properties:
+        position:
+          type: integer
+          minimum: 0
+        text:
+          type: string
+        done:
+          type: boolean
+        owner:
+          oneOf:
+            - $ref: '#/components/schemas/NamedUser'
+            - type: 'null'
+          description: The colleague the item first mentions, if any.
+    Recap:
+      type: object
+      additionalProperties: false
+      required: [meeting_id, status, version, body_md, decisions]
+      properties:
+        meeting_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/RecapStatus'
+        version:
+          $ref: '#/components/schemas/RecapVersion'
+        body_md:
+          type: string
+          description: |
+            Markdown. A callout is a GitHub alert, a toggle `<details>`, the
+            table of contents `<!-- toc -->`, the decisions block a task list
+            between `<!-- decisions -->` and `<!-- /decisions -->`, a mention
+            `[@Name](mtxt:user/<id>)` or `mtxt:speaker/<id>`.
+        decisions:
+          type: array
+          description: The decisions block's items, in order.
+          items:
+            $ref: '#/components/schemas/Decision'
+    RecapSave:
+      type: object
+      required: [base_version_id, body_md]
+      properties:
+        base_version_id:
+          type: [string, 'null']
+          description: The version the text was made from; null only for a recap with no version yet.
+        body_md:
+          type: string
+          maxLength: 500000
+    RecapSaved:
+      type: object
+      additionalProperties: false
+      required: [version, body_md]
+      properties:
+        version:
+          $ref: '#/components/schemas/RecapVersion'
+        body_md:
+          type: string
+          description: The text as stored. Take it when it differs from what was sent.
+    RecapConflict:
+      type: object
+      additionalProperties: false
+      required: [error, current]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+        current:
+          oneOf:
+            - $ref: '#/components/schemas/RecapVersion'
+            - type: 'null'
+    TooLarge:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+        reason:
+          type: string
+          enum: [recap_too_long]
+    ShareRequest:
+      description: Exactly one of `user_id` or `email`.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [user_id]
+          properties:
+            user_id:
+              type: string
+        - type: object
+          additionalProperties: false
+          required: [email]
+          properties:
+            email:
+              type: string
+              description: The colleague's address in the install, matched without regard to ASCII case.
+    ShareList:
+      type: object
+      additionalProperties: false
+      required: [shares]
+      properties:
+        shares:
+          type: array
+          items:
+            $ref: '#/components/schemas/Person'
+    SnippetPart:
+      type: object
+      additionalProperties: false
+      required: [text, hit]
+      properties:
+        text:
+          type: string
+        hit:
+          type: boolean
+          description: One of the matched words.
+    SearchResult:
+      type: object
+      additionalProperties: false
+      required: [meeting, match, snippet, start_s]
+      properties:
+        meeting:
+          $ref: '#/components/schemas/MeetingSummary'
+        match:
+          type: string
+          enum: [title, recap, transcript]
+          description: Where the best match is.
+        snippet:
+          type: [array, 'null']
+          description: The text around the best match, in parts; null for a title match.
+          items:
+            $ref: '#/components/schemas/SnippetPart'
+        start_s:
+          type: [integer, 'null']
+          description: For a transcript match, the second its segment starts at.
+    SearchResults:
+      type: object
+      additionalProperties: false
+      required: [results, next_cursor]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        next_cursor:
+          type: [string, 'null']
     RecordingStatus:
       type: string
       description: |
@@ -690,12 +1707,13 @@ components:
         code:
           type: string
           description: |
-            Stable machine-readable code. v0.1 uses `unauthorized`,
+            Stable machine-readable code. The API uses `unauthorized`,
             `forbidden`, `not_found`, `invalid_request`, `too_large`,
             `source_disabled`, `chunk_size`, `not_uploading`, `missing_chunks`,
             `hash_mismatch`, `size_mismatch`, `session_expired`, `busy`,
-            `unsupported_media_type`, `rate_limited`, `expired`, `denied` and
-            `internal`.
+            `unsupported_media_type`, `rate_limited`, `expired`, `denied`,
+            `insufficient_scope`, `conflict` and `internal`. A client treats
+            an unknown code by its HTTP status.
         message:
           type: string
           description: English text for logs. The recorder shows its own localised message per code.

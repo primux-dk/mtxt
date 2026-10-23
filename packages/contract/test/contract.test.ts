@@ -23,15 +23,22 @@ describe('contract', () => {
     expect(checkedIn.endsWith(generated)).toBe(true);
   });
 
-  it('declares the recorder endpoints', async () => {
+  it('declares the recorder endpoints and the REST API', async () => {
     const spec = parse(await readFile(specUrl, 'utf8'));
     expect(Object.keys(spec.paths).sort()).toEqual([
+      '/meetings',
+      '/meetings/{id}',
+      '/meetings/{id}/recap',
+      '/meetings/{id}/shares',
+      '/meetings/{id}/shares/{userId}',
+      '/meetings/{id}/transcript',
       '/recorder/token',
       '/recorder/tokens/{id}',
       '/recordings',
       '/recordings/{id}',
       '/recordings/{id}/chunks/{n}',
       '/recordings/{id}/complete',
+      '/search',
     ]);
   });
 
@@ -168,6 +175,81 @@ describe('contract details', () => {
     }
     for (const bad of ['text/html', 'application/octet-stream', 'audio/webm\r\nx: 1']) {
       expect(pattern.test(bad), bad).toBe(false);
+    }
+  });
+});
+
+describe('the REST API', () => {
+  type Op = {
+    tags?: string[];
+    security?: object[];
+    parameters?: { $ref?: string; name?: string }[];
+    responses: Record<string, { headers?: Record<string, unknown> }>;
+  };
+  const apiOps = async () => {
+    const spec = parse(await readFile(specUrl, 'utf8'));
+    const ops: [string, Op][] = [];
+    for (const [path, item] of Object.entries<Record<string, Op>>(spec.paths)) {
+      for (const [method, op] of Object.entries(item)) {
+        if (method === 'parameters' || !op.tags?.includes('api')) continue;
+        ops.push([`${method.toUpperCase()} ${path}`, op]);
+      }
+    }
+    return { spec, ops };
+  };
+
+  it('takes a bearer token on every call, and the session only for the editor save', async () => {
+    const { ops } = await apiOps();
+    expect(ops).toHaveLength(9);
+    for (const [name, op] of ops) {
+      expect(op.security, name).toEqual(
+        name === 'PUT /meetings/{id}/recap'
+          ? [{ bearerAuth: [] }, { sessionCookie: [] }]
+          : [{ bearerAuth: [] }],
+      );
+      for (const status of ['401', '429', '500']) {
+        expect(Object.keys(op.responses), `${name} ${status}`).toContain(status);
+      }
+    }
+  });
+
+  it('gives every GET an ETag, If-None-Match and 304', async () => {
+    const { ops } = await apiOps();
+    for (const [name, op] of ops.filter(([n]) => n.startsWith('GET '))) {
+      expect(Object.keys(op.responses), name).toContain('304');
+      expect(op.responses['200']!.headers, name).toHaveProperty('ETag');
+      expect(op.responses['200']!.headers, name).toHaveProperty('X-RateLimit-Remaining');
+      expect(
+        op.parameters?.some((p) => p.$ref === '#/components/parameters/IfNoneMatch'),
+        name,
+      ).toBe(true);
+    }
+  });
+
+  it('documents insufficient_scope on every write', async () => {
+    const { spec, ops } = await apiOps();
+    const owner = spec.components.responses.ApiOwnerOnly.description as string;
+    expect(owner).toContain('insufficient_scope');
+    for (const [name, op] of ops.filter(([n]) => !n.startsWith('GET '))) {
+      expect(op.responses['403'], name).toEqual({ $ref: '#/components/responses/ApiOwnerOnly' });
+    }
+  });
+
+  it('names an operation for every MCP tool', async () => {
+    const { spec, ops } = await apiOps();
+    const names = new Set(ops.map(([n]) => n));
+    const tools = spec['x-api'].mcp_tools as Record<string, string>;
+    expect(Object.keys(tools).sort()).toEqual([
+      'get_minutes',
+      'get_transcript',
+      'list_meetings',
+      'save_minutes',
+      'search',
+      'set_visibility',
+      'share',
+    ]);
+    for (const calls of Object.values(tools)) {
+      for (const call of calls.split(', ')) expect(names, call).toContain(call);
     }
   });
 });
