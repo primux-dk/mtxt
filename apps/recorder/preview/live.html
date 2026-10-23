@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Preview</title>
+    <script type="module" src="./mock.ts"></script>
+    <script type="module">
+      // Load the real page's body into this one, then its script.
+      const html = await (await fetch('/live.html')).text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      document.head.append(...doc.querySelectorAll('link[rel=stylesheet]'));
+      document.body.innerHTML = doc.body.innerHTML.replace(/<script[^>]*><\/script>/g, '');
+      const p = new URLSearchParams(location.search);
+      if (p.get('dialog') === 'disconnect')
+        setTimeout(() => window.dispatchEvent(new Event('preview-disconnect')), 300);
+      await import('/src/live.ts');
+    </script>
+  </head>
+  <body></body>
+</html>

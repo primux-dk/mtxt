@@ -18,12 +18,14 @@
     "generate": "pnpm --filter @mtxt/contract generate && pnpm --filter @mtxt/adapters db:generate && pnpm --filter @mtxt/web cf-typegen",
     "db:migrate": "pnpm --filter @mtxt/web db:migrate",
     "db:seed": "pnpm --filter @mtxt/web db:seed",
-    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:licenses": "node scripts/check-licenses.mjs && node apps/recorder/scripts/check-crate-licenses.mjs",
     "check:generated": "pnpm generate && git diff --exit-code -- packages/contract/src/types.ts packages/adapters/migrations apps/web/cloudflare-env.d.ts && test -z \"$(git status --porcelain -- packages/adapters/migrations)\"",
     "stt:compare": "pnpm --filter @mtxt/web stt:compare",
     "deploy:install": "node deploy/install.mjs",
     "deploy:smoke": "node deploy/smoke.mjs",
-    "deploy:backup": "node deploy/backup.mjs"
+    "deploy:backup": "node deploy/backup.mjs",
+    "recorder:dev": "pnpm --filter @mtxt/recorder tauri dev",
+    "recorder:build": "pnpm --filter @mtxt/recorder tauri build --target universal-apple-darwin"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -104,11 +104,17 @@ async function poll(deps: PollDeps, body: unknown): Promise<Response> {
         token_id: result.tokenId,
         expires_at: result.expiresAt.toISOString(),
         device_name: result.deviceName,
-        user: { name: user?.name || user?.email || '' },
+        user: {
+          id: result.userId,
+          name: user?.name || user?.email || '',
+          email: user?.email ?? '',
+        },
         install: {
           product_name: settings.productName,
           theme_accent: settings.themeAccent,
           theme_primary: settings.themePrimary,
+          interface_language: settings.interfaceLanguage,
+          live_transcript_default: settings.liveTranscriptDefault,
         },
       };
       return json(body);
