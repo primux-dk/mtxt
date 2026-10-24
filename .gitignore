@@ -26,3 +26,5 @@ coverage/
 /deploy/installs/
 /apps/web/wrangler.*.jsonc
 /backups/
+# The cutter's test fixtures: synthetic tones, made for the tests (apps/web/test/audio-cut.test.ts).
+!apps/web/test/fixtures/audio/*
