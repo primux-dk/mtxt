@@ -1,5 +1,5 @@
 /*
-  The audio cutter (docs/decisions.md, packet 17): reads a stored
+  The audio cutter (docs/decisions.md, packet 18): reads a stored
   recording's container, plans pieces under the provider's limits, and
   builds one piece at a time as a file of its own, without decoding a
   sample. The container is told by its first bytes, not by the MIME type a

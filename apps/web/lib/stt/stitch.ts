@@ -1,6 +1,6 @@
 /*
   One transcript from the pieces of a cut recording (docs/decisions.md,
-  packet 17). Each piece's times move by the piece's start in the
+  packet 18). Each piece's times move by the piece's start in the
   original. Two neighbours share the overlap around their seam, so the
   words there come twice: the stitcher looks for the same run of words on
   both sides near the seam and cuts inside it, so every word is kept once;

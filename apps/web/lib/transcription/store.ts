@@ -226,7 +226,7 @@ export const rawPath = (installId: string, recordingId: string, provider: string
 
 /**
  * `transcripts/{install}/{recording}/{provider}-{tag}/`: a recording sent in
- * pieces (packet 17) keeps its plan and one raw result per piece under this
+ * pieces (packet 18) keeps its plan and one raw result per piece under this
  * prefix, named by the claim that planned the attempt. It is the row's
  * `raw_path` from the plan on, so a delete or retention takes the pieces
  * along even while the transcript is still pending.

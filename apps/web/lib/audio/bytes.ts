@@ -1,5 +1,5 @@
 /*
-  Byte plumbing for the audio cutter (docs/decisions.md, packet 17): a
+  Byte plumbing for the audio cutter (docs/decisions.md, packet 18): a
   reader that walks a stream front to back and buffers only what a parser
   asks for, and the few writers the containers need. Plain TypeScript with
   no Next.js imports: the queue consumer runs it.

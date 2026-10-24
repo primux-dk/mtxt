@@ -8,7 +8,7 @@ import { oggCrc } from '../lib/audio/ogg';
 import { planPieces, Units, type PieceLimits } from '../lib/audio/plan';
 
 /*
-  Packet 17: the cutter. The fixtures are 14 seconds of a 330 Hz tone that
+  Packet 18: the cutter. The fixtures are 14 seconds of a 330 Hz tone that
   is silent from 6 to 7 s and from 13 to 14 s: chrome.webm was recorded by
   Chromium's own MediaRecorder (unknown-size Segment and Clusters, as the
   browser recorder sends), the rest made by ffmpeg. With ffmpeg on the PATH

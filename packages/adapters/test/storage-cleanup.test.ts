@@ -35,7 +35,7 @@ describe('storage cleanup', () => {
     expect(entries(sqlite)).toEqual([{ path: 'b.webm', attempts: 1 }]);
   });
 
-  it('deletes a prefix page by page: a transcript sent in pieces (packet 17)', async () => {
+  it('deletes a prefix page by page: a transcript sent in pieces (packet 18)', async () => {
     const { db, sqlite } = testDb();
     const keys = new Set([
       'transcripts/t/r/w-1/plan.json',

@@ -322,7 +322,7 @@ export const transcripts = sqliteTable(
      */
     rawPath: text('raw_path'),
     /**
-     * A recording sent in pieces (packet 17): how many, and how many are
+     * A recording sent in pieces (packet 18): how many, and how many are
      * transcribed, for the meeting page's progress. Null for a file sent
      * whole. With pieces, `raw_path` is the prefix
      * `transcripts/{install}/{recording}/{provider}-{transcript_id}/`, set

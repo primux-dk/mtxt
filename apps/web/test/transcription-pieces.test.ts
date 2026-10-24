@@ -11,7 +11,7 @@ import { resetForRetry } from '../lib/transcription/store';
 import { INSTALL, seedRecording, testDb } from './sqlite-db';
 
 /*
-  Packet 17: a recording over the provider's ceiling goes in pieces. The
+  Packet 18: a recording over the provider's ceiling goes in pieces. The
   limits are scaled down so the 14-second Chromium recording (54 KB) is
   "over the ceiling" and cuts into three pieces; everything else is the
   job as it runs in the Worker.

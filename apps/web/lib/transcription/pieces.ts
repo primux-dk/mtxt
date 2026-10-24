@@ -1,5 +1,5 @@
 /*
-  A long recording in pieces (docs/decisions.md, packet 17), for a
+  A long recording in pieces (docs/decisions.md, packet 18), for a
   synchronous provider with a size ceiling (Workers AI Whisper). The first
   delivery reads the file once and plans the pieces (lib/audio), stores the
   plan under the attempt's prefix and puts the prefix and the count on the

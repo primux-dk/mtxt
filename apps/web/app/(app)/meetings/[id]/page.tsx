@@ -277,7 +277,7 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     // Confirmed or transcribing: a calm line with the provider, and the page looks again
     // every few seconds so the transcript appears without a reload.
     const waiting = !view && !settings.sttProvider;
-    // A recording in pieces says how far it has come (packet 17).
+    // A recording in pieces says how far it has come (packet 18).
     const pieces = view?.transcript.chunksTotal ?? 0;
     // The heading is the library badge's word for the state (rule 7).
     return (

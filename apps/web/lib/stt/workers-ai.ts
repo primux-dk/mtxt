@@ -23,7 +23,7 @@ import {
 export const WHISPER_MAX_BYTES = 25 * 1024 * 1024;
 /**
  * The pieces of a recording over WHISPER_MAX_BYTES (measured 2026-10-23,
- * docs/decisions.md packet 17): 12 MiB or 15 minutes each, whichever comes
+ * docs/decisions.md packet 18): 12 MiB or 15 minutes each, whichever comes
  * first, so a piece, its base64 copy and the request body fit in a
  * Worker's 128 MB together; 3 seconds of overlap on each side of a seam;
  * the seam at the quietest point in the 30 seconds before the latest place

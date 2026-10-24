@@ -1,5 +1,5 @@
 /*
-  Where to cut a recording into pieces (docs/decisions.md, packet 17). The
+  Where to cut a recording into pieces (docs/decisions.md, packet 18). The
   container readers turn a file into units, the smallest pieces the
   container can be cut at without decoding: an Opus block, an Ogg page, an
   MP3 or AAC frame, a tenth of a second of PCM. The planner walks the

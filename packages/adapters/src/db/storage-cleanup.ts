@@ -44,7 +44,7 @@ export async function finishCleanup(
   let failed = 0;
   for (const entry of entries) {
     try {
-      // A path ending in "/" is a prefix: a transcript's pieces (packet 17).
+      // A path ending in "/" is a prefix: a transcript's pieces (packet 18).
       await deleteStored(storage, entry.path);
       await db
         .delete(storageCleanup)

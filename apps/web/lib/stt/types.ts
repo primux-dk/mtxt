@@ -85,7 +85,7 @@ export interface PieceInput {
 
 /**
  * A synchronous provider with a size ceiling can take a long recording in
- * pieces (docs/decisions.md, packet 17): the job cuts the file under
+ * pieces (docs/decisions.md, packet 18): the job cuts the file under
  * `limits`, sends the pieces one by one and stitches the results. A file
  * up to `wholeMaxBytes` still goes whole through `submit`.
  */

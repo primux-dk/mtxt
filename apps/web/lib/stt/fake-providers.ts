@@ -158,7 +158,7 @@ interface WhisperControl {
 
 /**
  * POST: set the delay, and forget the calls so far. GET: the size of every
- * call since, in order (packet 17: a recording over 25 MiB goes in pieces).
+ * call since, in order (packet 18: a recording over 25 MiB goes in pieces).
  */
 export async function whisperControlRoute(request: Request) {
   if (!(await allowed(request))) return notFound();

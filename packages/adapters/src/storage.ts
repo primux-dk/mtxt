@@ -68,7 +68,7 @@ export interface StorageAdapter extends MultipartStorage {
 /**
  * Deletes a stored path. A path that ends in "/" is a prefix, and every
  * object under it goes, page by page (a transcript sent in pieces keeps one
- * object per piece under its prefix; packet 17).
+ * object per piece under its prefix; packet 18).
  */
 export async function deleteStored(
   storage: Pick<StorageAdapter, 'delete'> & Partial<Pick<StorageAdapter, 'list'>>,

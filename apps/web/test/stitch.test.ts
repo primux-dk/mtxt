@@ -3,7 +3,7 @@ import { stitch, type StitchPiece } from '../lib/stt/stitch';
 import type { SttSegment, SttWord } from '../lib/stt/types';
 
 /*
-  Packet 17: the stitcher. A synthetic meeting says word i from i*400 ms to
+  Packet 18: the stitcher. A synthetic meeting says word i from i*400 ms to
   i*400+300 ms. Each piece hears the words inside its own span, with times
   from its own start, grouped into segments of five words; neighbours
   overlap around the seam, so the words there come twice.
