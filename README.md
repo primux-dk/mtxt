@@ -4,7 +4,7 @@ Meeting transcription a company hosts itself. A small recorder on each employee'
 
 Meetings only. No dictation.
 
-**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search, outbound webhooks and a REST API with personal API tokens. The MCP server comes next and wraps that API. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the macOS recorder builds; Windows comes later. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
+**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search, outbound webhooks and a REST API with personal API tokens. The MCP server comes next and wraps that API. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the recorder builds for macOS and, unsigned and not yet tried on a real machine, for Windows. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -162,7 +162,7 @@ pnpm deploy:smoke meetings.acme.com --product "Acme Meetings"
 
 ## Recorder
 
-The desktop recorder is `apps/recorder`, a Tauri 2 app in Rust: microphone and system audio, the company login through the browser, a queued upload, and an optional live transcript from a local model. It builds for macOS 14.2 and later, on a Mac, with `pnpm recorder:build`; Windows comes later. [apps/recorder/README.md](apps/recorder/README.md) covers the build, signing, tests and how it works.
+The desktop recorder is `apps/recorder`, a Tauri 2 app in Rust: microphone and system audio, the company login through the browser, a queued upload, and an optional live transcript from a local model. It builds for macOS 14.2 and later, on a Mac, with `pnpm recorder:build`, and for Windows 10 and 11, on Windows, with `pnpm recorder:build:windows` (MSI and NSIS installers, unsigned). [apps/recorder/README.md](apps/recorder/README.md) covers the build, signing, tests and how it works.
 
 ## Licence
 

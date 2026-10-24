@@ -1,5 +1,5 @@
-//! The bearer token lives in the macOS Keychain (the Windows Credential
-//! Manager in packet 10), one entry per install, through the `keyring` crate.
+//! The bearer token lives in the macOS Keychain, or in Windows Credential
+//! Manager, one entry per install, through the `keyring` crate.
 
 const SERVICE: &str = "co.mtxt.recorder";
 

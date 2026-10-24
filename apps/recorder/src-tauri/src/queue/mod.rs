@@ -243,7 +243,8 @@ mod tests {
     impl Persist for Flaky {
         fn save(&self, rec: &RecordingState) -> std::io::Result<()> {
             if self.fail.load(Ordering::SeqCst) {
-                return Err(std::io::Error::from_raw_os_error(28));
+                // Not OS error 28: Windows calls 28 "the printer is out of paper".
+                return Err(std::io::Error::new(std::io::ErrorKind::StorageFull, "No space left on device"));
             }
             self.store.save(rec)
         }

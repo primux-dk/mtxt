@@ -132,6 +132,7 @@ const base: Snapshot = {
   },
   signed_out: false,
   language: 'en',
+  platform: 'macos',
   permissions: { microphone: 'granted', system_audio: 'granted' },
   permissions_asked: true,
   recording: null,
@@ -233,6 +234,8 @@ export const states: Record<string, Partial<Snapshot>> = {
     permissions_asked: false,
   },
   denied: { permissions: { microphone: 'denied', system_audio: 'denied' } },
+  // Windows: only the microphone has a switch; loopback needs no permission.
+  'mic-denied': { permissions: { microphone: 'denied', system_audio: 'granted' } },
   figure05: { recording, queue: figure05, live: { ...base.live, running: true } },
   uploading: { queue: figure05 },
   offline: {
@@ -297,8 +300,13 @@ export const states: Record<string, Partial<Snapshot>> = {
   },
 };
 
-export function snapshot(name: string, lang: string): Snapshot {
-  return { ...base, ...(states[name] ?? {}), language: lang === 'da' ? 'da' : 'en' };
+export function snapshot(name: string, lang: string, platform = 'macos'): Snapshot {
+  return {
+    ...base,
+    ...(states[name] ?? {}),
+    language: lang === 'da' ? 'da' : 'en',
+    platform: platform === 'windows' ? 'windows' : 'macos',
+  };
 }
 
 const lines = [

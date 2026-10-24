@@ -1,20 +1,31 @@
 // The recorder's strings, from apps/recorder/locales. English is the source;
-// Danish the first translation. Messages are ICU: `{name}` arguments and
+// Danish the first translation. `<lang>.windows.json` holds the Windows
+// wording of the messages that name the Mac or its settings ("this PC",
+// "Settings → Privacy & security"); on Windows it is read before the base file. Messages are ICU: `{name}` arguments and
 // `{count, plural, one {...} other {...}}`. The window marks text with
 // `data-i18n="key"` and attributes with `data-i18n-attr="aria-label:key"`.
 
 import en from '../locales/en.json';
 import da from '../locales/da.json';
+import enWindows from '../locales/en.windows.json';
+import daWindows from '../locales/da.windows.json';
 
 export type Lang = 'en' | 'da';
+export type Platform = 'macos' | 'windows';
 export type Args = Record<string, string | number>;
 
 const files: Record<Lang, Record<string, string>> = { en, da };
+const overrides: Record<Platform, Record<Lang, Record<string, string>>> = {
+  macos: { en: {}, da: {} },
+  windows: { en: enWindows, da: daWindows },
+};
 let lang: Lang = 'en';
+let platform: Platform = 'macos';
 
-export function setLanguage(next: string): void {
+export function setLanguage(next: string, os?: string): void {
   lang = next === 'da' ? 'da' : 'en';
-  document.documentElement.lang = lang;
+  platform = os === 'windows' ? 'windows' : 'macos';
+  if (typeof document !== 'undefined') document.documentElement.lang = lang;
 }
 
 export function language(): Lang {
@@ -27,7 +38,8 @@ export function intlLocale(): string {
 }
 
 export function t(key: string, args: Args = {}): string {
-  const msg = files[lang][key] ?? files.en[key] ?? key;
+  const own = overrides[platform];
+  const msg = own[lang][key] ?? files[lang][key] ?? own.en[key] ?? files.en[key] ?? key;
   return format(msg, args);
 }
 

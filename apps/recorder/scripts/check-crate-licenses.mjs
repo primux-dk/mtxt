@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* global console, process, URL */
 // The Rust side of `pnpm check:licenses`. It judges every crate the recorder
-// builds for macOS (both architectures): normal dependencies, build
+// builds for macOS (both architectures) and for Windows (x64): normal dependencies, build
 // dependencies and proc macros; dev dependencies are left out, a release
 // never builds them. A crate passes when one alternative of its SPDX
 // expression is all ALLOWED, or when it is named in EXCEPTIONS with exactly
@@ -79,6 +79,8 @@ function metadata() {
         'aarch64-apple-darwin',
         '--filter-platform',
         'x86_64-apple-darwin',
+        '--filter-platform',
+        'x86_64-pc-windows-msvc',
       ],
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
     ),

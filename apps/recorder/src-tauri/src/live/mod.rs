@@ -4,7 +4,7 @@
 //! or written to disk.
 
 pub mod models;
-#[cfg(all(feature = "parakeet", target_arch = "aarch64"))]
+#[cfg(all(feature = "parakeet", any(target_arch = "aarch64", target_os = "windows")))]
 pub mod parakeet;
 pub mod segmenter;
 #[cfg(feature = "whisper")]
@@ -30,7 +30,7 @@ pub fn load_engine(models_dir: &std::path::Path, id: &str) -> Result<Box<dyn Eng
     }
     let dir = models::dir(models_dir, spec);
     match id {
-        #[cfg(all(feature = "parakeet", target_arch = "aarch64"))]
+        #[cfg(all(feature = "parakeet", any(target_arch = "aarch64", target_os = "windows")))]
         "parakeet" => parakeet::Parakeet::load(&dir).map(|e| Box::new(e) as Box<dyn Engine>).map_err(|e| e.to_string()),
         #[cfg(feature = "whisper")]
         "whisper" => whisper::Whisper::load(&dir).map(|e| Box::new(e) as Box<dyn Engine>),

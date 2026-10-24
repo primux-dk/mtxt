@@ -81,6 +81,8 @@ export interface Snapshot {
   } | null;
   signed_out: boolean;
   language: 'en' | 'da';
+  /** `std::env::consts::OS` of the recorder: `macos` or `windows`. */
+  platform: 'macos' | 'windows';
   permissions: { microphone: Permission; system_audio: Permission };
   permissions_asked: boolean;
   recording: {

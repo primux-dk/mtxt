@@ -1,0 +1,23 @@
+{
+  "recorder.error.file": "Optagelsen kunne ikke skrives på denne pc · Frigør plads, og prøv igen",
+  "recorder.live.help": "En lokal forhåndsvisning på denne pc. Den bliver aldrig overført.",
+  "recorder.queue.deleted": "Overført · Fjernet fra denne pc",
+  "recorder.queue.fileMissing": "Filen ligger ikke længere på denne pc · Fjern",
+  "recorder.network.offline": "Ingen forbindelse til {host} · Optagelserne bliver på denne pc og overføres, når forbindelsen er tilbage",
+  "recorder.ask.body": "Optagelsen ligger stadig på denne pc, og optageren bliver ved med at prøve. Prøv videre, eller gem filen et andet sted og stop forsøgene. Intet bliver slettet, medmindre du gemmer filen et andet sted.",
+  "recorder.disconnect.pending": "{count, plural, one {# optagelse er} other {# optagelser er}} ikke overført endnu. De bliver på denne pc og overføres, når du forbinder igen.",
+  "recorder.disconnect.body": "Optageren logger ud af {host}. Optagelserne på denne pc bliver liggende.",
+  "recorder.disconnect.failed": "Kunne ikke nå {host} for at afbryde · Prøv igen, eller afbryd kun på denne pc og fjern den under Optagere i biblioteket",
+  "recorder.disconnect.local": "Afbryd kun på denne pc",
+  "recorder.permission.system.explain": "Systemlyd: de andre deltagere, fra de højttalere eller det headset, du lytter på.",
+  "recorder.permission.mic.denied": "Mikrofonen er ikke tilladt for skrivebordsapps · Åbn Indstillinger",
+  "recorder.permission.openSettings": "Åbn Indstillinger",
+  "recorder.model.size": "{model} kræver en download på {size} og samme plads på denne pc. Den kører kun på denne pc.",
+  "recorder.error.stateSave": "Køen kunne ikke gemmes på denne pc: {error}",
+  "recorder.queue.unsaved": "Ikke gemt på denne pc: {error}",
+  "recorder.menu.delete": "Slet fra denne pc",
+  "recorder.delete.title": "Slet “{title}” fra denne pc?",
+  "recorder.delete.noFile": "Lyden ligger ikke længere på denne pc",
+  "recorder.queue.discarding": "Sletter fra denne pc",
+  "recorder.delete.failed": "Filerne kunne ikke slettes på denne pc · Prøv igen"
+}
