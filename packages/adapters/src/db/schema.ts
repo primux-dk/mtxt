@@ -739,6 +739,26 @@ export const oauthGrants = sqliteTable(
 );
 
 /**
+ * Every refresh token an MCP connection has spent (docs/spec.md "MCP"),
+ * as its SHA-256, so a spent one presented again reveals that it leaked
+ * and the connection it belonged to is revoked (RFC 9700 section 4.14.2).
+ * Rows go with their connection's row in the nightly prune.
+ */
+export const oauthSpentRefresh = sqliteTable(
+  'oauth_spent_refresh',
+  {
+    installId: installId(),
+    refreshHash: text('refresh_hash').notNull(),
+    tokenId: text('token_id').notNull(),
+    spentAt: timestamp('spent_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.installId, t.refreshHash] }),
+    index('oauth_spent_refresh_token').on(t.installId, t.tokenId),
+  ],
+);
+
+/**
  * One per challenge: Approve on /connect writes it `approved` for 10
  * minutes, Cancel writes it `denied`, and the recorder's poll exchanges an
  * approved one for a token (`redeemed`). No row exists before Approve or

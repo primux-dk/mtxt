@@ -364,6 +364,10 @@ describe('the MCP server on a database', () => {
       scope: string;
     };
   }
+  const refresh = (token: string) =>
+    tokenRoute.POST(
+      form({ grant_type: 'refresh_token', refresh_token: token, client_id: clientId }),
+    );
   const form = (fields: Record<string, string>) =>
     new Request(`${ORIGIN}/oauth/token`, {
       method: 'POST',
@@ -653,20 +657,14 @@ describe('the MCP server on a database', () => {
     expect(await countMcpConnections(ctx.db, INSTALL, 'anne')).toBe(0);
   });
 
-  it('refreshes with a new pair, after which the old refresh token is spent', async () => {
+  it('refreshes with a new pair; the access token lapses within the hour, the connection stays', async () => {
     const first = await connect('anne');
-    const refresh = (token: string) =>
-      tokenRoute.POST(
-        form({ grant_type: 'refresh_token', refresh_token: token, client_id: clientId }),
-      );
     const next = await refresh(first.refresh_token);
     expect(next.status).toBe(200);
     const pair = (await next.json()) as { access_token: string; refresh_token: string };
     expect(pair.access_token).not.toBe(first.access_token);
     expect((await rpc(first.access_token, 'tools/list')).status).toBe(401);
     expect((await rpc(pair.access_token, 'tools/list')).status).toBe(200);
-    expect((await refresh(first.refresh_token)).status).toBe(400);
-    // The access token lapses within the hour; the connection stays for its refresh.
     const later = new Date(Date.now() + MCP_ACCESS_LIFETIME_MS + 1000);
     expect(
       await findRecorderUser(ctx.db, INSTALL, await hashRecorderToken(pair.access_token), later),
@@ -680,6 +678,34 @@ describe('the MCP server on a database', () => {
         now: later,
       }),
     ).toMatchObject({ ok: true });
+  });
+
+  it('revokes the connection when a spent refresh token comes back, whoever holds the new one', async () => {
+    const first = await connect('anne');
+    // Whoever refreshed first (here, a thief) holds the new pair.
+    const stolen = (await (await refresh(first.refresh_token)).json()) as {
+      access_token: string;
+      refresh_token: string;
+    };
+    expect((await rpc(stolen.access_token, 'tools/list')).status).toBe(200);
+    // The rightful client comes back with the spent token: refused, and the connection ends.
+    const replay = await refresh(first.refresh_token);
+    expect(replay.status).toBe(400);
+    expect((await rpc(stolen.access_token, 'tools/list')).status).toBe(401);
+    expect((await refresh(stolen.refresh_token)).status).toBe(400);
+    expect(await countMcpConnections(ctx.db, INSTALL, 'anne')).toBe(0);
+    expect(audits().filter((a) => a.action === 'api_token_revoked')).toHaveLength(1);
+    // A spent token of another client revokes nothing.
+    const other = await connect('anne');
+    const spent = (await (await refresh(other.refresh_token)).json()) as { access_token: string };
+    await tokenRoute.POST(
+      form({
+        grant_type: 'refresh_token',
+        refresh_token: other.refresh_token,
+        client_id: await signClient(KEY, { name: 'Other', redirectUris: [REDIRECT] }),
+      }),
+    );
+    expect((await rpc(spent.access_token, 'tools/list')).status).toBe(200);
   });
 
   it('revokes by either token, for its own client only', async () => {

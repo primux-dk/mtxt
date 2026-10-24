@@ -9,7 +9,14 @@ import {
 } from '../recorder-auth';
 import type { Db } from './index';
 import { revokeToken } from './recorders';
-import { auditEvents, oauthGrants, recorderTokens, users, type ApiTokenScope } from './schema';
+import {
+  auditEvents,
+  oauthGrants,
+  oauthSpentRefresh,
+  recorderTokens,
+  users,
+  type ApiTokenScope,
+} from './schema';
 
 /*
   The MCP server's OAuth rows (docs/spec.md "MCP"). Approve on
@@ -22,6 +29,7 @@ import { auditEvents, oauthGrants, recorderTokens, users, type ApiTokenScope } f
 
 const tk = recorderTokens;
 const og = oauthGrants;
+const sr = oauthSpentRefresh;
 
 /** A bound value selected under a column's name, for INSERT ... SELECT in the table's column order. */
 const value = <T>(v: T, column: string) => sql<T>`${v}`.as(column);
@@ -205,8 +213,12 @@ export async function redeemOAuthCode(
 /**
  * The token endpoint's refresh: a working connection of this client, found
  * by its current refresh token, gets a new access token and a new refresh
- * token (the old one stops working), and its end moves on. One conditional
- * UPDATE, so two refreshes with the same token cannot both succeed.
+ * token, and its end moves on. The spent refresh token is kept, as its
+ * hash, in the same batch, so the two refreshes with one token cannot both
+ * succeed and a spent token presented later is known: it means the token
+ * leaked, and the connection is revoked, whoever holds its current token
+ * (RFC 9700 section 4.14.2). A client that retries a refresh whose answer
+ * it lost is revoked too, and connects again.
  */
 export async function refreshMcpToken(
   db: Db,
@@ -222,28 +234,62 @@ export async function refreshMcpToken(
   const now = input.now ?? new Date();
   const t = now.getTime();
   const accessExpiresAt = new Date(t + MCP_ACCESS_LIFETIME_MS);
-  const [row] = await db
-    .update(tk)
-    .set({
-      tokenHash: input.accessHash,
-      refreshHash: input.nextRefreshHash,
-      accessExpiresAt,
-      expiresAt: new Date(t + MCP_CONNECTION_LIFETIME_MS),
-    })
+  const working = and(
+    eq(tk.installId, installId),
+    eq(tk.kind, 'mcp'),
+    eq(tk.refreshHash, input.refreshHash),
+    eq(tk.clientId, input.clientId),
+    isNull(tk.revokedAt),
+    gt(tk.expiresAt, now),
+    sql`exists (select 1 from users u where u.install_id = ${installId} and u.id = ${tk.userId})`,
+  );
+  const [, rows] = await db.batch([
+    // The spent token first: it reads the row the update then moves on.
+    db.insert(sr).select(
+      db
+        .select({
+          installId: tk.installId,
+          refreshHash: value(input.refreshHash, 'refresh_hash'),
+          tokenId: tk.id,
+          spentAt: value(t, 'spent_at'),
+        })
+        .from(tk)
+        .where(working),
+    ),
+    db
+      .update(tk)
+      .set({
+        tokenHash: input.accessHash,
+        refreshHash: input.nextRefreshHash,
+        accessExpiresAt,
+        expiresAt: new Date(t + MCP_CONNECTION_LIFETIME_MS),
+      })
+      .where(working)
+      .returning({ id: tk.id, scope: tk.scope }),
+  ]);
+  const [row] = rows;
+  if (row) return { ok: true, tokenId: row.id, scope: row.scope ?? 'read', accessExpiresAt };
+  const [spent] = await db
+    .select({ tokenId: sr.tokenId, userId: tk.userId })
+    .from(sr)
+    .innerJoin(tk, and(eq(tk.installId, installId), eq(tk.id, sr.tokenId), eq(tk.kind, 'mcp')))
     .where(
       and(
-        eq(tk.installId, installId),
-        eq(tk.kind, 'mcp'),
-        eq(tk.refreshHash, input.refreshHash),
+        eq(sr.installId, installId),
+        eq(sr.refreshHash, input.refreshHash),
         eq(tk.clientId, input.clientId),
-        isNull(tk.revokedAt),
-        gt(tk.expiresAt, now),
-        sql`exists (select 1 from users u where u.install_id = ${installId} and u.id = ${tk.userId})`,
       ),
     )
-    .returning({ id: tk.id, scope: tk.scope });
-  if (!row) return { ok: false, reason: 'invalid_grant' };
-  return { ok: true, tokenId: row.id, scope: row.scope ?? 'read', accessExpiresAt };
+    .limit(1);
+  if (spent) {
+    await revokeToken(db, installId, {
+      userId: spent.userId,
+      tokenId: spent.tokenId,
+      kind: 'mcp',
+      now,
+    });
+  }
+  return { ok: false, reason: 'invalid_grant' };
 }
 
 /**
@@ -277,17 +323,32 @@ export async function revokeMcpToken(
   return result === 'revoked';
 }
 
-/** The nightly job's share: authorization codes that expired over a day ago. */
+/**
+ * The nightly job's share: authorization codes that expired over a day ago,
+ * and spent refresh tokens whose connection is gone (pruned with the
+ * tokens, 90 days after it ended).
+ */
 export async function pruneOAuthGrants(
   db: Db,
   installId: string,
   now: Date = new Date(),
 ): Promise<number> {
-  const gone = await db
-    .delete(og)
-    .where(
-      and(eq(og.installId, installId), lt(og.expiresAt, new Date(now.getTime() - GRANT_KEEP_MS))),
-    )
-    .returning({ codeHash: og.codeHash });
-  return gone.length;
+  const [codes, spent] = await db.batch([
+    db
+      .delete(og)
+      .where(
+        and(eq(og.installId, installId), lt(og.expiresAt, new Date(now.getTime() - GRANT_KEEP_MS))),
+      )
+      .returning({ codeHash: og.codeHash }),
+    db
+      .delete(sr)
+      .where(
+        and(
+          eq(sr.installId, installId),
+          sql`not exists (select 1 from recorder_tokens t where t.install_id = ${installId} and t.id = ${sr.tokenId})`,
+        ),
+      )
+      .returning({ refreshHash: sr.refreshHash }),
+  ]);
+  return codes.length + spent.length;
 }

@@ -57,6 +57,7 @@ describe('schema', () => {
       'meeting_shares',
       'meetings',
       'oauth_grants',
+      'oauth_spent_refresh',
       'recap_images',
       'recap_jobs_seen',
       'recap_outbox',
