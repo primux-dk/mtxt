@@ -205,8 +205,6 @@
       "desktop": "Optageren",
       "browser": "Browser",
       "upload": "Upload",
-      "teams": "Teams",
-      "meet": "Meet",
       "device": "Diktafon"
     },
     "conflict": "Data fra en anden installation afhænger af mødet, så det er ikke ændret. Kontakt din administrator.",
@@ -558,12 +556,10 @@
     },
     "sources": {
       "heading": "Optagekilder",
-      "help": "Teams og Meet gælder kun møder, virksomheden selv har arrangeret.",
+      "help": "Hvor et mødes optagelse må komme fra. Desktopoptageren dækker også møder, som andre har arrangeret.",
       "desktop": "Desktopoptager",
       "upload": "Overførsel af lydfil",
-      "browser": "Browseroptager",
-      "onedrive": "OneDrive · Teams-optagelser",
-      "drive": "Google Drive · Meet-optagelser"
+      "browser": "Browseroptager"
     },
     "templates": {
       "heading": "Referatskabeloner",
@@ -600,7 +596,14 @@
       "heading": "MCP",
       "help": "AI-værktøjer bruger medarbejderens eget virksomhedslogin.",
       "server": "MCP-server",
-      "serverHelp": "Kun tilladte møder. Læsning og ændringer logges."
+      "serverHelp": "Kun tilladte møder. Læsning og ændringer logges.",
+      "url": "Hver medarbejder tilføjer <url></url> i sit AI-værktøj som en fjern MCP-server:",
+      "claude": "Claude og Claude Desktop: Indstillinger, Connectors, Tilføj brugerdefineret connector, og indsæt adressen.",
+      "claudeCode": "Claude Code: <command></command>, og derefter /mcp for at logge ind.",
+      "chatgpt": "ChatGPT: Indstillinger, Apps og connectors, Opret, indsæt adressen, og vælg OAuth.",
+      "cursor": "Cursor: Settings, MCP, Add a custom MCP server, med adressen som url.",
+      "signIn": "Værktøjet åbner denne installations egen login-side. Medarbejderen logger ind med virksomhedens login og vælger Kun læse eller Læse og skrive. Forbindelserne står under API-nøgler i medarbejderens menu, hvor de også tilbagekaldes.",
+      "apiToken": "Et værktøj uden OAuth: lav en personlig API-nøgle under API-nøgler, og send den som Authorization: Bearer <token>."
     },
     "dataflow": {
       "heading": "Dataflow",
@@ -1004,7 +1007,10 @@
       "scope": {
         "read": "Kun læse",
         "readWrite": "Læse og skrive"
-      }
+      },
+      "viaMcp": "via MCP ({token})",
+      "mcpConnection": "MCP-forbindelse",
+      "savedMinutes": "Gemte referatet som version {version}"
     },
     "empty": {
       "first": {
@@ -1084,7 +1090,7 @@
   "apiTokens": {
     "open": "API-nøgler",
     "title": "API-nøgler",
-    "description": "Personlige nøgler til virksomhedens egne systemer. En nøgle læser, og med Læse og skrive også ændrer, kun de møder, du selv kan se.",
+    "description": "Personlige nøgler til virksomhedens egne systemer og de AI-værktøjer, du har forbundet via MCP. Hver læser, og med Læse og skrive også ændrer, kun de møder, du selv kan se.",
     "loading": "Henter API-nøgler…",
     "failed": "Dine API-nøgler kunne ikke hentes. Tjek forbindelsen, og prøv igen.",
     "retry": "Prøv igen",
@@ -1092,7 +1098,7 @@
     "full": "Du har {max} nøgler, og flere kan der ikke være. Tilbagekald en for at lave en ny.",
     "empty": {
       "title": "Ingen API-nøgler",
-      "body": "Lav en nøgle til et system, der læser dine møder, fx et CRM. Den vises én gang."
+      "body": "Lav en nøgle til et system, der læser dine møder, fx et CRM. Den vises én gang. AI-værktøjer, du forbinder via MCP, vises også her."
     },
     "count": "{count, plural, one {# nøgle} other {# nøgler}}",
     "created": "Oprettet",
@@ -1137,6 +1143,9 @@
       "nameInvalid": "Navnet må ikke have linjeskift eller kontroltegn.",
       "tooMany": "Du har {max} nøgler. Tilbagekald en, og lav så den nye.",
       "createFailed": "Nøglen blev ikke lavet. Prøv igen."
+    },
+    "kind": {
+      "mcp": "MCP"
     }
   },
   "editor": {
@@ -1219,5 +1228,37 @@
       "restored": "Gendannet fra v{version}",
       "chunked": "Skrevet ud fra resuméer af {parts} dele af transskriptionen"
     }
+  },
+  "oauth": {
+    "pageTitle": "Forbind et AI-værktøj",
+    "title": "Forbind {client} til {product}?",
+    "signedInAs": "Logget ind som",
+    "returnsTo": "Når du har svaret, går din browser tilbage til <host></host>.",
+    "warning": "Godkend kun en forbindelse, du lige selv har startet i dit eget AI-værktøj. Hvis ikke, så tryk Annuller.",
+    "body": "Værktøjet arbejder som dig og ser kun de møder, du må se. Det, det læser og ændrer, står i revisionsloggen. Du kan tilbagekalde det når som helst under API-nøgler i menuen.",
+    "scope": {
+      "legend": "Adgang",
+      "read": "Kun læse",
+      "readHelp": "Viser, søger i og læser møder, transskriptioner og referater.",
+      "readWrite": "Læse og skrive",
+      "readWriteHelp": "Gemmer også referater og ændrer, hvem der kan se dine egne møder."
+    },
+    "approve": "Godkend",
+    "approving": "Godkender…",
+    "cancel": "Annuller",
+    "returning": "Går tilbage til værktøjet…",
+    "error": {
+      "too_many": "Du har {max} MCP-forbindelser. Tilbagekald en under API-nøgler i menuen, og prøv igen.",
+      "invalid": "Anmodningen virker ikke længere. Start forbindelsen igen i værktøjet.",
+      "signed_out": "Din session er udløbet. Genindlæs siden, og log ind igen.",
+      "server": "Forbindelsen blev ikke gemt. Prøv igen.",
+      "off": "MCP-serveren er slået fra i denne installation. Bed din administrator om at slå den til."
+    },
+    "invalid": {
+      "title": "Denne anmodning om forbindelse virker ikke",
+      "client": "Værktøjet er ikke registreret i denne installation, eller registreringen er ændret. Start forbindelsen igen i værktøjet.",
+      "redirect_uri": "Værktøjet bad om at vende tilbage til en adresse, det ikke har registreret, så intet blev sendt. Start forbindelsen igen i værktøjet."
+    },
+    "toLibrary": "Gå til mine møder"
   }
 }

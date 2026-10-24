@@ -30,8 +30,7 @@ export async function GET(request: Request, { params }: Params) {
         action: 'exported',
         details: {
           format: format === 'json' ? 'transcript' : 'text',
-          via: 'api',
-          token: via!.token,
+          ...via!,
         },
       }),
     );

@@ -205,8 +205,6 @@
       "desktop": "Desktop recorder",
       "browser": "Browser",
       "upload": "Upload",
-      "teams": "Teams",
-      "meet": "Meet",
       "device": "Voice recorder"
     },
     "conflict": "Data from another installation depends on this meeting, so it was left as it is. Contact your admin.",
@@ -558,12 +556,10 @@
     },
     "sources": {
       "heading": "Recording sources",
-      "help": "Teams and Meet cover only meetings the company organised.",
+      "help": "Where a meeting's recording may come from. The desktop recorder also covers meetings someone else organised.",
       "desktop": "Desktop recorder",
       "upload": "Audio file upload",
-      "browser": "Browser recorder",
-      "onedrive": "OneDrive · Teams recordings",
-      "drive": "Google Drive · Meet recordings"
+      "browser": "Browser recorder"
     },
     "templates": {
       "heading": "Recap templates",
@@ -600,7 +596,14 @@
       "heading": "MCP",
       "help": "AI tools use the employee's own company login.",
       "server": "MCP server",
-      "serverHelp": "Permitted meetings only. Reads and changes are logged."
+      "serverHelp": "Permitted meetings only. Reads and changes are logged.",
+      "url": "Each employee adds <url></url> to their AI tool as a remote MCP server:",
+      "claude": "Claude and Claude Desktop: Settings, Connectors, Add custom connector, then paste the address.",
+      "claudeCode": "Claude Code: <command></command>, then /mcp to sign in.",
+      "chatgpt": "ChatGPT: Settings, Apps and connectors, Create, then paste the address and choose OAuth.",
+      "cursor": "Cursor: Settings, MCP, Add a custom MCP server, with the address as its url.",
+      "signIn": "The tool opens this install's own sign-in page. The employee signs in with the company login and chooses Read only or Read and write. Connections show under API tokens in the employee's menu, where they are revoked.",
+      "apiToken": "A tool without OAuth: make a personal API token under API tokens and send it as Authorization: Bearer <token>."
     },
     "dataflow": {
       "heading": "Data flow",
@@ -1004,7 +1007,10 @@
       "scope": {
         "read": "Read only",
         "readWrite": "Read and write"
-      }
+      },
+      "viaMcp": "through MCP ({token})",
+      "mcpConnection": "MCP connection",
+      "savedMinutes": "Saved the minutes as version {version}"
     },
     "empty": {
       "first": {
@@ -1084,7 +1090,7 @@
   "apiTokens": {
     "open": "API tokens",
     "title": "API tokens",
-    "description": "Personal tokens for your company's own systems. A token reads, and with Read and write also changes, only the meetings you can see.",
+    "description": "Personal tokens for your company's own systems, and the AI tools you connected through MCP. Each reads, and with Read and write also changes, only the meetings you can see.",
     "loading": "Loading API tokens…",
     "failed": "Could not load your API tokens. Check the connection and try again.",
     "retry": "Try again",
@@ -1092,7 +1098,7 @@
     "full": "You have {max} tokens, the most there can be. Revoke one to make another.",
     "empty": {
       "title": "No API tokens",
-      "body": "Make a token for a system that reads your meetings, such as a CRM. It is shown once."
+      "body": "Make a token for a system that reads your meetings, such as a CRM. It is shown once. AI tools you connect through MCP show here too."
     },
     "count": "{count, plural, one {# token} other {# tokens}}",
     "created": "Created",
@@ -1137,6 +1143,9 @@
       "nameInvalid": "The name cannot hold line breaks or control characters.",
       "tooMany": "You have {max} tokens. Revoke one, then make the new one.",
       "createFailed": "The token was not made. Try again."
+    },
+    "kind": {
+      "mcp": "MCP"
     }
   },
   "editor": {
@@ -1219,5 +1228,37 @@
       "restored": "Restored from v{version}",
       "chunked": "Drafted from summaries of {parts} parts of the transcript"
     }
+  },
+  "oauth": {
+    "pageTitle": "Connect an AI tool",
+    "title": "Connect {client} to {product}?",
+    "signedInAs": "Signed in as",
+    "returnsTo": "After you answer, your browser goes back to <host></host>.",
+    "warning": "Only approve a connection you just started in your own AI tool. If you did not, press Cancel.",
+    "body": "The tool works as you and sees only the meetings you may see. What it reads and changes is in the audit log. Revoke it at any time under API tokens in the menu.",
+    "scope": {
+      "legend": "Access",
+      "read": "Read only",
+      "readHelp": "Lists, searches and reads meetings, transcripts and minutes.",
+      "readWrite": "Read and write",
+      "readWriteHelp": "Also saves minutes and changes who can see your own meetings."
+    },
+    "approve": "Approve",
+    "approving": "Approving…",
+    "cancel": "Cancel",
+    "returning": "Going back to the tool…",
+    "error": {
+      "too_many": "You have {max} MCP connections. Revoke one under API tokens in the menu, then try again.",
+      "invalid": "This request no longer works. Start the connection again in the tool.",
+      "signed_out": "Your session ended. Reload the page and sign in again.",
+      "server": "The connection was not saved. Try again.",
+      "off": "The MCP server is off for this install. Ask your admin to turn it on."
+    },
+    "invalid": {
+      "title": "This connection request does not work",
+      "client": "The tool is not registered with this install, or its registration was changed. Start the connection again in the tool.",
+      "redirect_uri": "The tool asked to return to an address it did not register, so nothing was sent. Start the connection again in the tool."
+    },
+    "toLibrary": "Go to my meetings"
   }
 }

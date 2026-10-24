@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
+    "@modelcontextprotocol/server": "2.3.1",
     "@mtxt/adapters": "workspace:*",
     "@mtxt/contract": "workspace:*",
     "@noble/hashes": "^2.4.0",
@@ -62,11 +63,13 @@
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1",
     "y-protocols": "^1.0.7",
-    "yjs": "^13.6.33"
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261021.1",
     "@eslint/eslintrc": "^3.3.7",
+    "@modelcontextprotocol/client": "2.3.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/markdown-it": "^14.2.0",

@@ -560,7 +560,7 @@ export interface components {
          */
         RecordingStatus: "uploading" | "confirmed" | "transcribing" | "transcribed" | "failed";
         /** @enum {string} */
-        RecordingSource: "desktop" | "browser" | "upload" | "teams" | "meet" | "device";
+        RecordingSource: "desktop" | "browser" | "upload" | "device";
         /** @description Lowercase hex SHA-256 of the whole file. */
         Sha256: string;
         NewMeeting: {

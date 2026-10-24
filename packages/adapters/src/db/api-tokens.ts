@@ -1,5 +1,11 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
-import { API_RATE_LIMIT, API_RATE_WINDOW_MS, MAX_API_TOKENS, rateAllowed } from '../recorder-auth';
+import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import {
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_MS,
+  MAX_API_TOKENS,
+  MAX_MCP_CONNECTIONS,
+  rateAllowed,
+} from '../recorder-auth';
 import type { Db } from './index';
 import { auditEvents, recorderTokens, users, type ApiTokenScope } from './schema';
 
@@ -17,6 +23,8 @@ const value = <T>(v: T, column: string) => sql<T>`${v}`.as(column);
 
 export interface ApiTokenRow {
   id: string;
+  /** A personal API token, or an MCP client's connection (docs/spec.md "MCP"). */
+  kind: 'api' | 'mcp';
   name: string;
   scope: ApiTokenScope;
   createdAt: Date;
@@ -84,6 +92,9 @@ export async function createApiToken(
             scope: value(input.scope, 'scope'),
             rateWindowAt: value(null, 'rate_window_at'),
             rateCount: value(0, 'rate_count'),
+            clientId: value(null, 'client_id'),
+            refreshHash: value(null, 'refresh_hash'),
+            accessExpiresAt: value(null, 'access_expires_at'),
           })
           .from(users)
           .where(owner),
@@ -93,7 +104,10 @@ export async function createApiToken(
   return created.length ? { ok: true, id } : { ok: false, reason: 'too_many' };
 }
 
-/** A user's working API tokens, newest first. Revoked and expired ones are left out. */
+/**
+ * A user's working API tokens and MCP connections, newest first, for the
+ * API tokens dialog. Revoked and expired ones are left out.
+ */
 export async function listApiTokens(
   db: Db,
   installId: string,
@@ -103,6 +117,7 @@ export async function listApiTokens(
   const rows = await db
     .select({
       id: tk.id,
+      kind: tk.kind,
       name: tk.deviceName,
       scope: tk.scope,
       createdAt: tk.createdAt,
@@ -115,14 +130,18 @@ export async function listApiTokens(
       and(
         eq(tk.installId, installId),
         eq(tk.userId, userId),
-        eq(tk.kind, 'api'),
+        inArray(tk.kind, ['api', 'mcp']),
         isNull(tk.revokedAt),
         gt(tk.expiresAt, now),
       ),
     )
     .orderBy(desc(tk.createdAt), tk.id)
-    .limit(MAX_API_TOKENS * 2);
-  return rows.map((r) => ({ ...r, scope: r.scope ?? 'read' }));
+    .limit((MAX_API_TOKENS + MAX_MCP_CONNECTIONS) * 2);
+  return rows.map((r) => ({
+    ...r,
+    kind: r.kind === 'mcp' ? 'mcp' : 'api',
+    scope: r.scope ?? 'read',
+  }));
 }
 
 export type RateResult =

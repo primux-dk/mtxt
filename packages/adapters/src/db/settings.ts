@@ -1,7 +1,14 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from './index';
 import { DEFAULT_SETTINGS } from './defaults';
-import { keyterms, settings, users, type NewSettings, type Settings } from './schema';
+import {
+  CAPTURE_SOURCES,
+  keyterms,
+  settings,
+  users,
+  type NewSettings,
+  type Settings,
+} from './schema';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -18,7 +25,10 @@ export async function readSettings(db: Db, installId: string): Promise<Settings>
     themeAccent: HEX.test(value.themeAccent) ? value.themeAccent : DEFAULT_SETTINGS.themeAccent,
     themePrimary: HEX.test(value.themePrimary) ? value.themePrimary : DEFAULT_SETTINGS.themePrimary,
     adminEmails: Array.isArray(value.adminEmails) ? value.adminEmails : [],
-    recordingSources: Array.isArray(value.recordingSources) ? value.recordingSources : [],
+    // A row saved while Teams and Meet were sources may still name them.
+    recordingSources: Array.isArray(value.recordingSources)
+      ? value.recordingSources.filter((s) => (CAPTURE_SOURCES as readonly string[]).includes(s))
+      : [],
   };
 }
 

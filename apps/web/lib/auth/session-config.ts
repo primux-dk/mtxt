@@ -15,6 +15,9 @@ export const isPublicPath = (path: string) =>
   path === '/api/v1/recorder/token' ||
   // A webhook's signed export link is its own grant (lib/webhooks/grant.ts): this one shape only.
   /^\/api\/v1\/export\/[^/]+$/.test(path) ||
+  // The MCP server and its OAuth endpoints stand on their own tokens (docs/spec.md "MCP");
+  // /oauth/authorize is a page and needs the session like any other.
+  isMcpPublicPath(path) ||
   // Only an e2e build has the test sign-in (lib/auth/test-sign-in.ts); the flag is inlined at build time.
   (process.env.MTXT_E2E_BUILD === '1' &&
     (path === '/api/test/sign-in' ||
@@ -47,3 +50,16 @@ export const isTokenApiPath = (path: string) =>
   path === '/api/v1/meetings' ||
   path === '/api/v1/search' ||
   /^\/api\/v1\/meetings\/[^/]+(\/transcript|\/recap|\/shares(\/[^/]+)?)?$/.test(path);
+
+/**
+ * The MCP server's paths that answer without a session: /mcp checks its
+ * bearer token itself and answers 401 with the OAuth metadata's address;
+ * the metadata, registration, token and revocation endpoints are OAuth's
+ * own and take no cookie.
+ */
+export const isMcpPublicPath = (path: string) =>
+  path === '/mcp' ||
+  path === '/oauth/register' ||
+  path === '/oauth/token' ||
+  path === '/oauth/revoke' ||
+  /^\/\.well-known\/oauth-(protected-resource|authorization-server)(\/mcp)?$/.test(path);

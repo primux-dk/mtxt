@@ -94,7 +94,5 @@ export const RECORDING_SOURCES = [
   'desktop',
   'browser',
   'upload',
-  'teams',
-  'meet',
   'device',
 ] as const satisfies readonly RecordingSource[];

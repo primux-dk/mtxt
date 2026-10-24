@@ -249,8 +249,16 @@ describe('validateSettings', () => {
     expect(errorsOf(form({ recordingSources: null })).recordingSources).toEqual({
       code: 'atLeastOneSource',
     });
-    const result = validateSettings(form({ recordingSources: ['meet', 'zoom'] }), configured, SELF);
-    expect(result.ok && result.patch.recordingSources).toEqual(['meet']);
+    // Teams and Meet are no longer recording sources: a stale form value is dropped like any other.
+    expect(errorsOf(form({ recordingSources: ['meet', 'teams'] })).recordingSources).toEqual({
+      code: 'atLeastOneSource',
+    });
+    const result = validateSettings(
+      form({ recordingSources: ['meet', 'zoom', 'browser'] }),
+      configured,
+      SELF,
+    );
+    expect(result.ok && result.patch.recordingSources).toEqual(['browser']);
   });
 
   it('reports a keyterm error with its line', () => {

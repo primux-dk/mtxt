@@ -2,14 +2,15 @@ import 'server-only';
 import { API_RATE_LIMIT, takeApiRequest, type ViaApi } from '@mtxt/adapters';
 import { getApiUser, type SessionUser } from '../auth/session';
 import { HttpError } from '../http-error';
+import { mcpCall } from '../mcp/context';
 import { getAdapters } from '../install';
 import { authorise, etagFor, etagMatches } from './rules';
 
 /*
   Every REST API route runs through rest() (docs/spec.md "API"): the
   caller and its token, the scope, the per-token rate limit, the contract's
-  error shape, and on a GET the ETag and its 304. An API token's request is
-  counted before its scope is checked, and every answer, an error too,
+  error shape, and on a GET the ETag and its 304. An API token's request,
+  and an MCP tool's call to it, is counted before its scope is checked, and every answer, an error too,
   carries the rate headers. A read is audited only
   when its body is served: the route hands its audit row to `served`, which
   runs after the 304 check and before the answer leaves, so a 304 writes
@@ -18,7 +19,10 @@ import { authorise, etagFor, etagMatches } from './rules';
 
 export type RestContext = Awaited<ReturnType<typeof getAdapters>> & {
   user: SessionUser;
-  /** `via: 'api'` and the token's name, for audit rows; null for the library's own session. */
+  /**
+   * `via: 'api'` and the token's name, or `via: 'mcp'` and the MCP client's
+   * name, for audit rows; null for the library's own session.
+   */
   via: ViaApi | null;
   /** Runs `write` when the response's body is served (not on a 304, not on an error). */
   served: (write: () => Promise<unknown>) => void;
@@ -63,7 +67,9 @@ export async function rest(
     // Every request with an API token counts, a refused one included, so a
     // script that keeps hitting a 403 is still held to its minute.
     const adapters = await getAdapters();
-    if (user.token?.kind === 'api') {
+    // A tool call of the MCP server (lib/mcp/context.ts), with an MCP connection's or an API token.
+    const mcp = user.token && user.token.kind !== 'recorder' ? mcpCall() : undefined;
+    if (user.token && (user.token.kind === 'api' || mcp)) {
       const taken = await takeApiRequest(adapters.db, adapters.installId, user.token.id);
       limits = {
         'x-ratelimit-limit': String(API_RATE_LIMIT),
@@ -82,11 +88,16 @@ export async function rest(
     const verdict = authorise(user.token, {
       write: need.write ?? false,
       session: need.session ?? false,
+      mcp: Boolean(mcp),
     });
     if (!verdict.ok) throw new HttpError(verdict.status, verdict.code, verdict.message);
 
     const writes: (() => Promise<unknown>)[] = [];
-    const via: ViaApi | null = user.token ? { via: 'api', token: user.token.name } : null;
+    const via: ViaApi | null = mcp
+      ? { via: 'mcp', token: mcp.client }
+      : user.token
+        ? { via: 'api', token: user.token.name }
+        : null;
     const response = await handler({ ...adapters, user, via, served: (w) => writes.push(w) });
 
     const headers = new Headers(response.headers);

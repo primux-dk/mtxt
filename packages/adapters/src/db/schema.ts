@@ -25,7 +25,14 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 export const VISIBILITIES = ['private', 'shared', 'company'] as const;
-export const RECORDING_SOURCES = [
+export const RECORDING_SOURCES = ['desktop', 'browser', 'upload', 'device'] as const;
+/**
+ * The values the recordings CHECK still allows. Teams and Meet stopped being
+ * recording sources (docs/decisions.md, 2026-10-23); dropping them
+ * from the CHECK would rebuild the table, and a D1 rebuild cascades. No
+ * row ever held either, and the app writes only RECORDING_SOURCES.
+ */
+const STORED_RECORDING_SOURCES = [
   'desktop',
   'browser',
   'upload',
@@ -73,7 +80,7 @@ export const TRANSCRIPT_STATUSES = ['pending', 'done', 'failed'] as const;
 /** A recorder grant: approved on /connect and waiting for the poll, cancelled there, or exchanged for a token. */
 export const RECORDER_GRANT_STATUSES = ['approved', 'denied', 'redeemed'] as const;
 /** A bearer token is a desktop recorder's, or a personal API token (docs/spec.md "API"). */
-export const TOKEN_KINDS = ['recorder', 'api'] as const;
+export const TOKEN_KINDS = ['recorder', 'api', 'mcp'] as const;
 /** What a personal API token may do: read, or read and write. */
 export const API_TOKEN_SCOPES = ['read', 'read_write'] as const;
 /** The events an endpoint can take (docs/spec.md "Webhooks"). `webhook.test` is sent only by "Send test event". */
@@ -96,7 +103,7 @@ export const WEBHOOK_DELIVERY_STATUSES = [
   'cancelled',
 ] as const;
 /** The settings page's "Recording sources": where a meeting may come from. */
-export const CAPTURE_SOURCES = ['desktop', 'upload', 'browser', 'teams', 'meet'] as const;
+export const CAPTURE_SOURCES = ['desktop', 'upload', 'browser'] as const;
 
 const id = () =>
   text('id')
@@ -266,7 +273,7 @@ export const recordings = sqliteTable(
     uniqueIndex('recordings_one_primary')
       .on(t.meetingId)
       .where(sql`"is_primary" = 1`),
-    inValues('recordings', 'source', RECORDING_SOURCES),
+    inValues('recordings', 'source', STORED_RECORDING_SOURCES),
     inValues('recordings', 'status', RECORDING_STATUSES),
   ],
 );
@@ -680,10 +687,74 @@ export const recorderTokens = sqliteTable(
     /** The API rate limit's window: when the current minute began, and the requests in it. */
     rateWindowAt: timestamp('rate_window_at'),
     rateCount: integer('rate_count').notNull().default(0),
+    /**
+     * An MCP connection's (`kind = 'mcp'`): the OAuth client it was issued
+     * to, the SHA-256 of its current refresh token, and when its access
+     * token (`token_hash`) stops working. `expires_at` is the connection's
+     * end, moved on by each refresh. Null for the other kinds.
+     */
+    clientId: text('client_id'),
+    refreshHash: text('refresh_hash'),
+    accessExpiresAt: timestamp('access_expires_at'),
   },
   (t) => [
     uniqueIndex('recorder_tokens_install_hash').on(t.installId, t.tokenHash),
     index('recorder_tokens_user').on(t.userId, t.installId),
+    uniqueIndex('recorder_tokens_install_refresh').on(t.installId, t.refreshHash),
+  ],
+);
+
+/**
+ * An OAuth authorization code for an MCP client (docs/spec.md "MCP"),
+ * written by Approve on /oauth/authorize and exchanged once at
+ * /oauth/token. `code_hash` is the SHA-256 of the code; the code itself is
+ * never stored. A code exchanged twice revokes the connection it became.
+ */
+export const oauthGrants = sqliteTable(
+  'oauth_grants',
+  {
+    installId: installId(),
+    codeHash: text('code_hash').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** The signed client id (lib/mcp/oauth.ts) and the name it registered with. */
+    clientId: text('client_id').notNull(),
+    clientName: text('client_name').notNull(),
+    redirectUri: text('redirect_uri').notNull(),
+    /** base64url SHA-256 of the client's code verifier (RFC 7636 S256). */
+    codeChallenge: text('code_challenge').notNull(),
+    scope: text('scope', { enum: API_TOKEN_SCOPES }).notNull(),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at').notNull(),
+    redeemedAt: timestamp('redeemed_at'),
+    /** The connection a redeemed code became. */
+    tokenId: text('token_id'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.installId, t.codeHash] }),
+    index('oauth_grants_user').on(t.userId),
+    index('oauth_grants_expires').on(t.installId, t.expiresAt),
+  ],
+);
+
+/**
+ * Every refresh token an MCP connection has spent (docs/spec.md "MCP"),
+ * as its SHA-256, so a spent one presented again reveals that it leaked
+ * and the connection it belonged to is revoked (RFC 9700 section 4.14.2).
+ * Rows go with their connection's row in the nightly prune.
+ */
+export const oauthSpentRefresh = sqliteTable(
+  'oauth_spent_refresh',
+  {
+    installId: installId(),
+    refreshHash: text('refresh_hash').notNull(),
+    tokenId: text('token_id').notNull(),
+    spentAt: timestamp('spent_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.installId, t.refreshHash] }),
+    index('oauth_spent_refresh_token').on(t.installId, t.tokenId),
   ],
 );
 

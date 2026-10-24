@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, KeyRound, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { Bot, Copy, KeyRound, Plus, RotateCw, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import {
@@ -34,8 +34,10 @@ const DATE: Intl.DateTimeFormatOptions = { dateStyle: 'medium' };
 
 /**
  * "API tokens" in the user menu (docs/spec.md "API"): the signed-in user's
- * personal API tokens, a form to make one, the token shown once with Copy,
- * and Revoke. The list loads when the dialog opens. Revoke is optimistic:
+ * personal API tokens and the AI tools connected through MCP (docs/spec.md
+ * "MCP"), a form to make a token, the token shown once with Copy, and
+ * Revoke for either kind. An MCP connection is made by its tool's OAuth
+ * flow, never here. The list loads when the dialog opens. Revoke is optimistic:
  * the row goes at once and comes back with a message if the server refuses
  * (behaviour.md rule 2). Each step has one primary action (rule 10); field
  * errors sit at the field and keep what was typed (rule 9). The Dialog
@@ -104,7 +106,8 @@ export function ApiTokensDialog({
   }, [step, open]);
 
   const tokens = list.state === 'done' ? list.tokens : [];
-  const full = list.state === 'done' && tokens.length >= MAX_TOKENS;
+  // MCP connections are counted apart; the cap here is the API tokens'.
+  const full = list.state === 'done' && tokens.filter((x) => x.kind === 'api').length >= MAX_TOKENS;
 
   const nameMessage = (
     code: NonNullable<Extract<CreateResult, { ok: false }>['errors']>['name'],
@@ -174,7 +177,7 @@ export function ApiTokensDialog({
     });
     let result: Awaited<ReturnType<typeof revokeMyApiToken>>;
     try {
-      result = await revokeMyApiToken(token.id);
+      result = await revokeMyApiToken(token.id, token.kind);
     } catch {
       result = { ok: false, code: 'server' };
     }
@@ -399,14 +402,27 @@ export function ApiTokensDialog({
                       key={token.id}
                       className="flex items-center gap-3 border-b border-line-subtle px-3 py-3 last:border-b-0"
                     >
-                      <KeyRound
-                        aria-hidden="true"
-                        strokeWidth={1.5}
-                        className="size-5 shrink-0 text-muted-foreground"
-                      />
+                      {token.kind === 'mcp' ? (
+                        <Bot
+                          aria-hidden="true"
+                          strokeWidth={1.5}
+                          className="size-5 shrink-0 text-muted-foreground"
+                        />
+                      ) : (
+                        <KeyRound
+                          aria-hidden="true"
+                          strokeWidth={1.5}
+                          className="size-5 shrink-0 text-muted-foreground"
+                        />
+                      )}
                       <div className="min-w-0 grow">
                         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                           <span className="font-[550] [overflow-wrap:anywhere]">{token.name}</span>
+                          {token.kind === 'mcp' && (
+                            <span className="rounded-pill border border-accent-line-strong bg-accent-tint px-2 text-xs text-accent-foreground">
+                              {t('kind.mcp')}
+                            </span>
+                          )}
                           <span className="rounded-pill border border-border px-2 text-xs text-muted-foreground">
                             {scopeLabel(token.scope)}
                           </span>

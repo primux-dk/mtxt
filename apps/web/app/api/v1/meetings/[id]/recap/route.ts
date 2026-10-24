@@ -20,7 +20,8 @@ import { queueMeetingEventQuietly } from '@/lib/webhooks/store';
   `save_minutes` with a `read_write` token. The body names the version it
   was made on; a save whose base is no longer the current version is
   refused with 409 and the version that is current, so the editor can say
-  who changed it and when. Only the owner saves.
+  who changed it and when. Only the owner saves. Through MCP the save is
+  an `mcp_write` audit row with the version it made.
 */
 type Params = { params: Promise<{ id: string }> };
 
@@ -49,8 +50,7 @@ export async function GET(request: Request, { params }: Params) {
         action: 'exported',
         details: {
           format: format === 'markdown' ? 'md' : format,
-          via: 'api',
-          token: via!.token,
+          ...via!,
         },
       }),
     );
@@ -61,58 +61,73 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
-  return rest(request, { write: true, session: true }, async ({ db, installId, queue, user }) => {
-    const { id } = await params;
-    const { meeting } = await restMeeting(db, installId, user, id, 'owner').catch(
-      (error: unknown) => {
-        if (error instanceof HttpError && error.status === 403)
-          throw new HttpError(403, 'forbidden', 'Only the owner edits the recap.');
-        throw error;
-      },
-    );
-    const body = await readJson(request, RECAP_SAVE_MAX_BYTES);
-    const base = body.base_version_id;
-    const markdown = body.body_md;
-    if ((base !== null && typeof base !== 'string') || typeof markdown !== 'string') {
-      throw new HttpError(400, 'invalid_request', 'Send base_version_id and body_md.');
-    }
-    const recap = await loadRecap(db, installId, meeting.id);
-    if (!recap) throw new HttpError(404, 'not_found', 'This meeting has no recap yet.');
-    const result = await writeVersion(db, installId, {
-      recapId: recap.id,
-      meetingId: meeting.id,
-      bodyMd: markdown,
-      authorId: user.id,
-      base: { versionId: base },
-    }).catch((error: unknown) => {
-      // A size error is the client's: 413 with its reason, so the editor explains and waits.
-      if (error instanceof RecapTooLongError) {
-        throw new HttpError(413, 'too_large', error.message, { reason: 'recap_too_long' });
-      }
-      throw error;
-    });
-    if (result.ok) {
-      // `recap.saved` a minute from now; the saves meanwhile join it (lib/webhooks/store.ts).
-      await queueMeetingEventQuietly(
-        { db, installId, queue },
-        {
-          event: 'recap.saved',
-          meetingId: meeting.id,
-          dedupeKey: `saved:${result.version.id}`,
-          delayS: SAVED_DELAY_S,
+  return rest(
+    request,
+    { write: true, session: true },
+    async ({ db, installId, queue, user, via }) => {
+      const { id } = await params;
+      const { meeting } = await restMeeting(db, installId, user, id, 'owner').catch(
+        (error: unknown) => {
+          if (error instanceof HttpError && error.status === 403)
+            throw new HttpError(403, 'forbidden', 'Only the owner edits the recap.');
+          throw error;
         },
       );
-      // The stored text: the editor takes it when it differs from what it sent.
-      return Response.json(
-        { version: recapVersionView(result.version), body_md: result.bodyMd },
-        { headers: { 'cache-control': 'no-store' } },
-      );
-    }
-    if (result.reason === 'conflict') {
-      throw new HttpError(409, 'conflict', 'The recap was changed elsewhere.', {
-        current: result.current ? recapVersionView(result.current) : null,
+      const body = await readJson(request, RECAP_SAVE_MAX_BYTES);
+      const base = body.base_version_id;
+      const markdown = body.body_md;
+      if ((base !== null && typeof base !== 'string') || typeof markdown !== 'string') {
+        throw new HttpError(400, 'invalid_request', 'Send base_version_id and body_md.');
+      }
+      const recap = await loadRecap(db, installId, meeting.id);
+      if (!recap) throw new HttpError(404, 'not_found', 'This meeting has no recap yet.');
+      const result = await writeVersion(db, installId, {
+        recapId: recap.id,
+        meetingId: meeting.id,
+        bodyMd: markdown,
+        authorId: user.id,
+        base: { versionId: base },
+      }).catch((error: unknown) => {
+        // A size error is the client's: 413 with its reason, so the editor explains and waits.
+        if (error instanceof RecapTooLongError) {
+          throw new HttpError(413, 'too_large', error.message, { reason: 'recap_too_long' });
+        }
+        throw error;
       });
-    }
-    throw new HttpError(404, 'not_found', 'This meeting has no recap.');
-  });
+      if (result.ok) {
+        // The library and the API have no audit action for a recap save; MCP's `save_minutes` is
+        // a write by an AI tool, and every MCP write is an audit row (docs/spec.md "MCP").
+        if (via?.via === 'mcp') {
+          await audit(db, installId, {
+            userId: user.id,
+            meetingId: meeting.id,
+            meetingTitle: meeting.title,
+            action: 'mcp_write',
+            details: { tool: 'save_minutes', version: result.version.number, ...via },
+          });
+        }
+        // `recap.saved` a minute from now; the saves meanwhile join it (lib/webhooks/store.ts).
+        await queueMeetingEventQuietly(
+          { db, installId, queue },
+          {
+            event: 'recap.saved',
+            meetingId: meeting.id,
+            dedupeKey: `saved:${result.version.id}`,
+            delayS: SAVED_DELAY_S,
+          },
+        );
+        // The stored text: the editor takes it when it differs from what it sent.
+        return Response.json(
+          { version: recapVersionView(result.version), body_md: result.bodyMd },
+          { headers: { 'cache-control': 'no-store' } },
+        );
+      }
+      if (result.reason === 'conflict') {
+        throw new HttpError(409, 'conflict', 'The recap was changed elsewhere.', {
+          current: result.current ? recapVersionView(result.current) : null,
+        });
+      }
+      throw new HttpError(404, 'not_found', 'This meeting has no recap.');
+    },
+  );
 }

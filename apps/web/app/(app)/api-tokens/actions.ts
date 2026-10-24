@@ -19,6 +19,8 @@ import { getAdapters } from '@/lib/install';
 /** An API token as the API tokens dialog shows it. Dates as ISO strings. */
 export interface ApiTokenView {
   id: string;
+  /** A personal API token, or an AI tool's MCP connection (docs/spec.md "MCP"). */
+  kind: 'api' | 'mcp';
   name: string;
   scope: ApiTokenScope;
   createdAt: string;
@@ -38,6 +40,7 @@ export type RevokeResult = { ok: true } | { ok: false; code: 'not_found' | 'serv
 
 const view = (r: ApiTokenRow): ApiTokenView => ({
   id: r.id,
+  kind: r.kind,
   name: r.name,
   scope: r.scope,
   createdAt: r.createdAt.toISOString(),
@@ -45,7 +48,7 @@ const view = (r: ApiTokenRow): ApiTokenView => ({
   lastUsedAt: r.lastUsedAt?.toISOString() ?? null,
 });
 
-/** The signed-in user's own working API tokens. Nobody else's, admins included. */
+/** The signed-in user's own working API tokens and MCP connections. Nobody else's, admins included. */
 export async function listMyApiTokens(): Promise<ApiTokensResult> {
   const user = await getSessionUser();
   if (!user) return { ok: false };
@@ -98,6 +101,7 @@ export async function createMyApiToken(input: {
       token,
       row: view({
         id: created.id,
+        kind: 'api',
         name,
         scope: input.scope as ApiTokenScope,
         createdAt: now,
@@ -112,15 +116,23 @@ export async function createMyApiToken(input: {
 }
 
 /**
- * Revoke: the token stops working at once. Sets a value, so a retry after a
- * lost answer is a success that writes nothing (behaviour.md rule 2).
+ * Revoke: the token, or the MCP connection with its refresh token, stops
+ * working at once. Sets a value, so a retry after a lost answer is a
+ * success that writes nothing (behaviour.md rule 2).
  */
-export async function revokeMyApiToken(tokenId: string): Promise<RevokeResult> {
+export async function revokeMyApiToken(
+  tokenId: string,
+  kind: 'api' | 'mcp' = 'api',
+): Promise<RevokeResult> {
   const user = await getSessionUser();
   if (!user) return { ok: false, code: 'server' };
   try {
     const { db, installId } = await getAdapters();
-    const result = await revokeToken(db, installId, { userId: user.id, tokenId, kind: 'api' });
+    const result = await revokeToken(db, installId, {
+      userId: user.id,
+      tokenId,
+      kind: kind === 'mcp' ? 'mcp' : 'api',
+    });
     return result === 'not_found' ? { ok: false, code: 'not_found' } : { ok: true };
   } catch (error) {
     console.error('Could not revoke an API token:', (error as Error).name);

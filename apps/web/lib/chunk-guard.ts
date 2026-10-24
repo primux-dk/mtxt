@@ -66,9 +66,16 @@ export const WEBHOOK_MAX_BYTES = 64 * 1024;
 export const RECORDER_TOKEN_PATH = '/api/v1/recorder/token';
 export const RECORDER_TOKEN_MAX_BYTES = 4 * 1024;
 
+/** The MCP server's OAuth bodies (packet 17): a client's registration, and the token endpoint's forms. */
+export const OAUTH_REGISTER_MAX_BYTES = 16 * 1024;
+export const OAUTH_FORM_MAX_BYTES = 8 * 1024;
+
 const SMALL_BODIES: Record<string, { max: number; what: string }> = {
   [WEBHOOK_PATH]: { max: WEBHOOK_MAX_BYTES, what: 'A webhook body' },
   [RECORDER_TOKEN_PATH]: { max: RECORDER_TOKEN_MAX_BYTES, what: 'A token request' },
+  '/oauth/register': { max: OAUTH_REGISTER_MAX_BYTES, what: 'A client registration' },
+  '/oauth/token': { max: OAUTH_FORM_MAX_BYTES, what: 'A token request' },
+  '/oauth/revoke': { max: OAUTH_FORM_MAX_BYTES, what: 'A revocation' },
 };
 
 const smallTooLarge = (path: string) => () =>
@@ -157,6 +164,13 @@ export const SHARE_MAX_BYTES = 4 * 1024;
 const MEETING_PATH = /^\/api\/v1\/meetings\/[^/]+$/;
 const SHARES_PATH = /^\/api\/v1\/meetings\/[^/]+\/shares$/;
 
+/*
+  An MCP request (packet 17) carries a tool call, at most a recap save's
+  markdown inside JSON-RPC, so it is held to a recap save and room for the
+  envelope. The MCP server checks the same bound (lib/mcp/server.ts).
+*/
+export const MCP_MAX_BYTES = RECAP_SAVE_MAX_BYTES + 128 * 1024;
+
 function recapBound(request: Request) {
   const path = guardPath(new URL(request.url).pathname);
   if (request.method === 'PUT' && RECAP_SAVE_PATH.test(path))
@@ -167,6 +181,8 @@ function recapBound(request: Request) {
     return { max: MEETING_PATCH_MAX_BYTES, what: 'A meeting change' };
   if (request.method === 'POST' && SHARES_PATH.test(path))
     return { max: SHARE_MAX_BYTES, what: 'A share' };
+  if (request.method === 'POST' && path === '/mcp')
+    return { max: MCP_MAX_BYTES, what: 'An MCP request' };
   return null;
 }
 

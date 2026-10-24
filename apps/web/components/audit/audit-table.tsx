@@ -30,12 +30,15 @@ export async function AuditTable({
       : shown.join(', ');
   };
 
-  /** A row a personal API token wrote: its own details, then "through the API (name)". */
+  /**
+   * A row a personal API token or an MCP tool wrote: its own details, then
+   * "through the API (name)" or "through MCP (client)".
+   */
   const details = (row: AuditRow) => {
     const own = ownDetails(row);
     const d = row.details;
-    if (d?.via !== 'api' || typeof d.token !== 'string') return own;
-    const via = t('details.viaApi', { token: d.token });
+    if ((d?.via !== 'api' && d?.via !== 'mcp') || typeof d.token !== 'string') return own;
+    const via = t(d.via === 'mcp' ? 'details.viaMcp' : 'details.viaApi', { token: d.token });
     return own ? `${own} · ${via}` : via;
   };
 
@@ -48,7 +51,11 @@ export async function AuditTable({
     ) {
       const scope =
         d.scope === 'read_write' ? t('details.scope.readWrite') : t('details.scope.read');
-      return t('details.token', { name: d.name, scope });
+      const token = t('details.token', { name: d.name, scope });
+      return d.kind === 'mcp' ? `${token} · ${t('details.mcpConnection')}` : token;
+    }
+    if (row.action === 'mcp_write' && d.tool === 'save_minutes' && typeof d.version === 'number') {
+      return t('details.savedMinutes', { version: d.version });
     }
     if (
       (row.action === 'recorder_connected' || row.action === 'recorder_disconnected') &&
