@@ -30,4 +30,5 @@ export const DEFAULT_SETTINGS = {
   adminEmails: [],
   adminBootstrapClaimedAt: null,
   webhookAutoSend: 'off',
+  timeZone: 'UTC',
 } as const;

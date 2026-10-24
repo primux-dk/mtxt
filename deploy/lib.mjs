@@ -86,6 +86,11 @@ export function loadInstall(path) {
   if (settings.interfaceLanguage && !['en', 'da'].includes(settings.interfaceLanguage)) {
     fail('settings.interfaceLanguage is en or da.');
   }
+  if (settings.timeZone !== undefined && !knownTimeZone(settings.timeZone)) {
+    fail(
+      `settings.timeZone is an IANA time zone such as Europe/Copenhagen: "${settings.timeZone}"`,
+    );
+  }
   if (settings.identityProvider && !['entra', 'google'].includes(settings.identityProvider)) {
     fail('settings.identityProvider is entra or google.');
   }
@@ -106,6 +111,14 @@ export function loadInstall(path) {
     secretsFile: expand(config.secretsFile ?? `~/.config/mtxt/${installId}.env`),
     generatedConfig: join(web, `wrangler.${installId}.jsonc`),
   };
+}
+
+/**
+ * Whether `zone` is UTC or a name in the runtime's own list, the same check
+ * the settings page makes; an offset (`+01:00`) or a legacy name (`CET`) is not.
+ */
+export function knownTimeZone(zone) {
+  return zone === 'UTC' || Intl.supportedValuesOf('timeZone').includes(zone);
 }
 
 /** wrangler.jsonc to JSON: drops comments and trailing commas, leaves strings alone. */

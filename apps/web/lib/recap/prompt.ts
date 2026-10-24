@@ -1,7 +1,8 @@
 /*
   The recap prompt (docs/decisions.md, packet 5). One system prompt with the
-  rules, one user message with the template and then the transcript as
-  "Speaker: text" lines, a "[mm:ss]" line at every new minute. A transcript
+  rules, one user message with the meeting's date, the template and then
+  the transcript as "Speaker: text" lines, a "[mm:ss]" line at every new
+  minute. A transcript
   too long for the model's context is cut into parts by line, each part
   summarised first, and the recap drafted from the summaries.
 
@@ -24,6 +25,8 @@ export interface PromptInput {
   language: string;
   /** The model's context window, in tokens. */
   contextTokens: number;
+  /** The day the meeting was held, `YYYY-MM-DD` on the install's time zone; due dates count from it. */
+  meetingDay?: string;
 }
 
 export interface Call {
@@ -32,12 +35,18 @@ export interface Call {
   maxTokens: number;
 }
 
-/** The template used when the install has none. Headings in English; the model writes in the transcript's language. */
+/**
+ * The template used when the install has none. Headings in English; the
+ * model writes in the transcript's language. The decisions line shows the
+ * item's shape: the task, its owner after `@`, its due date after `~`.
+ */
 export const FALLBACK_TEMPLATE = `# Summary
 
 ## Discussion
 
 ## Decisions
+
+- [ ] Task · @owner · ~due date
 
 ## Open questions
 `;
@@ -92,6 +101,7 @@ export function systemPrompt(language: string, keyterms: readonly string[]): str
     "Follow the template's markdown structure exactly: keep every heading of the template, in its order and with its wording, and fill each section from the transcript. When the meeting said nothing for a section, write one short line saying so.",
     'Write the decisions and agreed actions as a markdown checklist ("- [ ] ...") in the template\'s section for decisions, or under a heading for decisions, in the language of the recap, when the template has none.',
     'When a speaker clearly took a decision or an action, end its checklist item with "@" and the speaker\'s name exactly as the transcript writes it, for example "@Anne Holm". Give no owner when it is not clear.',
+    'When the transcript says when an item is due ("på torsdag", "i morgen", "by Friday", "next week", "the 30th"), keep those words in the item and end it, after the owner, with "~" and the date as YYYY-MM-DD, worked out from the meeting date above the template, for example "~2026-10-30". Give no date when none was said or it is not clear which day was meant.',
     'Do not invent facts, names, numbers or dates. Mark anything you are not sure of with "(unclear)", written in the language of the recap.',
     'Answer with the markdown of the recap only: no preamble, no closing remark, no code fence.',
   ];
@@ -106,7 +116,7 @@ function summarySystem(language: string, keyterms: readonly string[]): string {
   return [
     '- You summarise one part of a long meeting transcript, so that a recap can be written from the summaries of all its parts.',
     name ? `- Write in ${name}.` : '- Write in the language of the transcript.',
-    '- Keep every decision, agreed action and its owner (as "@" and the speaker\'s name exactly as written), every number and date, and every open question. Keep the times in brackets where topics change.',
+    '- Keep every decision, agreed action and its owner (as "@" and the speaker\'s name exactly as written), every number and date, every deadline in the words it was said in ("på torsdag", "by Friday"), and every open question. Keep the times in brackets where topics change.',
     '- Do not invent anything. Answer with the summary only.',
     ...(keyterms.length
       ? [`- Spell these terms as written here: ${keyterms.slice(0, 200).join(', ')}.`]
@@ -114,8 +124,17 @@ function summarySystem(language: string, keyterms: readonly string[]): string {
   ].join('\n');
 }
 
-const userMessage = (template: string, transcriptHeading: string, body: string) =>
-  `Template:\n\n${template.trim()}\n\n${transcriptHeading}\n\n${body}`;
+/** "Meeting date: Thursday 2026-10-22", or nothing when the day is not known. */
+export function meetingDateLine(day: string | undefined): string {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return '';
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(
+    new Date(`${day}T00:00:00Z`),
+  );
+  return `Meeting date: ${weekday} ${day}\n\n`;
+}
+
+const userMessage = (day: string | undefined, template: string, heading: string, body: string) =>
+  `${meetingDateLine(day)}Template:\n\n${template.trim()}\n\n${heading}\n\n${body}`;
 
 /**
  * A line of at most `budget` estimated tokens: a longer one is cut at
@@ -195,7 +214,7 @@ export function planBudgets(input: PromptInput, scale = 1) {
     (input.contextTokens -
       RECAP_MAX_TOKENS -
       estimateTokens(system) -
-      estimateTokens(userMessage(template, SUMMARY_HEADING, '')) -
+      estimateTokens(userMessage(input.meetingDay, template, SUMMARY_HEADING, '')) -
       MARGIN) *
       scale,
   );
@@ -205,7 +224,7 @@ export function planBudgets(input: PromptInput, scale = 1) {
   );
   // Room for less than a few minutes of transcript is no room.
   if (finalRoom < 500 || partRoom < 500) return null;
-  return { template, system, summary, finalRoom, partRoom };
+  return { template, system, summary, finalRoom, partRoom, meetingDay: input.meetingDay };
 }
 
 /** The final call: the template, then the transcript, or the summaries of its parts. */
@@ -216,7 +235,12 @@ export function draftCall(
 ): Call {
   return {
     system: budgets.system,
-    user: userMessage(budgets.template, summarised ? SUMMARY_HEADING : 'Transcript:', body),
+    user: userMessage(
+      budgets.meetingDay,
+      budgets.template,
+      summarised ? SUMMARY_HEADING : 'Transcript:',
+      body,
+    ),
     maxTokens: RECAP_MAX_TOKENS,
   };
 }

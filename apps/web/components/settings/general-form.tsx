@@ -13,10 +13,18 @@ export interface GeneralValues {
   themeAccent: string;
   themePrimary: string;
   interfaceLanguage: 'en' | 'da';
+  timeZone: string;
 }
 
-/** The General tab: product name, company name, theme with its preview, interface language. */
-export function GeneralForm({ values }: { values: GeneralValues }) {
+/** The General tab: product name, company name, theme with its preview, interface language, time zone. */
+export function GeneralForm({
+  values,
+  timeZones,
+}: {
+  values: GeneralValues;
+  /** IANA names the runtime knows, UTC first. */
+  timeZones: string[];
+}) {
   const t = useTranslations('settings');
   const tAll = useTranslations();
   // Controlled so the theme preview follows while typing.
@@ -32,6 +40,7 @@ export function GeneralForm({ values }: { values: GeneralValues }) {
         themeAccent: t('theme.accent'),
         themePrimary: t('theme.primary'),
         interfaceLanguage: t('interfaceLanguage.field'),
+        timeZone: t('timeZone.field'),
       }}
     >
       {({ errors }) => (
@@ -99,6 +108,23 @@ export function GeneralForm({ values }: { values: GeneralValues }) {
                 <option value="da">
                   {tAll('language.option', { code: 'da', name: tAll('language.da') })}
                 </option>
+              </select>
+            </Field>
+          </Section>
+
+          <Section id="time-zone" heading={t('timeZone.heading')} help={t('timeZone.help')}>
+            <Field
+              id="timeZone"
+              label={t('timeZone.field')}
+              help={t('timeZone.note')}
+              error={errors.timeZone}
+            >
+              <select {...controlProps(errors, 'timeZone', true)} defaultValue={values.timeZone}>
+                {timeZones.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone.replaceAll('_', ' ')}
+                  </option>
+                ))}
               </select>
             </Field>
           </Section>

@@ -7,11 +7,14 @@
   the current version.
 
   An AI draft has no block yet: `liftDecisions` turns the draft's first
-  checklist into it, and every `@Name` that is one of the meeting's
-  speakers into a mention, of the colleague when the speaker is linked.
+  checklist into it, every `@Name` that is one of the meeting's speakers
+  into a mention, of the colleague when the speaker is linked, and a
+  `~YYYY-MM-DD` the model wrote into the item's due date. `withDueDates`
+  then decides each item's date from its words (lib/recap/due.ts).
 */
 import { Fragment, type Node as PmNode } from '@tiptap/pm/model';
-import { MENTION_ID } from './extensions';
+import { decideDue } from './due';
+import { dueDate, MENTION_ID } from './extensions';
 import { recapSchema } from './markdown';
 
 export interface MeetingSpeaker {
@@ -26,6 +29,8 @@ export interface DecisionRow {
   text: string;
   ownerUserId: string | null;
   done: boolean;
+  /** `YYYY-MM-DD` or null. */
+  dueOn: string | null;
 }
 
 /** Text nodes with every `@Name` of a known speaker turned into a mention. */
@@ -87,16 +92,74 @@ function withMentions(node: PmNode, speakers: readonly MeetingSpeaker[]): PmNode
   return node.copy(Fragment.from(children));
 }
 
-/** A task list as the decisions block: the same items, the same ticks. */
+/** `~2026-10-30` as a word of its own, where a model may write it in a checklist item. */
+const DUE_WORD = /(^|[ \t]+)~(\d{4}-\d{2}-\d{2})(?=[ \t]|$)/g;
+
+/** An item's content with every `~YYYY-MM-DD` taken out of its first paragraph, and the first valid one. */
+function takeDueWords(content: Fragment): { content: Fragment; due: string | null } {
+  const first = content.firstChild;
+  if (!first || first.type.name !== 'paragraph') return { content, due: null };
+  const schema = recapSchema();
+  let due: string | null = null;
+  const children: PmNode[] = [];
+  first.forEach((child) => {
+    if (!child.isText || child.marks.some((m) => m.type.name === 'code')) {
+      children.push(child);
+      return;
+    }
+    const text = child.text!.replace(DUE_WORD, (whole, _space: string, date: string) => {
+      if (!dueDate(date)) return whole;
+      due ??= date;
+      return '';
+    });
+    if (text) children.push(schema.text(text, child.marks));
+  });
+  if (!due) return { content, due: null };
+  // The space that stood before the date at the end goes with it.
+  const last = children.at(-1);
+  if (last?.isText && /\s$/.test(last.text!)) {
+    const trimmed = last.text!.trimEnd();
+    children.splice(-1, 1, ...(trimmed ? [schema.text(trimmed, last.marks)] : []));
+  }
+  return { content: content.replaceChild(0, first.copy(Fragment.from(children))), due };
+}
+
+/** A task list as the decisions block: the same items, the same ticks, a model's `~date` as the due date. */
 function asDecisionList(list: PmNode): PmNode {
   const schema = recapSchema();
   const items: PmNode[] = [];
   list.forEach((item) => {
+    const { content, due } = takeDueWords(item.content);
     items.push(
-      schema.nodes.decisionItem!.create({ checked: Boolean(item.attrs.checked) }, item.content),
+      schema.nodes.decisionItem!.create({ checked: Boolean(item.attrs.checked), due }, content),
     );
   });
   return schema.nodes.decisionList!.create(null, items);
+}
+
+/**
+ * Every decision's due date as the draft keeps it, for a meeting held on
+ * `day` (`YYYY-MM-DD` on the install's time zone): a phrase in the item's
+ * words decides, an unsure one gives none, and otherwise the model's date
+ * stands when it is plausible (lib/recap/due.ts).
+ */
+export function withDueDates(doc: PmNode, day: string): PmNode {
+  const map = (node: PmNode): PmNode => {
+    if (node.type.name === 'decisionItem') {
+      const due = decideDue(itemText(node), day, node.attrs.due ?? null);
+      return due === node.attrs.due ? node : node.type.create({ ...node.attrs, due }, node.content);
+    }
+    if (node.isLeaf || node.isTextblock) return node;
+    let changed = false;
+    const children: PmNode[] = [];
+    node.forEach((child) => {
+      const next = map(child);
+      if (next !== child) changed = true;
+      children.push(next);
+    });
+    return changed ? node.copy(Fragment.from(children)) : node;
+  };
+  return map(doc);
 }
 
 /**
@@ -171,6 +234,7 @@ export function decisionRows(
       text: itemText(node),
       ownerUserId: owner,
       done: Boolean(node.attrs.checked),
+      dueOn: dueDate(node.attrs.due),
     });
     return false;
   });

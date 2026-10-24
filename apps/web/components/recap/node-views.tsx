@@ -2,11 +2,11 @@
 
 /*
   The recap's own blocks as the editor shows them: a decision with its
-  checkbox and date, a callout with its icon, and the table of contents
-  computed from the headings. The schema is lib/recap/extensions.ts; these
-  only add the view.
+  checkbox, its owner and its due date, a callout with its icon, and the
+  table of contents computed from the headings. The schema is
+  lib/recap/extensions.ts; these only add the view.
 */
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useState } from 'react';
 import { Info, TriangleAlert } from 'lucide-react';
 import {
   NodeViewContent,
@@ -14,43 +14,76 @@ import {
   ReactNodeViewRenderer,
   type NodeViewProps,
 } from '@tiptap/react';
+import type { Node as PmNode } from '@tiptap/pm/model';
 import { useTranslations } from 'next-intl';
-import { Callout, DecisionItem, TableOfContents } from '@/lib/recap/extensions';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Callout, DecisionItem, dueDate, TableOfContents } from '@/lib/recap/extensions';
 
 export interface RecapViewContext {
-  /** The meeting's date, shown with each decision ("22 Oct"). */
-  meetingDate: string;
   locale: string;
-  /** Owners' current names by decision position, from the rows. */
-  owners: (string | null)[];
 }
 
-export const ViewContext = createContext<RecapViewContext>({
-  meetingDate: '',
-  locale: 'en-GB',
-  owners: [],
-});
+export const ViewContext = createContext<RecapViewContext>({ locale: 'en-GB' });
 
-/** The `flushSave` meta on a transaction saves at once instead of after the pause; it carries the tick. */
+/** The `flushSave` meta on a transaction saves at once instead of after the pause; it carries the change. */
 export const FLUSH_SAVE = 'flushSave';
-/** A transaction that undoes refused ticks: kept locally, not saved (rule 2). */
+/** A transaction that undoes refused decision changes: kept locally, not saved (rule 2). */
 export const ROLLBACK = 'recapRollback';
 
-export interface Tick {
-  /** The decision item's position in the document when it was ticked. */
+/** A tick or a due date set on a decision, saved at once and undone if the server refuses it. */
+export type DecisionChange = {
+  /** The decision item's position in the document when it changed. */
   pos: number;
-  checked: boolean;
+} & (
+  | { attr: 'checked'; value: boolean }
+  | { attr: 'due'; value: string | null; previous: string | null }
+);
+
+/** The item's owner as it reads: the first person it mentions. */
+function ownerOf(node: PmNode): string | null {
+  let owner: string | null = null;
+  node.descendants((leaf) => {
+    if (owner) return false;
+    if (leaf.type.name === 'mention') owner = String(leaf.attrs.label ?? '').trim() || null;
+    return true;
+  });
+  return owner;
 }
 
 function DecisionView({ node, editor, getPos, updateAttributes }: NodeViewProps) {
   const t = useTranslations('recap');
-  const { meetingDate, locale } = useContext(ViewContext);
-  const task = node.textContent.trim();
-  const date = meetingDate
-    ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(
-        new Date(meetingDate),
-      )
-    : '';
+  const { locale } = useContext(ViewContext);
+  const task = node.textContent.trim() || t('decision.untitled');
+  const owner = ownerOf(node);
+  const due = dueDate(node.attrs.due);
+  const dueText = due
+    ? t('decision.due', {
+        date: new Intl.DateTimeFormat(locale, {
+          day: 'numeric',
+          month: 'short',
+          timeZone: 'UTC',
+        }).format(new Date(`${due}T00:00:00Z`)),
+      })
+    : null;
+  const editable = editor.isEditable;
+
+  /** A tick or a due date is a change like any other, saved at once (behaviour.md rule 2). */
+  const change = (attrs: { checked: boolean } | { due: string | null }) => {
+    const pos = typeof getPos === 'function' ? getPos() : undefined;
+    if (pos === undefined) return updateAttributes(attrs);
+    const meta: DecisionChange =
+      'checked' in attrs
+        ? { pos, attr: 'checked', value: attrs.checked }
+        : { pos, attr: 'due', value: attrs.due, previous: due };
+    editor.view.dispatch(
+      editor.state.tr
+        .setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs })
+        .setMeta(FLUSH_SAVE, meta),
+    );
+  };
+
   return (
     <NodeViewWrapper
       as="li"
@@ -61,28 +94,114 @@ function DecisionView({ node, editor, getPos, updateAttributes }: NodeViewProps)
         type="checkbox"
         contentEditable={false}
         checked={Boolean(node.attrs.checked)}
-        disabled={!editor.isEditable}
-        aria-label={t('decision.markDone', { task: task || t('decision.untitled') })}
-        onChange={(e) => {
-          // A tick is a change like any other, saved at once (behaviour.md rule 2).
-          const pos = typeof getPos === 'function' ? getPos() : undefined;
-          if (pos === undefined) return updateAttributes({ checked: e.target.checked });
-          editor.view.dispatch(
-            editor.state.tr
-              .setNodeMarkup(pos, undefined, { ...node.attrs, checked: e.target.checked })
-              .setMeta(FLUSH_SAVE, { pos, checked: e.target.checked } satisfies Tick),
-          );
-        }}
+        disabled={!editable}
+        aria-label={t('decision.markDone', { task })}
+        onChange={(e) => change({ checked: e.target.checked })}
       />
       <div className="min-w-0 grow">
         <NodeViewContent />
-        {date && (
-          <span contentEditable={false} className="decision-meta">
-            <time dateTime={meetingDate.slice(0, 10)}>{date}</time>
+        {(owner || due || editable) && (
+          <span contentEditable={false} className="decision-meta" data-testid="decision-meta">
+            {owner && <span className="decision-owner">{owner}</span>}
+            {owner && (due || editable) && <span aria-hidden="true"> · </span>}
+            {editable ? (
+              <DueDatePicker
+                due={due}
+                label={dueText ?? t('decision.addDue')}
+                task={task}
+                onChange={(value) => change({ due: value })}
+              />
+            ) : (
+              due && <time dateTime={due}>{dueText}</time>
+            )}
           </span>
         )}
       </div>
     </NodeViewWrapper>
+  );
+}
+
+/**
+ * "Add due date" or "Due 30 Oct", opening a small picker: the browser's own
+ * date field, Save and Clear. Escape or a click outside leaves the date as it was.
+ */
+function DueDatePicker({
+  due,
+  label,
+  task,
+  onChange,
+}: {
+  due: string | null;
+  label: string;
+  task: string;
+  onChange: (value: string | null) => void;
+}) {
+  const t = useTranslations('recap.decision');
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(due ?? '');
+  const id = useId();
+  const valid = dueDate(value);
+  const save = () => {
+    if (!valid) return;
+    setOpen(false);
+    if (valid !== due) onChange(valid);
+  };
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        // Each opening starts from the date the item has now.
+        if (next) setValue(due ?? '');
+        setOpen(next);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={due ? 'decision-due' : 'decision-due decision-due-empty'}
+          aria-label={t('dueButton', { label, task })}
+        >
+          {due ? <time dateTime={due}>{label}</time> : label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent aria-label={t('dueField', { task })}>
+        <form
+          className="grid gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save();
+          }}
+        >
+          <label htmlFor={id} className="text-sm font-[550]">
+            {t('dueLabel')}
+          </label>
+          <Input
+            id={id}
+            type="date"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            min="1000-01-01"
+            max="9999-12-31"
+          />
+          <div className="flex flex-wrap justify-end gap-2">
+            {due && (
+              <Button
+                variant="quiet"
+                onClick={() => {
+                  setOpen(false);
+                  onChange(null);
+                }}
+              >
+                {t('clearDue')}
+              </Button>
+            )}
+            <Button type="submit" variant="primary" disabled={!valid}>
+              {t('saveDue')}
+            </Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
   );
 }
 

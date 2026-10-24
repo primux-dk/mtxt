@@ -23,11 +23,13 @@ const RETRY_MS = 5000;
 export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'conflict';
 export type SaveProblem = 'offline' | 'too_long' | 'refused' | null;
 
+export type Undone = 'tick' | 'due' | 'both' | null;
+
 export interface SaveState {
   status: SaveStatus;
   problem: SaveProblem;
-  /** A refused save undid a decision tick (rule 2). */
-  tickUndone: boolean;
+  /** What a refused save undid on the decisions: ticks, due dates or both (rule 2). */
+  undone: Undone;
   /** The newer version that refused the save. */
   conflict: VersionView | null;
   current: VersionView | null;
@@ -47,10 +49,10 @@ export function useAutosave(options: {
   onSaved?: (version: VersionView, seq: number) => void;
   /**
    * The server refused save `seq` (a conflict or a 4xx): the editor rolls
-   * back exactly the ticks that save carried and says whether there were
-   * any (rule 2).
+   * back exactly the ticks and due dates that save carried and says which
+   * it undid (rule 2).
    */
-  onRefused?: (seq: number) => boolean;
+  onRefused?: (seq: number) => Undone;
   /** The server stored other text than it was sent (a foreign image or mention removed): show that. */
   onNormalized?: (bodyMd: string) => void;
 }) {
@@ -58,7 +60,7 @@ export function useAutosave(options: {
   const [state, setState] = useState<SaveState>({
     status: 'saved',
     problem: null,
-    tickUndone: false,
+    undone: null,
     conflict: null,
     current: options.initial,
   });
@@ -151,9 +153,9 @@ export function useAutosave(options: {
           bodyMd: now,
           savedAt: Date.now(),
         }).catch(() => {});
-        set({ current: version, status: 'saving', problem: null, tickUndone: false });
+        set({ current: version, status: 'saving', problem: null, undone: null });
         timer.current = setTimeout(() => void save(), again.current ? 0 : AUTOSAVE_MS);
-      } else set({ current: version, status: 'saved', problem: null, tickUndone: false });
+      } else set({ current: version, status: 'saved', problem: null, undone: null });
       again.current = false;
       return;
     }
@@ -163,11 +165,11 @@ export function useAutosave(options: {
       };
       // Network saves stop; the text typed from here on is still kept in this browser.
       stopped.current = true;
-      const undone = onRefused.current?.(seq) ?? false;
+      const undone = onRefused.current?.(seq) ?? null;
       set({
         status: 'conflict',
         conflict: current ? fromApiVersion(current) : null,
-        tickUndone: undone,
+        undone,
       });
       return;
     }
@@ -175,8 +177,8 @@ export function useAutosave(options: {
       response === null ? 'offline' : response.status === 413 ? 'too_long' : 'refused';
     // A refusal (not the network, not the server's own failure) undoes the ticks it carried.
     const refused = response !== null && response.status < 500;
-    const undone = refused ? (onRefused.current?.(seq) ?? false) : false;
-    set({ status: 'unsaved', problem, tickUndone: undone });
+    const undone = refused ? (onRefused.current?.(seq) ?? null) : null;
+    set({ status: 'unsaved', problem, undone });
     // A network error or the server's own failure: try again; a refusal waits for the next change.
     if (problem === 'offline' || (response && response.status >= 500)) {
       timer.current = setTimeout(() => void save(), RETRY_MS);
@@ -214,7 +216,7 @@ export function useAutosave(options: {
       base.current = version.id;
       confirmed.current = bodyMd;
       stopped.current = false;
-      set({ current: version, status: 'saved', problem: null, conflict: null, tickUndone: false });
+      set({ current: version, status: 'saved', problem: null, conflict: null, undone: null });
     },
     [recapId],
   );

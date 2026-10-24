@@ -8,6 +8,8 @@ export interface SeedOverrides {
   companyName?: string | null;
   language?: string;
   interfaceLanguage?: 'en' | 'da';
+  /** IANA name; the app refuses one the runtime does not know at the settings page. */
+  timeZone?: string;
   aiGatewayId?: string | null;
 }
 
@@ -38,6 +40,7 @@ export function seedSql(installId: string, overrides: SeedOverrides = {}): strin
     ['ai_gateway_id', s.aiGatewayId],
     ['language', s.language],
     ['interface_language', s.interfaceLanguage],
+    ['time_zone', s.timeZone],
     ['live_transcript_default', s.liveTranscriptDefault],
     ['default_visibility', s.defaultVisibility],
     ['retention_audio_days', s.retentionAudioDays],

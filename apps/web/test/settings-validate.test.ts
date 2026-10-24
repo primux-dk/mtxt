@@ -27,6 +27,7 @@ function form(overrides: Record<string, string | string[] | null> = {}) {
     sttRegion: '',
     language: 'da',
     interfaceLanguage: 'da',
+    timeZone: 'Europe/Copenhagen',
     keyterms: 'Primux\nlinje 2,2',
     liveTranscriptDefault: 'on',
     defaultVisibility: 'private',
@@ -287,6 +288,7 @@ describe('validateSettings, one tab at a time (packet 14)', () => {
       'themeAccent',
       'themePrimary',
       'interfaceLanguage',
+      'timeZone',
     ]);
     const result = validateSettings(data, configured, SELF, ['general']);
     expect(result.ok).toBe(true);
@@ -297,6 +299,7 @@ describe('validateSettings, one tab at a time (packet 14)', () => {
       'productName',
       'themeAccent',
       'themePrimary',
+      'timeZone',
     ]);
     // The keyterm list, the stored keys and the admin list stay as they are.
     expect(result.keyterms).toBeUndefined();
@@ -344,6 +347,23 @@ describe('validateSettings, one tab at a time (packet 14)', () => {
     const recap = only(['recapProvider', 'recapModel']);
     const result = validateSettings(recap, configured, SELF, ['recap']);
     expect(result.ok && Object.keys(result.patch).sort()).toEqual(['recapModel', 'recapProvider']);
+  });
+});
+
+describe('the time zone', () => {
+  it('takes a zone the runtime knows, UTC when the field is missing, and refuses any other', () => {
+    const zone = (value: string | null) => {
+      const result = validateSettings(form({ timeZone: value }), configured, SELF, ['general']);
+      return result.ok ? result.patch.timeZone : result.errors.timeZone;
+    };
+    expect(zone('Europe/Copenhagen')).toBe('Europe/Copenhagen');
+    expect(zone('America/Buenos_Aires')).toBe('America/Buenos_Aires');
+    expect(zone(null)).toBe('UTC');
+    expect(zone('Europe/Atlantis')).toEqual({ code: 'invalid' });
+    // Intl reads these; the list on the page has neither (packet 15 review).
+    expect(zone('+01:00')).toEqual({ code: 'invalid' });
+    expect(zone('CET')).toEqual({ code: 'invalid' });
+    expect(zone('x'.repeat(65))).toEqual({ code: 'invalid' });
   });
 });
 

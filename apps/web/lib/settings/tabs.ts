@@ -21,7 +21,14 @@ export type FormTab = (typeof FORM_TABS)[number];
 
 /** Each form tab's fields, in the order they appear on it. */
 export const TAB_FIELDS = {
-  general: ['productName', 'companyName', 'themeAccent', 'themePrimary', 'interfaceLanguage'],
+  general: [
+    'productName',
+    'companyName',
+    'themeAccent',
+    'themePrimary',
+    'interfaceLanguage',
+    'timeZone',
+  ],
   login: ['identityProvider', 'oidcTenantId', 'oidcClientId', 'oidcClientSecret', 'adminEmails'],
   transcription: ['sttProvider', 'sttApiKey', 'sttRegion', 'aiGatewayId', 'language', 'keyterms'],
   recap: ['recapProvider', 'recapModel', 'recapApiKey'],

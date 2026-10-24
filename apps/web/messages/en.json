@@ -311,7 +311,9 @@
         "too_long": "The recap is too long to save (max 500,000 characters)",
         "refused": "the server refused the save"
       },
-      "tickUndone": "the tick was undone"
+      "tickUndone": "the tick was undone",
+      "dueUndone": "the due date was undone",
+      "bothUndone": "the tick and the due date were undone"
     },
     "toolbar": {
       "label": "Recap formatting",
@@ -324,7 +326,14 @@
     },
     "decision": {
       "markDone": "Mark as done: {task}",
-      "untitled": "an empty decision"
+      "untitled": "an empty decision",
+      "due": "Due {date}",
+      "addDue": "Add due date",
+      "dueField": "Due date for {task}",
+      "dueLabel": "Due date",
+      "clearDue": "Clear due date",
+      "dueButton": "{label}, {task}",
+      "saveDue": "Save"
     },
     "editorHint": "Type / for blocks. Use @ for colleagues.",
     "versionLine": {
@@ -520,6 +529,12 @@
       "field": "Default interface language",
       "note": "A user's browser or operating system language wins when a translation exists."
     },
+    "timeZone": {
+      "heading": "Time zone",
+      "help": "The day a meeting falls on.",
+      "field": "Install time zone",
+      "note": "The recap draft counts due dates such as \"on Thursday\" or \"tomorrow\" from the meeting's day in this zone."
+    },
     "keyterms": {
       "heading": "Company words",
       "help": "Product names, people and jargon.",
@@ -555,6 +570,8 @@
       "help": "Several templates. The employee picks one per meeting.",
       "name": "Template name",
       "body": "Content in Markdown",
+      "bodyHelp": "Write the decisions section as a checklist line: the task, its owner after @, its due date after ~. The draft fills in the owner and the due date when the meeting named them, for example",
+      "decisionLine": "- [ ] Task · @owner · ~due date",
       "add": "Add template",
       "list": "Templates",
       "empty": "No templates yet. Add the first one; employees pick one per meeting.",

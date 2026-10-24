@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import JSZip from 'jszip';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import { test } from './contract';
+import { matchesSchema, test } from './contract';
 import {
   ADMIN,
   d1,
@@ -124,6 +124,16 @@ let writeToken = '';
 let oleToken = '';
 let ida = '';
 let ole = '';
+
+test("the harness checks a decision's due_on as a real calendar day (packet 15 review)", () => {
+  const decision = { position: 0, text: 'Test', done: false, owner: null };
+  expect(matchesSchema('Decision', { ...decision, due_on: '2026-10-30' })).toBe(true);
+  expect(matchesSchema('Decision', { ...decision, due_on: null })).toBe(true);
+  expect(matchesSchema('Decision', { ...decision, due_on: 'not-a-date' })).toBe(false);
+  expect(matchesSchema('Decision', { ...decision, due_on: '2026-02-31' })).toBe(false);
+  expect(matchesSchema('Decision', { ...decision, due_on: '2026-10-30T00:00:00Z' })).toBe(false);
+  expect(matchesSchema('Decision', decision)).toBe(false);
+});
 
 test('make a token in the dialog: the field says what is wrong, the token shows once, Copy copies it', async ({
   page,

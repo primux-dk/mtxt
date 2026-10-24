@@ -10,6 +10,7 @@
     <details><summary>…</summary>      toggle; the body is markdown, up to </details>
     <!-- toc -->                       table of contents
     <!-- decisions --> … <!-- /decisions -->   the decisions block: a checklist
+    - [ ] Text ~2026-10-30            a decision's due date, last on its first line
     [@Name](mtxt:user/<id>)           mention of a colleague (speaker/<id> for a speaker)
 
   No other HTML is let through: an HTML block or tag that is not one of the
@@ -29,7 +30,7 @@ import {
   type MarkdownSerializerState,
   defaultMarkdownSerializer,
 } from 'prosemirror-markdown';
-import { allowedImage, MENTION_ID, recapExtensions } from './extensions';
+import { allowedImage, dueDate, MENTION_ID, recapExtensions } from './extensions';
 
 let cachedSchema: Schema | null = null;
 /** The recap schema, built once. */
@@ -40,6 +41,14 @@ export function recapSchema(): Schema {
 
 const ALERT = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*/i;
 const TASK = /^\[([ xX])\][ \t]+/;
+/**
+ * A decision's due date: `~` and an ISO date, the last word of the item's
+ * first physical line, before a hard break's `\` if it has one. Read on the
+ * raw source, so an escaped `\~2026-10-30` stays text, and a date on a
+ * continuation line is text too (packet 15 review).
+ */
+const DUE = /(?:^|[ \t])~(\d{4}-\d{2}-\d{2})[ \t]*\\?[ \t]*$/;
+const DUE_TEXT = /[ \t]*~\d{4}-\d{2}-\d{2}[ \t]*$/;
 const DETAILS_OPEN = /^<details(?:\s+open)?\s*>\s*(?:<summary>([\s\S]*?)<\/summary>)?\s*$/i;
 const DETAILS_INLINE =
   /^<details(?:\s+open)?\s*>\s*<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>\s*$/i;
@@ -239,6 +248,10 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
             const first = inline.children?.[0];
             if (first?.type === 'text') first.content = first.content.replace(TASK, '');
           }
+          if (kind === 'decision' && inline?.type === 'inline') {
+            const due = takeDue(inline);
+            if (due) item.attrSet('due', due);
+          }
           items.push(kind === 'task' ? 'task' : 'decision');
           out.push(item);
         } else {
@@ -302,6 +315,22 @@ function rewriteBlocks(state: StateCore, md: MarkdownIt): Token[] {
   }
   while (details > 0) closeDetails();
   return out;
+}
+
+/** The due date that ends a decision's first line, taken out of its text; null when there is none. */
+function takeDue(inline: Token): string | null {
+  const [first, ...rest] = inline.content.split('\n');
+  const due = dueDate(DUE.exec(first!)?.[1]);
+  const children = inline.children ?? [];
+  // The first line's tokens end at the first soft or hard break.
+  const brk = children.findIndex((c) => c.type === 'softbreak' || c.type === 'hardbreak');
+  const at = (brk === -1 ? children.length : brk) - 1;
+  const last = children[at];
+  if (!due || last?.type !== 'text' || !DUE_TEXT.test(last.content)) return null;
+  last.content = last.content.replace(DUE_TEXT, '');
+  if (!last.content) children.splice(at, 1);
+  inline.content = [first!.replace(/[ \t]*~\d{4}-\d{2}-\d{2}/, ''), ...rest].join('\n');
+  return due;
 }
 
 /** A bullet list is a task list when every one of its own items starts with `[ ]` or `[x]`. */
@@ -412,7 +441,10 @@ function parser(): MarkdownParser {
     details_content: { block: 'detailsContent' },
     toc: { node: 'tableOfContents' },
     decisions: { block: 'decisionList' },
-    decision_item: { block: 'decisionItem', getAttrs: checked },
+    decision_item: {
+      block: 'decisionItem',
+      getAttrs: (t) => ({ ...checked(t), due: dueDate(t.attrGet('due')) }),
+    },
     task_list: { block: 'taskList' },
     task_item: { block: 'taskItem', getAttrs: checked },
     table: { block: 'table' },
@@ -533,7 +565,25 @@ const nodes: Record<string, NodeSerializer> = {
   },
   decisionItem: (state, node) => {
     state.write(node.attrs.checked ? '[x] ' : '[ ] ');
-    state.renderContent(node);
+    const due = dueDate(node.attrs.due);
+    if (!due) return state.renderContent(node);
+    // The date ends the first physical line, after the text and the owner:
+    // before the first hard break's `\`, or at the end when there is none.
+    node.forEach((child, _, i) => {
+      if (i === 0 && child.type.name === 'paragraph') {
+        // The node's own schema: in the browser it is the editor's, not recapSchema().
+        const line = serializer()
+          .serialize(child.type.schema.node('doc', null, [child]), { tightLists: true })
+          .trimEnd();
+        const marker = `${line ? ' ' : ''}~${due}`;
+        const brk = line.indexOf('\\\n');
+        state.text(
+          brk === -1 ? line + marker : line.slice(0, brk) + marker + line.slice(brk),
+          false,
+        );
+        state.closeBlock(child);
+      } else state.render(child, node, i);
+    });
   },
   paragraph: (state, node) => {
     state.renderInline(node);

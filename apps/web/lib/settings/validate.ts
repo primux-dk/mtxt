@@ -24,6 +24,7 @@ import {
 import { isTenantGuid } from '../auth/identity';
 import { HEX, themeFailures, type ContrastPair, type ThemeMode } from '../theme/contrast';
 import { parseKeyterms, type Keyterm, type KeytermError } from './keyterms';
+import { validTimeZone } from '../recap/due';
 import { AZURE_MODEL, MODEL_ID, NEEDS_RECAP_KEY } from '../recap/models';
 import { checkEndpointUrl } from '../webhooks/address';
 import { MAX_LABEL_LENGTH, MAX_URL_LENGTH } from '../webhooks/rules';
@@ -75,6 +76,7 @@ export const FIELDS = [
   'recapModel',
   'recapApiKey',
   'interfaceLanguage',
+  'timeZone',
   'keyterms',
   'defaultVisibility',
   'recordingSources',
@@ -124,6 +126,7 @@ export interface SettingsPatch {
   /** Null means the provider's default model. */
   recapModel: string | null;
   interfaceLanguage: Settings['interfaceLanguage'];
+  timeZone: string;
   liveTranscriptDefault: boolean;
   defaultVisibility: Settings['defaultVisibility'];
   recordingSources: CaptureSource[];
@@ -222,12 +225,16 @@ export function validateSettings(
     if (!oneOf(INTERFACE_LANGUAGES, interfaceLanguage))
       errors.interfaceLanguage = { code: 'invalid' };
 
+    const timeZone = text('timeZone') || 'UTC';
+    if (!validTimeZone(timeZone)) errors.timeZone = { code: 'invalid' };
+
     Object.assign(patch, {
       productName,
       companyName: companyName || null,
       themeAccent,
       themePrimary,
       interfaceLanguage: interfaceLanguage as Settings['interfaceLanguage'],
+      timeZone,
     });
   }
 

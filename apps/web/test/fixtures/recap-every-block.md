@@ -13,7 +13,7 @@
 ## Beslutninger
 
 <!-- decisions -->
-- [ ] Test det nye skift torsdag. [@Søren Bak](mtxt:user/dev-colleague)
+- [ ] Test det nye skift torsdag. [@Søren Bak](mtxt:user/dev-colleague) ~2026-10-29
 - [x] Saml kapacitetstallene. [@Anne Holm](mtxt:user/dev-newcomer)
 <!-- /decisions -->
 

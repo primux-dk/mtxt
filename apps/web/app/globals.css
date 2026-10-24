@@ -296,6 +296,30 @@
     color: var(--muted-foreground);
     user-select: none;
   }
+  .recap-body .decision-owner {
+    color: var(--foreground);
+  }
+  /* The owner's due date control: the date itself, or a muted "Add due date". */
+  .recap-body .decision-due {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 2px;
+    margin: 0 -2px;
+    border-radius: 4px;
+    font: inherit;
+    color: var(--foreground);
+    cursor: pointer;
+  }
+  .recap-body .decision-due:hover {
+    background: var(--secondary);
+  }
+  .recap-body .decision-due-empty {
+    color: var(--muted-foreground);
+  }
+  .recap-body .decision-due-empty:hover {
+    color: var(--foreground);
+  }
   .recap-body table {
     width: 100%;
     border-collapse: collapse;

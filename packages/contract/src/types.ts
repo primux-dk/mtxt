@@ -481,6 +481,11 @@ export interface components {
             done: boolean;
             /** @description The colleague the item first mentions, if any. */
             owner: components["schemas"]["NamedUser"] | null;
+            /**
+             * Format: date
+             * @description The due date, a calendar day with no time or zone; null when none is set.
+             */
+            due_on: string | null;
         };
         Recap: {
             meeting_id: string;
@@ -489,7 +494,8 @@ export interface components {
             /**
              * @description Markdown. A callout is a GitHub alert, a toggle `<details>`, the
              *     table of contents `<!-- toc -->`, the decisions block a task list
-             *     between `<!-- decisions -->` and `<!-- /decisions -->`, a mention
+             *     between `<!-- decisions -->` and `<!-- /decisions -->` whose item
+             *     may end in its due date, `~2026-10-30`, a mention
              *     `[@Name](mtxt:user/<id>)` or `mtxt:speaker/<id>`.
              */
             body_md: string;

@@ -84,6 +84,8 @@
   "recap.toolbar.link": "Tilføj link",
   "recap.toolbar.undo": "Fortryd",
   "recap.decision.markDone": "Markér som færdig: {task}",
+  "recap.decision.dueWord": "Frist",
+  "recap.decision.addDue": "Tilføj frist",
   "recap.editorHint": "Skriv / for blokke. Brug @ til kolleger.",
   "recorder.meetingTitle": "Mødetitel",
   "recorder.stop": "Stop optagelse",

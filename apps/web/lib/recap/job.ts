@@ -10,7 +10,8 @@
   The job loads the meeting's transcript with its speakers, the template
   (the meeting's, else the install's default, else a plain one), the
   keyterms and the language, builds the prompt (lib/recap/prompt.ts), calls
-  the install's recap model, lifts the decisions, and writes version n+1
+  the install's recap model, lifts the decisions and their due dates
+  (counted from the meeting's day on the install's time zone), and writes version n+1
   with no author. A failure worth another try goes back to the queue, up to
   MAX_ATTEMPTS deliveries; otherwise the recap is `failed` with a fixed
   reason. The model's own words are only ever the recap.
@@ -26,7 +27,8 @@ import {
 } from '@mtxt/adapters';
 import { describeError } from '../stt/redact';
 import { keytermList } from '../transcription/job';
-import { liftDecisions, type MeetingSpeaker } from './decisions';
+import { liftDecisions, withDueDates, type MeetingSpeaker } from './decisions';
+import { meetingDay } from './due';
 import { RecapError, type RecapLlm } from './llm';
 import { parseMarkdown, toMarkdown } from './markdown';
 import { contextTokens } from './models';
@@ -266,14 +268,17 @@ export async function runRecap(deps: RecapDeps, job: RecapJob, attempt: number):
     const template = await templateFor(db, installId, recapRow?.templateId ?? meeting.templateId);
     const llm = await deps.llm(settings);
     const language = transcript.language || (settings.language === 'auto' ? '' : settings.language);
+    const day = meetingDay(meeting.startedAt, settings.timeZone);
     const { markdown, note } = await draftRecap(llm, {
       template: template.bodyMd,
       segments: transcript.segments,
       keyterms: await keytermList(db, installId),
       language,
       contextTokens: contextTokens(llm.provider, llm.model),
+      meetingDay: day,
     });
-    const body = toMarkdown(liftDecisions(parseMarkdown(markdown), transcript.speakers));
+    const lifted = liftDecisions(parseMarkdown(markdown), transcript.speakers);
+    const body = toMarkdown(withDueDates(lifted, day));
     const written = await writeVersion(db, installId, {
       recapId: draft.recapId,
       meetingId: meeting.id,

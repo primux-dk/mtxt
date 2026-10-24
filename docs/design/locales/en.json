@@ -84,6 +84,8 @@
   "recap.toolbar.link": "Add link",
   "recap.toolbar.undo": "Undo",
   "recap.decision.markDone": "Mark as done: {task}",
+  "recap.decision.dueWord": "Due",
+  "recap.decision.addDue": "Add due date",
   "recap.editorHint": "Type / for blocks. Use @ for colleagues.",
   "recorder.meetingTitle": "Meeting title",
   "recorder.stop": "Stop recording",
