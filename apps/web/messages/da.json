@@ -1006,7 +1006,10 @@
       "scope": {
         "read": "Kun læse",
         "readWrite": "Læse og skrive"
-      }
+      },
+      "viaMcp": "via MCP ({token})",
+      "mcpConnection": "MCP-forbindelse",
+      "savedMinutes": "Gemte referatet som version {version}"
     },
     "empty": {
       "first": {

@@ -1006,7 +1006,10 @@
       "scope": {
         "read": "Read only",
         "readWrite": "Read and write"
-      }
+      },
+      "viaMcp": "through MCP ({token})",
+      "mcpConnection": "MCP connection",
+      "savedMinutes": "Saved the minutes as version {version}"
     },
     "empty": {
       "first": {
