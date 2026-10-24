@@ -25,6 +25,7 @@ export const isPublicPath = (path: string) =>
       path.startsWith('/api/test/fake-assemblyai/') ||
       path.startsWith('/api/test/fake-elevenlabs/') ||
       path === '/api/test/fake-workers-ai' ||
+      path === '/api/test/fake-workers-ai/control' ||
       // And the fake recap model (lib/recap/test-hooks.ts).
       path === '/api/test/fake-recap' ||
       path === '/api/test/fake-recap/control' ||

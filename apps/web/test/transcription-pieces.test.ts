@@ -46,7 +46,7 @@ function harness(audio: Uint8Array = AUDIO) {
             range.length === undefined ? undefined : range.offset + range.length,
           )
         : bytes;
-      return { key, size: bytes.byteLength, body: new Blob([part]).stream() };
+      return { key, size: bytes.byteLength, body: new Blob(<BlobPart[]>[part]).stream() };
     },
     async put(key: string, body: string | Uint8Array) {
       stored.set(key, body);
@@ -68,7 +68,7 @@ function whisper(behaviour: (call: number, input: PieceInput) => void = () => {}
   const transcribePiece = vi.fn(async (input: PieceInput): Promise<SttResult> => {
     const { durationMs } = await planCut(
       async (r) =>
-        new Blob([
+        new Blob(<BlobPart[]>[
           r
             ? input.audio.subarray(r.offset, r.length ? r.offset + r.length : undefined)
             : input.audio,

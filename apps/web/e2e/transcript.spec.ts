@@ -387,6 +387,80 @@ test('Workers AI Whisper: one speaker, synchronous', async ({ page, request }) =
   }
 });
 
+test('Workers AI Whisper: a recording over 25 MiB goes in pieces, with progress, and becomes one transcript', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(180_000);
+  await useProvider('workers-ai-whisper');
+  try {
+    // Each fake Whisper call takes 6 seconds, so the page sees the pieces come in.
+    await request.post('/api/test/fake-workers-ai/control', { data: { delayMs: 6000 } });
+    // 28 minutes of 8 kHz WAV: 26.9 MB, over the 25 MiB a single call takes.
+    const audio = wav(1680);
+    expect(audio.length).toBeGreaterThan(25 * 1024 * 1024);
+    const created = await request.post('/api/v1/recordings', {
+      headers: colleague,
+      data: {
+        meeting: { title: 'Langt møde i dele', started_at: '2026-10-22T09:00:00Z' },
+        duration_s: 1680,
+        sha256: sha256(audio),
+        size_bytes: audio.length,
+        source: 'upload',
+        content_type: 'audio/wav',
+      },
+    });
+    const { id, meeting_id } = await created.json();
+    const CHUNK = 8 * 1024 * 1024;
+    for (let n = 0; n * CHUNK < audio.length; n++) {
+      const put = await request.put(`/api/v1/recordings/${id}/chunks/${n + 1}`, {
+        headers: colleague,
+        data: audio.subarray(n * CHUNK, (n + 1) * CHUNK),
+      });
+      expect(put.status()).toBeLessThan(300);
+    }
+    expect(
+      (await request.post(`/api/v1/recordings/${id}/complete`, { headers: colleague })).status(),
+    ).toBe(200);
+
+    await page.goto(`/meetings/${meeting_id}`);
+    await page.getByRole('tab', { name: /Transcript/ }).click();
+    const progress = page.getByText(
+      /Transcribing with Workers AI Whisper in 3 parts, [0-2] done\./,
+    );
+    await expect(progress).toBeVisible({ timeout: 30_000 });
+    await page.screenshot({ path: shot('transcript-pieces-progress') });
+
+    await expect.poll(() => statusOf(request, id), { timeout: 90_000 }).toBe('transcribed');
+    // Three calls, each under the 12 MiB piece limit; together the file once plus the overlaps.
+    const calls = (await (await request.get('/api/test/fake-workers-ai/control')).json()) as {
+      bytes: number;
+    }[];
+    expect(calls).toHaveLength(3);
+    for (const call of calls) expect(call.bytes).toBeLessThanOrEqual(12 * 1024 * 1024);
+    const sent = calls.reduce((n, c) => n + c.bytes, 0);
+    expect(sent).toBeGreaterThan(audio.length);
+    expect(sent).toBeLessThan(audio.length + 4 * 3 * 16_000 + 3 * 44);
+    expect(
+      d1(`select chunks_total, chunks_done, substr(raw_path, -1) as tail from transcripts
+        where recording_id = '${id}'`),
+    ).toEqual([{ chunks_total: 3, chunks_done: 3, tail: '/' }]);
+    // The fixture's segments at each piece's offset, the last one past 25 minutes.
+    const rows = d1(`select s.start_ms from segments s join transcripts t on t.id = s.transcript_id
+      where t.recording_id = '${id}' order by s.start_ms`) as { start_ms: number }[];
+    expect(rows.length).toBeGreaterThanOrEqual(4);
+    expect(rows.at(-1)!.start_ms).toBeGreaterThan(25 * 60_000);
+
+    await page.reload();
+    await page.getByRole('tab', { name: /Transcript/ }).click();
+    await expect(segments(page)).toHaveCount(rows.length);
+    await page.screenshot({ path: shot('transcript-pieces-done') });
+  } finally {
+    await request.post('/api/test/fake-workers-ai/control', { data: { delayMs: 0 } });
+    await useProvider('assemblyai');
+  }
+});
+
 test('ElevenLabs Scribe, chosen in Settings: two speakers, synchronous, from one multipart request', async ({
   page,
   request,

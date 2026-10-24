@@ -19,7 +19,7 @@ const fixture = (name: string) => new Uint8Array(readFileSync(join(FIXTURES, nam
 const opener =
   (bytes: Uint8Array): OpenAudio =>
   async (range) =>
-    new Blob([
+    new Blob(<BlobPart[]>[
       range
         ? bytes.subarray(
             range.offset,

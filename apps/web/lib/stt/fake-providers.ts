@@ -150,9 +150,40 @@ export async function transcriptRoute(request: Request, id: string) {
   return Response.json(transcriptFor(job));
 }
 
-/** Workers AI Whisper: the fixture, or an error when the test asked for one. */
+const WHISPER_PREFIX = 'test/fake-workers-ai';
+interface WhisperControl {
+  /** How long each call takes, so a test can see a recording in pieces in progress. */
+  delayMs: number;
+}
+
+/**
+ * POST: set the delay, and forget the calls so far. GET: the size of every
+ * call since, in order (packet 17: a recording over 25 MiB goes in pieces).
+ */
+export async function whisperControlRoute(request: Request) {
+  if (!(await allowed(request))) return notFound();
+  if (request.method === 'GET') {
+    return Response.json((await readJson(`${WHISPER_PREFIX}/requests.json`)) ?? []);
+  }
+  const body = (await request.json()) as Partial<WhisperControl>;
+  const next: WhisperControl = {
+    delayMs: Number.isInteger(body.delayMs) ? Math.min(body.delayMs!, 30_000) : 0,
+  };
+  await writeJson(`${WHISPER_PREFIX}/control.json`, next);
+  await writeJson(`${WHISPER_PREFIX}/requests.json`, []);
+  return Response.json(next);
+}
+
+/** Workers AI Whisper: the fixture, or an error when the test asked for one. Each call's size is kept. */
 export async function whisperRoute(request: Request) {
   if (!(await allowed(request))) return notFound();
+  const call = (await request.json()) as { bytes?: number; language?: string | null };
+  const calls = (await readJson<{ bytes: number }[]>(`${WHISPER_PREFIX}/requests.json`)) ?? [];
+  await writeJson(`${WHISPER_PREFIX}/requests.json`, [...calls, { bytes: call.bytes ?? 0 }]);
+  const { delayMs } = (await readJson<WhisperControl>(`${WHISPER_PREFIX}/control.json`)) ?? {
+    delayMs: 0,
+  };
+  if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
   const { mode } = await control();
   if (mode === 'error') return Response.json({ error: 'capacity' }, { status: 500 });
   if (mode === 'empty') return Response.json({ text: '', segments: [] });

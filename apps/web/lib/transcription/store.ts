@@ -487,12 +487,13 @@ export async function resetForRetry(
       )
       .returning({ id: r.id }),
     // The failed attempt's pieces, a prefix in raw_path, are deleted later (storage_cleanup).
-    db.run(sql`insert into storage_cleanup (id, install_id, path, created_at, attempts)
-      select lower(hex(randomblob(16))), ${installId}, x.raw_path, ${Date.now()}, 0
+    db.insert(schema.storageCleanup).select(
+      sql`select lower(hex(randomblob(16))), ${installId}, x.raw_path, ${Date.now()}, 0
       from transcripts x where x.recording_id = ${recordingId} and x.install_id = ${installId}
         and x.is_comparison = 0 and x.status in ('failed', 'pending') and x.raw_path like '%/'
         and exists (select 1 from recordings y where y.id = ${recordingId}
-          and y.install_id = ${installId} and y.status = 'transcribing')`),
+          and y.install_id = ${installId} and y.status = 'transcribing')`,
+    ),
     db
       .update(t)
       .set({
