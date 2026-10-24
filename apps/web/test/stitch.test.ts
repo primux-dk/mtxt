@@ -145,6 +145,18 @@ describe('stitching pieces', () => {
     for (const w of two.words!) expect(w.speaker).toBe(turns(Number(w.text.slice(1))));
   });
 
+  it('rounds times moved by an offset that is not a whole millisecond, and ends at the recording', () => {
+    // An Ogg page or AAC frame boundary: 883,015.6009 ms into the original.
+    const a = piece(0, 9_000, [0, 8_000]);
+    const b = { ...piece(7_000, 17_000, [8_000, 17_000]), startMs: 7_000.6009070295 };
+    const result = stitch([a, b], 16_900);
+    for (const s of result.segments) {
+      expect(Number.isInteger(s.startMs) && Number.isInteger(s.endMs)).toBe(true);
+      expect(s.endMs).toBeLessThanOrEqual(16_900);
+    }
+    for (const w of result.words!) expect(Number.isInteger(w.startMs)).toBe(true);
+  });
+
   it('stitches one piece to itself and no pieces to nothing', () => {
     const only = piece(0, 4_000, [0, 4_000]);
     expect(said(stitch([only]).segments)).toEqual(range(0, 10));

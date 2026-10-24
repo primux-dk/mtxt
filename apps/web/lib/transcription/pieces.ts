@@ -192,5 +192,5 @@ export async function runPieces(run: PiecesRun): Promise<PiecesOutcome> {
     if (!piece) throw new SttError('stt_failed', 'internal', false, undefined, `piece ${k + 1}`);
     pieces.push(piece);
   }
-  return { kind: 'done', result: stitch(pieces), rawPath: prefix! };
+  return { kind: 'done', result: stitch(pieces, Math.round(plan.durationMs)), rawPath: prefix! };
 }

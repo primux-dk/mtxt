@@ -45,15 +45,17 @@ const mid = (w: { startMs: number; endMs: number }) => (w.startMs + w.endMs) / 2
  * A piece's words, moved to the original's time, each tied to its segment.
  * A segment without words gets its text split evenly over its span.
  */
-function tokens(piece: StitchPiece): { tokens: Token[]; segments: SttSegment[] } {
-  const shift = piece.startMs;
+function tokens(piece: StitchPiece, totalMs: number): { tokens: Token[]; segments: SttSegment[] } {
+  // A piece starts where a frame or page does, rarely on a whole millisecond: times are
+  // rounded once moved, and nothing ends past the recording.
+  const at = (ms: number) => Math.min(totalMs, Math.round(ms + piece.startMs));
   const segments = piece.result.segments.map((s) => ({
     ...s,
-    startMs: s.startMs + shift,
-    endMs: Math.max(s.endMs, s.startMs) + shift,
+    startMs: at(s.startMs),
+    endMs: at(Math.max(s.endMs, s.startMs)),
   }));
   const words = (piece.result.words ?? [])
-    .map((w) => ({ ...w, startMs: w.startMs + shift, endMs: Math.max(w.endMs, w.startMs) + shift }))
+    .map((w) => ({ ...w, startMs: at(w.startMs), endMs: at(Math.max(w.endMs, w.startMs)) }))
     .filter((w) => normalise(w.text));
   const out: Token[] = [];
   let w = 0;
@@ -163,8 +165,8 @@ function rebuild(segments: readonly SttSegment[], all: readonly Token[], kept: r
 }
 
 /** The pieces as one result. `raw` says how many pieces there were; each piece's own raw result is stored apart. */
-export function stitch(pieces: readonly StitchPiece[]): SttResult {
-  const prepared = pieces.map(tokens);
+export function stitch(pieces: readonly StitchPiece[], totalMs = Infinity): SttResult {
+  const prepared = pieces.map((piece) => tokens(piece, totalMs));
   const keepFrom = prepared.map(() => 0);
   const keepTo = prepared.map((p) => p.tokens.length);
   for (let k = 0; k + 1 < pieces.length; k++) {
