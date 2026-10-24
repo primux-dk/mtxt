@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   countMcpConnections,
+  createApiToken,
   createOAuthCode,
   findRecorderUser,
   hashRecorderToken,
@@ -553,6 +554,35 @@ describe('the MCP server on a database', () => {
       visibility: 'private',
     });
     expect(JSON.parse(other.content[0]!.text)).toMatchObject({ status: 403 });
+  });
+
+  it('takes a personal API token for a tool without OAuth, with its scope, and not a recorder token', async () => {
+    const value = newRecorderToken();
+    await createApiToken(ctx.db, INSTALL, {
+      userId: 'anne',
+      name: 'Static client',
+      scope: 'read',
+      tokenHash: await hashRecorderToken(value),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    const transcript = await tool(value, 'get_transcript', { meeting_id: 'a1' });
+    expect(transcript.content[0]!.text).toContain('Budgettet holder.');
+    const refused = await tool(value, 'set_visibility', {
+      meeting_id: 'a1',
+      visibility: 'company',
+    });
+    expect(JSON.parse(refused.content[0]!.text)).toMatchObject({
+      status: 403,
+      error: { code: 'insufficient_scope' },
+    });
+    const row = audits().find((a) => a.action === 'exported')!;
+    expect(JSON.parse(row.details)).toEqual({ format: 'text', via: 'mcp', token: 'Static client' });
+
+    const recorder = 'mtxt_' + 'r'.repeat(43);
+    ctx.raw
+      .exec(`insert into recorder_tokens (id, install_id, user_id, device_name, token_hash, created_at, expires_at)
+      values ('rec', '${INSTALL}', 'anne', 'Mac', '${await hashRecorderToken(recorder)}', 0, ${Date.now() + 86_400_000})`);
+    expect((await rpc(recorder, 'tools/list')).status).toBe(401);
   });
 
   it("refuses an MCP connection's token on the REST API itself", async () => {

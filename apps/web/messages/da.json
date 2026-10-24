@@ -602,7 +602,8 @@
       "claudeCode": "Claude Code: <command></command>, og derefter /mcp for at logge ind.",
       "chatgpt": "ChatGPT: Indstillinger, Apps og connectors, Opret, indsæt adressen, og vælg OAuth.",
       "cursor": "Cursor: Settings, MCP, Add a custom MCP server, med adressen som url.",
-      "signIn": "Værktøjet åbner denne installations egen login-side. Medarbejderen logger ind med virksomhedens login og vælger Kun læse eller Læse og skrive. Forbindelserne står under API-nøgler i medarbejderens menu, hvor de også tilbagekaldes."
+      "signIn": "Værktøjet åbner denne installations egen login-side. Medarbejderen logger ind med virksomhedens login og vælger Kun læse eller Læse og skrive. Forbindelserne står under API-nøgler i medarbejderens menu, hvor de også tilbagekaldes.",
+      "apiToken": "Et værktøj uden OAuth: lav en personlig API-nøgle under API-nøgler, og send den som Authorization: Bearer <token>."
     },
     "dataflow": {
       "heading": "Dataflow",

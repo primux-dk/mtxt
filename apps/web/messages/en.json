@@ -602,7 +602,8 @@
       "claudeCode": "Claude Code: <command></command>, then /mcp to sign in.",
       "chatgpt": "ChatGPT: Settings, Apps and connectors, Create, then paste the address and choose OAuth.",
       "cursor": "Cursor: Settings, MCP, Add a custom MCP server, with the address as its url.",
-      "signIn": "The tool opens this install's own sign-in page. The employee signs in with the company login and chooses Read only or Read and write. Connections show under API tokens in the employee's menu, where they are revoked."
+      "signIn": "The tool opens this install's own sign-in page. The employee signs in with the company login and chooses Read only or Read and write. Connections show under API tokens in the employee's menu, where they are revoked.",
+      "apiToken": "A tool without OAuth: make a personal API token under API tokens and send it as Authorization: Bearer <token>."
     },
     "dataflow": {
       "heading": "Data flow",

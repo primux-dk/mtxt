@@ -147,6 +147,7 @@ export function SharingForm({ values, mcpUrl }: { values: SharingValues; mcpUrl:
                 </li>
                 <li>{t('mcp.chatgpt')}</li>
                 <li>{t('mcp.cursor')}</li>
+                <li>{t('mcp.apiToken')}</li>
               </ul>
               <p>{t('mcp.signIn')}</p>
             </div>

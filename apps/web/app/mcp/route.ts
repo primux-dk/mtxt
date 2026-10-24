@@ -7,7 +7,8 @@ import { mcpHandler } from '@/lib/mcp/server';
 /*
   /mcp (docs/spec.md "MCP"): the MCP server, Streamable HTTP. The caller is
   an MCP connection's access token, from the install's own OAuth server
-  (app/oauth). Without one the answer is 401 with the protected resource
+  (app/oauth), or a personal API token, for a tool that cannot do OAuth
+  and sends a fixed Authorization header; either acts with its own scope. Without one the answer is 401 with the protected resource
   metadata's address, where an MCP client starts the OAuth flow. With
   "MCP server" off in the settings, /mcp is 404. Bearer only, never the
   session cookie, so any origin may call it.
@@ -34,14 +35,16 @@ async function serve(request: Request): Promise<Response> {
   }
   const origin = new URL(request.url).origin;
   const user = await getApiUser();
-  if (!user || user.token?.kind !== 'mcp') {
+  // An OAuth connection's token, or a personal API token for a tool without OAuth.
+  if (!user || (user.token?.kind !== 'mcp' && user.token?.kind !== 'api')) {
     const sent = request.headers.has('authorization');
     return withCors(
       Response.json(
         {
           error: {
             code: 'unauthorized',
-            message: 'Connect through OAuth: the protected resource metadata names the server.',
+            message:
+              'Connect through OAuth (the protected resource metadata names the server), or send a personal API token as Authorization: Bearer <token>.',
           },
         },
         {

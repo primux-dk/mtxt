@@ -67,8 +67,8 @@ export async function rest(
     // Every request with an API token counts, a refused one included, so a
     // script that keeps hitting a 403 is still held to its minute.
     const adapters = await getAdapters();
-    // An MCP connection's token, inside a tool call of the MCP server (lib/mcp/context.ts).
-    const mcp = user.token?.kind === 'mcp' ? mcpCall() : undefined;
+    // A tool call of the MCP server (lib/mcp/context.ts), with an MCP connection's or an API token.
+    const mcp = user.token && user.token.kind !== 'recorder' ? mcpCall() : undefined;
     if (user.token && (user.token.kind === 'api' || mcp)) {
       const taken = await takeApiRequest(adapters.db, adapters.installId, user.token.id);
       limits = {

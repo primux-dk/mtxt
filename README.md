@@ -157,7 +157,7 @@ The address is the install's hostname with `/mcp`, for example `https://meetings
 - **ChatGPT:** Settings, Apps and connectors, Create, paste the address and choose OAuth.
 - **Cursor:** Settings, MCP, Add a custom MCP server, with the address as its `url`.
 
-The tool opens the install's own sign-in page in the browser: the company login, then "Connect <tool> to <product>?", where the employee picks **Read only** or **Read and write** and approves. The connection shows under API tokens in the employee's menu, marked MCP, and Revoke there ends it at once.
+The tool opens the install's own sign-in page in the browser: the company login, then "Connect <tool> to <product>?", where the employee picks **Read only** or **Read and write** and approves. The connection shows under API tokens in the employee's menu, marked MCP, and Revoke there ends it at once. A tool that cannot do OAuth takes a personal API token instead (see [API](#api)), sent as `Authorization: Bearer <token>`; it acts with that token's scope.
 
 | Tool             | REST call                                   | What it does                                                                 |
 | ---------------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
