@@ -594,6 +594,65 @@ describe('the MCP server on a database', () => {
     expect(JSON.parse(created.details)).toEqual({ name: 'Claude', scope: 'read', kind: 'mcp' });
   });
 
+  it('revokes the connection when two exchanges of one code run at once', async () => {
+    const code = newRecorderToken();
+    await createOAuthCode(ctx.db, INSTALL, {
+      codeHash: await hashRecorderToken(code),
+      userId: 'anne',
+      clientId,
+      clientName: 'Claude',
+      redirectUri: REDIRECT,
+      codeChallenge: await s256(VERIFIER),
+      scope: 'read',
+    });
+    // Both exchanges read the code before either claims it, as two requests at once can.
+    let reads = 0;
+    let release = () => {};
+    const bothRead = new Promise<void>((resolve) => (release = resolve));
+    const grants = ctx.db.query.oauthGrants;
+    let queue: Promise<unknown> = Promise.resolve();
+    const raced = new Proxy(ctx.db, {
+      get(target, key) {
+        // D1 runs one batch at a time; the in-memory database needs that said.
+        if (key === 'batch') {
+          return (statements: Parameters<typeof target.batch>[0]) => {
+            const run = queue.then(() => target.batch(statements));
+            queue = run.catch(() => {});
+            return run;
+          };
+        }
+        if (key !== 'query') return Reflect.get(target, key);
+        return new Proxy(target.query, {
+          get(query, name) {
+            if (name !== 'oauthGrants') return Reflect.get(query, name);
+            return {
+              findFirst: async (args: Parameters<typeof grants.findFirst>[0]) => {
+                const row = await grants.findFirst(args);
+                reads++;
+                if (reads === 2) release();
+                if (reads <= 2) await bothRead;
+                return row;
+              },
+            };
+          },
+        });
+      },
+    });
+    const exchange = async () =>
+      redeemOAuthCode(raced, INSTALL, {
+        codeHash: await hashRecorderToken(code),
+        clientId,
+        redirectUri: REDIRECT,
+        challenge: await s256(VERIFIER),
+        accessHash: await hashRecorderToken(newRecorderToken()),
+        refreshHash: await hashRecorderToken(newRecorderToken()),
+      });
+    const results = await Promise.all([exchange(), exchange()]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok)).toEqual([{ ok: false, reason: 'invalid_grant' }]);
+    expect(await countMcpConnections(ctx.db, INSTALL, 'anne')).toBe(0);
+  });
+
   it('refreshes with a new pair, after which the old refresh token is spent', async () => {
     const first = await connect('anne');
     const refresh = (token: string) =>

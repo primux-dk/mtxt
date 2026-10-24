@@ -86,7 +86,8 @@ export type IssueResult =
  * client's verifier (`challenge`, worked out by the caller). The code is
  * taken and the connection made in one batch; the 26th working connection
  * of a user is refused inside the same statements. A code presented again
- * revokes the connection it became (RFC 6749 section 4.1.2).
+ * revokes the connection it became (RFC 6749 section 4.1.2), also when the
+ * two exchanges ran at once and this one lost the claim.
  */
 export async function redeemOAuthCode(
   db: Db,
@@ -108,17 +109,13 @@ export async function redeemOAuthCode(
   });
   if (!grant || !safeEqual(grant.codeHash, input.codeHash))
     return { ok: false, reason: 'invalid_grant' };
-  if (grant.redeemedAt) {
-    if (grant.tokenId) {
-      await revokeToken(db, installId, {
-        userId: grant.userId,
-        tokenId: grant.tokenId,
-        kind: 'mcp',
-        now,
-      });
-    }
+  /** A code used twice: the connection it became stops working (RFC 6749 section 4.1.2). */
+  const replayed = async (tokenId: string | null): Promise<IssueResult> => {
+    if (tokenId)
+      await revokeToken(db, installId, { userId: grant.userId, tokenId, kind: 'mcp', now });
     return { ok: false, reason: 'invalid_grant' };
-  }
+  };
+  if (grant.redeemedAt) return replayed(grant.tokenId);
   if (
     grant.expiresAt.getTime() <= t ||
     grant.clientId !== input.clientId ||
@@ -193,7 +190,14 @@ export async function redeemOAuthCode(
       )
       .returning({ id: tk.id }),
   ]);
-  if (!claimed.length) return { ok: false, reason: 'invalid_grant' };
+  if (!claimed.length) {
+    // Another exchange of the same code took it between the read and the batch; its batch
+    // has committed, connection included, so the code is a replay here too.
+    const taken = await db.query.oauthGrants.findFirst({
+      where: and(eq(og.installId, installId), eq(og.codeHash, input.codeHash)),
+    });
+    return replayed(taken?.tokenId ?? null);
+  }
   if (!created.length) return { ok: false, reason: 'too_many' };
   return { ok: true, tokenId: id, scope: grant.scope, accessExpiresAt };
 }
