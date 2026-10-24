@@ -321,6 +321,16 @@ export const transcripts = sqliteTable(
      * a full result can pass D1's 2 MB value limit.
      */
     rawPath: text('raw_path'),
+    /**
+     * A recording sent in pieces (packet 18): how many, and how many are
+     * transcribed, for the meeting page's progress. Null for a file sent
+     * whole. With pieces, `raw_path` is the prefix
+     * `transcripts/{install}/{recording}/{provider}-{transcript_id}/`, set
+     * when the pieces are planned, holding `plan.json` and one
+     * `piece-NNN.json` per piece; storage cleanup deletes the whole prefix.
+     */
+    chunksTotal: integer('chunks_total'),
+    chunksDone: integer('chunks_done'),
   },
   (t) => [
     /** One server transcript per recording; the live preview is never stored. Comparisons sit beside it. */

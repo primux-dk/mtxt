@@ -23,6 +23,7 @@ import {
 import { describeError } from '../stt/redact';
 import { SttError, type SttProvider, type SttResult } from '../stt/types';
 import { queueMeetingEventQuietly } from '../webhooks/store';
+import { runPieces } from './pieces';
 import { nextStep } from './state';
 import {
   claimTranscript,
@@ -74,6 +75,7 @@ export async function runTranscribe(
 ): Promise<Outcome> {
   const { db, installId } = deps;
   const log = deps.log ?? console;
+  const startedAt = Date.now();
 
   // Any recap a crashed delivery left in the outbox goes out now.
   await sendOutbox(db, installId, deps.queue).catch((error) =>
@@ -111,8 +113,8 @@ export async function runTranscribe(
   };
 
   let claim: { transcriptId: string; token: string; provider: string } | null = null;
-  const complete = async (result: SttResult) => {
-    const done = await completeTranscript(db, deps.storage, installId, rec, claim!, result);
+  const complete = async (result: SttResult, stored?: { rawPath: string }) => {
+    const done = await completeTranscript(db, deps.storage, installId, rec, claim!, result, stored);
     if (!done.written) log.log('Another delivery finished the transcript first', recordingId);
     // The outbox row is in D1 already; this sends it, and any later delivery would too.
     await sendOutbox(db, installId, deps.queue, { transcriptId: claim!.transcriptId });
@@ -189,6 +191,29 @@ export async function runTranscribe(
     if (!taken) return await held();
     claim = { transcriptId: taken.id, token: taken.claimToken, provider: id };
     await markTranscribing(db, installId, recordingId);
+    const limits = provider.pieces?.limits;
+    if (
+      provider.pieces &&
+      limits &&
+      (rec.sizeBytes > limits.wholeMaxBytes || rec.durationS * 1000 > limits.wholeMaxMs)
+    ) {
+      // Over the provider's ceiling, or long: in pieces, resumed where an earlier delivery stopped.
+      const outcome = await runPieces({
+        deps,
+        recording: rec,
+        claim,
+        row: taken,
+        pieces: provider.pieces,
+        language: settings.language,
+        keyterms: await keytermList(db, installId),
+        startedAt,
+        call: id,
+      });
+      if (outcome.kind === 'lost') log.log('Another delivery took the transcript', recordingId);
+      if (outcome.kind === 'done')
+        return await complete(outcome.result, { rawPath: outcome.rawPath });
+      if (outcome.kind !== 'whole') return;
+    }
     const submitted = await provider.submit({
       recordingId,
       contentType: rec.contentType,

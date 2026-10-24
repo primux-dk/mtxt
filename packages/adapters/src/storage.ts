@@ -60,5 +60,30 @@ export interface StorageAdapter extends MultipartStorage {
   get(key: string, range?: { offset: number; length?: number }): Promise<StoredObjectBody | null>;
   head(key: string): Promise<StoredObject | null>;
   delete(keys: string | string[]): Promise<void>;
+  /** The keys under a prefix, a page at a time; `cursor` is set while more follow. */
+  list(prefix: string, options?: { cursor?: string }): Promise<{ keys: string[]; cursor?: string }>;
   read(key: string, options?: { expiresInSeconds?: number }): Promise<ReadHandle | null>;
+}
+
+/**
+ * Deletes a stored path. A path that ends in "/" is a prefix, and every
+ * object under it goes, page by page (a transcript sent in pieces keeps one
+ * object per piece under its prefix; packet 18).
+ */
+export async function deleteStored(
+  storage: Pick<StorageAdapter, 'delete'> & Partial<Pick<StorageAdapter, 'list'>>,
+  path: string,
+): Promise<void> {
+  if (!path.endsWith('/')) return storage.delete(path);
+  if (!storage.list) throw new Error('This store cannot list a prefix');
+  // Every key first, then the deletes: a listing is never read while it changes.
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await storage.list(path, cursor ? { cursor } : undefined);
+    keys.push(...page.keys);
+    cursor = page.cursor;
+  } while (cursor);
+  // R2 deletes at most 1,000 keys a call.
+  for (let i = 0; i < keys.length; i += 1000) await storage.delete(keys.slice(i, i + 1000));
 }

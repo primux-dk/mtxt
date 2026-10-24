@@ -1,4 +1,5 @@
 export type * from './storage';
+export { deleteStored } from './storage';
 export type * from './queue';
 export type * from './uploads';
 export type * from './speech';

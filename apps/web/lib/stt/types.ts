@@ -9,6 +9,7 @@
   outside the Next.js bundle.
 */
 import type { SttProvider as SttProviderId } from '@mtxt/adapters';
+import type { PieceLimits } from '../audio/plan';
 
 export type { SttProviderId };
 
@@ -74,11 +75,34 @@ export interface SttDescription {
   };
 }
 
+/** One piece of a cut recording, a file of its own (lib/audio). */
+export interface PieceInput {
+  audio: Uint8Array;
+  contentType: string;
+  language: string;
+  keyterms: readonly string[];
+}
+
+/**
+ * A synchronous provider with a size ceiling can take a long recording in
+ * pieces (docs/decisions.md, packet 18): the job cuts the file under
+ * `limits`, sends the pieces one by one and stitches the results. A file
+ * up to `wholeMaxBytes` and `wholeMaxMs` still goes whole through `submit`;
+ * so does a shorter one the cutter cannot read.
+ */
+export interface PiecedTranscription {
+  limits: PieceLimits & { wholeMaxBytes: number; wholeMaxMs: number };
+  /** The piece's result, its times from the piece's own start. */
+  transcribePiece(input: PieceInput): Promise<SttResult>;
+}
+
 export interface SttProvider {
   describe(): SttDescription;
   submit(job: SttJob): Promise<Submitted>;
   /** For async providers: the job's state by its handle. */
   fetch?(handle: string): Promise<Fetched>;
+  /** For a synchronous provider with a size ceiling: long recordings in pieces. */
+  pieces?: PiecedTranscription;
 }
 
 /**
@@ -107,6 +131,7 @@ export const STT_REASONS = [
   'provider_error',
   'timeout',
   'too_long',
+  'unsplittable',
   'missing_audio',
   'config',
   'internal',

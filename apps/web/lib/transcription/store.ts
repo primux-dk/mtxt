@@ -224,6 +224,20 @@ export async function markFailed(
 export const rawPath = (installId: string, recordingId: string, provider: string, tag: string) =>
   `transcripts/${installId}/${recordingId}/${provider}-${tag}.json`;
 
+/**
+ * `transcripts/{install}/{recording}/{provider}-{tag}/`: a recording sent in
+ * pieces (packet 18) keeps its plan and one raw result per piece under this
+ * prefix, named by the claim that planned the attempt. It is the row's
+ * `raw_path` from the plan on, so a delete or retention takes the pieces
+ * along even while the transcript is still pending.
+ */
+export const piecePrefix = (
+  installId: string,
+  recordingId: string,
+  provider: string,
+  tag: string,
+) => `transcripts/${installId}/${recordingId}/${provider}-${tag}/`;
+
 /** Segment rows as JSON arrays under the per-statement size, each checked against D1's bound. */
 function segmentBatches(result: SttResult, speakerIds: Map<number, string>): string[] {
   const batches: string[] = [];
@@ -266,9 +280,15 @@ export async function completeTranscript(
   recording: { id: string; meetingId: string },
   claim: { transcriptId: string; token: string; provider: string },
   result: SttResult,
+  /** A result stitched from pieces: its raw results are stored under this prefix already. */
+  stored?: { rawPath: string },
 ): Promise<{ written: boolean }> {
-  const path = rawPath(installId, recording.id, claim.provider, claim.token);
-  await storage.put(path, JSON.stringify(result.raw ?? null), { contentType: 'application/json' });
+  const path = stored?.rawPath ?? rawPath(installId, recording.id, claim.provider, claim.token);
+  if (!stored) {
+    await storage.put(path, JSON.stringify(result.raw ?? null), {
+      contentType: 'application/json',
+    });
+  }
 
   const held = sql`exists (select 1 from transcripts x where x.id = ${claim.transcriptId}
     and x.install_id = ${installId} and x.claim_token = ${claim.token} and x.status = 'pending')`;
@@ -332,6 +352,7 @@ export async function completeTranscript(
         rawJson: {},
         rawPath: boundD1(path, 'raw_path'),
         pollDeadlineAt: null,
+        ...(stored ? {} : { chunksTotal: null, chunksDone: null }),
         ...unclaim,
       })
       .where(and(eq(t.installId, installId), holds(claim.transcriptId, claim.token)))
@@ -340,8 +361,8 @@ export async function completeTranscript(
   ]);
   const written = (results.at(-2) as unknown[]).length > 0;
   if (!written) {
-    // Another delivery won: its raw result stays, this one goes.
-    await storage.delete(path).catch(() => {});
+    // Another delivery won: its raw result stays, this one goes (pieces stay with their row).
+    if (!stored) await storage.delete(path).catch(() => {});
     return { written };
   }
   await indexSegments(db, installId, recording.meetingId);
@@ -440,8 +461,10 @@ export async function sendOutbox(
 
 /**
  * The owner's Try again: the recording back to transcribing and its failed
- * transcript row to a fresh pending attempt (no job id, claim or deadline),
- * in one batch. False when the recording was not failed.
+ * transcript row to a fresh pending attempt (no job id, claim, deadline or
+ * pieces), in one batch. The failed attempt's pieces go to storage cleanup
+ * in the same batch; the next attempt plans under a prefix of its own.
+ * False when the recording was not failed.
  */
 export async function resetForRetry(
   db: Db,
@@ -463,9 +486,25 @@ export async function resetForRetry(
         ),
       )
       .returning({ id: r.id }),
+    // The failed attempt's pieces, a prefix in raw_path, are deleted later (storage_cleanup).
+    db.insert(schema.storageCleanup).select(
+      sql`select lower(hex(randomblob(16))), ${installId}, x.raw_path, ${Date.now()}, 0
+      from transcripts x where x.recording_id = ${recordingId} and x.install_id = ${installId}
+        and x.is_comparison = 0 and x.status in ('failed', 'pending') and x.raw_path like '%/'
+        and exists (select 1 from recordings y where y.id = ${recordingId}
+          and y.install_id = ${installId} and y.status = 'transcribing')`,
+    ),
     db
       .update(t)
-      .set({ status: 'pending', providerJobId: null, pollDeadlineAt: null, ...unclaim })
+      .set({
+        status: 'pending',
+        providerJobId: null,
+        pollDeadlineAt: null,
+        chunksTotal: null,
+        chunksDone: null,
+        rawPath: sql`case when ${t.rawPath} like '%/' then null else ${t.rawPath} end`,
+        ...unclaim,
+      })
       .where(
         and(
           eq(t.recordingId, recordingId),

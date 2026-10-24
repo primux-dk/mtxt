@@ -230,6 +230,7 @@
     "state": {
       "transcribing": {
         "body": "Transskriberer med {provider}. Transskriptionen kommer her, når den er klar. Du kan godt forlade siden.",
+        "pieces": "Transskriberer med {provider} i {total} dele, {done} er færdige. Transskriptionen kommer her, når den er klar. Du kan godt forlade siden.",
         "waiting": "Venter på en tale-til-tekst-udbyder. Transskriptionen starter, når en administrator vælger en under Indstillinger."
       },
       "failed": {
@@ -262,6 +263,7 @@
       "provider_error": "Udbyderen havde en fejl{status, select, none {} other { (HTTP {status})}}.",
       "timeout": "Udbyderen svarede ikke i tide.",
       "too_long": "Optagelsen er over udbyderens størrelsesgrænse.",
+      "unsplittable": "Optagelsen er over udbyderens størrelsesgrænse, i et format, der ikke kan sendes i dele (FLAC eller en beskadiget fil).",
       "missing_audio": "Lydfilen mangler i lageret.",
       "config": "En indstilling, installationen skal bruge, mangler eller er forkert.",
       "internal": "Installationen fik en fejl, da den gemte transskriptionen."

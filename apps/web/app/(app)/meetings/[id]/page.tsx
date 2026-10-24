@@ -277,13 +277,23 @@ export default async function MeetingPage({ params, searchParams }: Props) {
     // Confirmed or transcribing: a calm line with the provider, and the page looks again
     // every few seconds so the transcript appears without a reload.
     const waiting = !view && !settings.sttProvider;
+    // A recording in pieces says how far it has come (packet 18).
+    const pieces = view?.transcript.chunksTotal ?? 0;
     // The heading is the library badge's word for the state (rule 7).
     return (
       <PanelState
         Icon={Loader}
         title={ts('transcribing')}
         body={
-          waiting ? tt('state.transcribing.waiting') : tt('state.transcribing.body', { provider })
+          waiting
+            ? tt('state.transcribing.waiting')
+            : pieces > 1
+              ? tt('state.transcribing.pieces', {
+                  provider,
+                  total: pieces,
+                  done: view?.transcript.chunksDone ?? 0,
+                })
+              : tt('state.transcribing.body', { provider })
         }
       >
         <RefreshWhile seconds={8} />
