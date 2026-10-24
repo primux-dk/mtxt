@@ -13,7 +13,7 @@
   (lib/stt/stitch) and written like any other result.
 */
 import { and, eq } from 'drizzle-orm';
-import { cleanupEntries, recordCleanup, schema } from '@mtxt/adapters';
+import { cleanupEntries, deleteStored, recordCleanup, schema } from '@mtxt/adapters';
 import { buildPiece, planCut, UnsupportedAudio, type CutPlan, type OpenAudio } from '../audio';
 import { stitch, type StitchPiece } from '../stt/stitch';
 import { SttError, type PiecedTranscription, type SttResult } from '../stt/types';
@@ -169,7 +169,20 @@ export async function runPieces(run: PiecesRun): Promise<PiecesOutcome> {
       `${audio.byteLength} bytes, ${Math.round((piece.endMs - piece.startMs) / 1000)} s of audio,`,
       `cut in ${built} ms, transcribed in ${Date.now() - began - built} ms`,
     );
-    if (!counted.length) return { kind: 'lost' };
+    if (!counted.length) {
+      // The row was deleted or reset meanwhile (a delete, retention, Try again): its prefix was
+      // cleaned up before this piece landed, so the piece, and the prefix with it, go now.
+      // A row that still holds the prefix belongs to the delivery that took the claim over.
+      const still = await db
+        .select({ id: t.id })
+        .from(t)
+        .where(
+          and(eq(t.installId, installId), eq(t.id, claim.transcriptId), eq(t.rawPath, prefix!)),
+        )
+        .get();
+      if (!still) await deleteStored(storage, prefix!).catch(() => {});
+      return { kind: 'lost' };
+    }
   }
 
   const pieces: StoredPiece[] = [];

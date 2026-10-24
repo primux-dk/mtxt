@@ -231,6 +231,20 @@ describe('a recording in pieces', () => {
     expect(w.calls).toHaveLength(3);
   });
 
+  it('a transcript deleted while a piece is with Whisper: the piece that lands after goes too', async () => {
+    const h = harness();
+    const w = whisper((call) => {
+      // Retention, or the owner's delete, takes the row and cleans the prefix meanwhile.
+      if (call === 1) {
+        const prefix = String(row().raw_path);
+        for (const key of [...h.stored.keys()]) if (key.startsWith(prefix)) h.stored.delete(key);
+        ctx.raw.exec(`DELETE FROM transcripts`);
+      }
+    });
+    await runTranscribe(deps(h, w.provider), 'rec-1', 1);
+    expect([...h.stored.keys()].filter((k) => k.startsWith('transcripts/'))).toEqual([]);
+  });
+
   it('a recording over the ceiling that cannot be cut fails with a fixed reason and a next step', async () => {
     const flac = new TextEncoder().encode('fLaC'.padEnd(30_000, '\0'));
     const h = harness(flac);

@@ -108,7 +108,8 @@ export class StreamReader {
   /** Moves forward to an absolute position at or after the current one. */
   async seek(pos: number): Promise<boolean> {
     if (pos < this.pos) throw new Error('StreamReader cannot go back');
-    return (await this.skip(pos - this.pos)) === pos - this.pos;
+    const distance = pos - this.pos;
+    return (await this.skip(distance)) === distance;
   }
 
   async close() {

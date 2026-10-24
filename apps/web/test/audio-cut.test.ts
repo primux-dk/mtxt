@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildPiece, planCut, sniff, UnsupportedAudio, type OpenAudio } from '../lib/audio';
+import { pickRanges } from '../lib/audio/bytes';
 import { oggCrc } from '../lib/audio/ogg';
 import { planPieces, Units, type PieceLimits } from '../lib/audio/plan';
 
@@ -71,6 +72,25 @@ function toneWav(seconds: number, rate = 8000) {
 }
 
 const LIMITS: PieceLimits = { maxBytes: 1_000_000, maxMs: 8_000, overlapMs: 500, searchMs: 3_000 };
+
+describe('reading ranges', () => {
+  it('picks ranges with gaps between them, in one pass', async () => {
+    const bytes = Uint8Array.from({ length: 100 }, (_, i) => i);
+    const parts = await pickRanges(opener(bytes), [
+      { pos: 5, len: 3 },
+      { pos: 40, len: 2 },
+      { pos: 97, len: 3 },
+    ]);
+    expect(parts.map((p) => [...p])).toEqual([
+      [5, 6, 7],
+      [40, 41],
+      [97, 98, 99],
+    ]);
+    await expect(pickRanges(opener(bytes), [{ pos: 99, len: 5 }])).rejects.toThrow(
+      UnsupportedAudio,
+    );
+  });
+});
 
 describe('the planner', () => {
   /** Units of 20 ms; `quiet` says which are silent. */
@@ -154,6 +174,8 @@ describe('cutting each container', () => {
     { name: 'tone.mp3', format: 'mp3', piece: 'mp3', quiet: false },
     { name: 'tone.aac', format: 'adts', piece: 'adts', quiet: true },
     { name: 'tone.m4a', format: 'mp4', piece: 'adts', quiet: true },
+    // A video: the AAC frames sit between video chunks, and a piece reads past them.
+    { name: 'tone-video.mp4', format: 'mp4', piece: 'adts', quiet: true },
     { name: 'tone.wav', format: 'wav', piece: 'wav', quiet: true },
   ] as const;
 
