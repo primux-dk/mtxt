@@ -241,6 +241,21 @@ describe('cutting each container', () => {
     await expect(planCut(opener(adpcm), adpcm.length, LIMITS)).rejects.toThrow(/WAV format 2/);
   });
 
+  it('refuses a damaged MP4 whose box sizes point past its bytes', async () => {
+    // ftyp, then a 16-byte moov holding an 8-byte child that claims a 64-bit size.
+    const bytes = new Uint8Array(40);
+    const v = new DataView(bytes.buffer);
+    v.setUint32(0, 16);
+    bytes.set(new TextEncoder().encode('ftypisom'), 4);
+    v.setUint32(16, 16);
+    bytes.set(new TextEncoder().encode('moov'), 20);
+    v.setUint32(24, 1);
+    bytes.set(new TextEncoder().encode('trak'), 28);
+    await expect(planCut(opener(bytes.subarray(0, 32)), 32, LIMITS)).rejects.toThrow(
+      UnsupportedAudio,
+    );
+  });
+
   it('refuses an MP3 that loses its frame sync in the middle', async () => {
     const mp3 = fixture('tone.mp3');
     const broken = new Uint8Array(mp3.length + 70_000);

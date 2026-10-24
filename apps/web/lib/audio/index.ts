@@ -87,7 +87,7 @@ async function index(format: AudioFormat, open: OpenAudio, size: number) {
 }
 
 /** Reads the file once and plans its pieces. Throws UnsupportedAudio for a file it cannot cut. */
-export async function planCut(
+async function planCutUnchecked(
   open: OpenAudio,
   size: number,
   limits: PieceLimits,
@@ -122,7 +122,7 @@ function spec(units: Units, piece: PlannedPiece, base: number[] | null, gained: 
 }
 
 /** One piece as a file of its own. `cache` keeps parsed tables between pieces of one delivery. */
-export async function buildPiece(
+async function buildPieceUnchecked(
   plan: CutPlan,
   index: number,
   open: OpenAudio,
@@ -150,4 +150,24 @@ export async function buildPiece(
       return concat([wavHeader(plan.meta as WavMeta, length), bytes!]);
     }
   }
+}
+
+/**
+ * A damaged container can send a parser past the end of its bytes (a box
+ * size that points outside the file): that is a file the cutter cannot cut,
+ * not an error worth a retry.
+ */
+function damaged(error: unknown): never {
+  if (error instanceof RangeError) throw new UnsupportedAudio('damaged container');
+  throw error;
+}
+
+/** Reads the file once and plans its pieces. Throws UnsupportedAudio for a file it cannot cut. */
+export function planCut(...args: Parameters<typeof planCutUnchecked>): Promise<CutPlan> {
+  return planCutUnchecked(...args).catch(damaged);
+}
+
+/** One piece as a file of its own. `cache` keeps parsed tables between pieces of one delivery. */
+export function buildPiece(...args: Parameters<typeof buildPieceUnchecked>): Promise<Uint8Array> {
+  return buildPieceUnchecked(...args).catch(damaged);
 }
