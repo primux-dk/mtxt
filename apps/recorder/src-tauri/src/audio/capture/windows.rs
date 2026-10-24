@@ -45,7 +45,6 @@ struct Loopback {
     channels: usize,
     kind: SampleKind,
     block_align: usize,
-    timeline: Timeline,
     scratch: Vec<f32>,
 }
 
@@ -139,7 +138,6 @@ impl Loopback {
                     channels,
                     kind,
                     block_align,
-                    timeline: Timeline::new(rate, qpc_now()),
                     scratch: Vec::new(),
                 })
             })();
@@ -152,7 +150,7 @@ impl Loopback {
     /// placed on the timeline by each packet's QPC time; zeros for a stretch
     /// with no packets. Err when the device is gone and the stream must be
     /// reopened.
-    fn drain(&mut self, sink: &mut Sink) -> Result<(), windows::core::Error> {
+    fn drain(&mut self, sink: &mut Sink, timeline: &mut Timeline) -> Result<(), windows::core::Error> {
         let mut got = false;
         unsafe {
             loop {
@@ -167,7 +165,7 @@ impl Loopback {
                 self.capture.GetBuffer(&mut data, &mut frames, &mut flags, None, Some(&mut qpc))?;
                 if frames > 0 {
                     let stamped = flags & (AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR.0 as u32) == 0 && qpc > 0;
-                    let place = self.timeline.packet(stamped.then_some(qpc), u64::from(frames));
+                    let place = timeline.packet(stamped.then_some(qpc), u64::from(frames));
                     push_silence(sink, place.zeros as usize);
                     let skip = place.skip as usize;
                     let keep = frames as usize - skip;
@@ -183,7 +181,7 @@ impl Loopback {
             }
         }
         if !got {
-            push_silence(sink, self.timeline.silence(qpc_now()) as usize);
+            push_silence(sink, timeline.silence(qpc_now()) as usize);
         }
         Ok(())
     }
@@ -229,11 +227,19 @@ pub fn start(sink: Sink) -> Result<Box<dyn Capture>, CaptureError> {
                 }
             };
             let _ = ready_tx.send(Ok(shared.clone()));
+            // One clock for the whole recording, across device changes and
+            // Lost stretches: QPC is the system's, not the device's. While no
+            // device is open the ring still gets its silence, so the mixer's
+            // queue stays full and recovered sound is not written early.
+            let mut timeline = Timeline::new(shared.rate(), qpc_now());
             let mut last_watch = Instant::now();
             let mut watch_now = false;
             while let Err(mpsc::RecvTimeoutError::Timeout) = stop_rx.recv_timeout(POLL) {
+                if stream.is_none() {
+                    push_silence(&mut sink, timeline.silence(qpc_now()) as usize);
+                }
                 if let Some(s) = stream.as_mut() {
-                    if let Err(e) = s.drain(&mut sink) {
+                    if let Err(e) = s.drain(&mut sink, &mut timeline) {
                         if e.code() == AUDCLNT_E_DEVICE_INVALIDATED {
                             log::info!("system audio: the output device went away");
                         } else {
@@ -258,6 +264,7 @@ pub fn start(sink: Sink) -> Result<Box<dyn Capture>, CaptureError> {
                     Ok(s) => {
                         log::info!("system audio: now on {:?} at {} Hz", s.device_id, s.rate);
                         shared.set_rate(s.rate);
+                        timeline.set_rate(s.rate);
                         shared.set_state(SourceState::On);
                         stream = Some(s);
                     }

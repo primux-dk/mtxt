@@ -120,6 +120,11 @@ impl Timeline {
         Timeline { rate: u64::from(rate.max(1)), next: now }
     }
 
+    /// A reopened device can bring another rate; the clock carries on.
+    pub fn set_rate(&mut self, rate: u32) {
+        self.rate = u64::from(rate.max(1));
+    }
+
     fn frames(&self, ticks: u64) -> u64 {
         ticks * self.rate / TICKS
     }
@@ -266,5 +271,19 @@ mod tests {
         assert_eq!(t.packet(Some(0), 480), Place { zeros: 0, skip: 0 });
         assert_eq!(t.packet(None, 480), Place { zeros: 0, skip: 0 });
         assert_eq!(t.packet(Some(20 * MS), 480), Place { zeros: 0, skip: 0 });
+    }
+
+    #[test]
+    fn a_lost_device_keeps_the_clock() {
+        // Sound for 100 ms, then the device is gone for 2 s (the thread fills
+        // silence every 10 ms), then a new device at 44.1 kHz delivers sound.
+        let mut t = Timeline::new(48_000, 0);
+        assert_eq!(t.packet(Some(0), 4_800), Place { zeros: 0, skip: 0 });
+        let quiet: u64 = (1..=210).map(|i| t.silence(i * 10 * MS)).sum();
+        assert_eq!(quiet, 48 * (2_100 - 50 - 100));
+        t.set_rate(44_100);
+        // The first packet of the new device starts at 2,080 ms: only the
+        // 30 ms not yet filled are zeros, at the new rate.
+        assert_eq!(t.packet(Some(2_080 * MS), 441), Place { zeros: 1_323, skip: 0 });
     }
 }
