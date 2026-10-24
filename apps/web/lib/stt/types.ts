@@ -87,10 +87,11 @@ export interface PieceInput {
  * A synchronous provider with a size ceiling can take a long recording in
  * pieces (docs/decisions.md, packet 18): the job cuts the file under
  * `limits`, sends the pieces one by one and stitches the results. A file
- * up to `wholeMaxBytes` still goes whole through `submit`.
+ * up to `wholeMaxBytes` and `wholeMaxMs` still goes whole through `submit`;
+ * so does a shorter one the cutter cannot read.
  */
 export interface PiecedTranscription {
-  limits: PieceLimits & { wholeMaxBytes: number };
+  limits: PieceLimits & { wholeMaxBytes: number; wholeMaxMs: number };
   /** The piece's result, its times from the piece's own start. */
   transcribePiece(input: PieceInput): Promise<SttResult>;
 }

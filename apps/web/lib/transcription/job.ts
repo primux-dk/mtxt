@@ -191,8 +191,13 @@ export async function runTranscribe(
     if (!taken) return await held();
     claim = { transcriptId: taken.id, token: taken.claimToken, provider: id };
     await markTranscribing(db, installId, recordingId);
-    if (provider.pieces && rec.sizeBytes > provider.pieces.limits.wholeMaxBytes) {
-      // Over the provider's ceiling: in pieces, resumed where an earlier delivery stopped.
+    const limits = provider.pieces?.limits;
+    if (
+      provider.pieces &&
+      limits &&
+      (rec.sizeBytes > limits.wholeMaxBytes || rec.durationS * 1000 > limits.wholeMaxMs)
+    ) {
+      // Over the provider's ceiling, or long: in pieces, resumed where an earlier delivery stopped.
       const outcome = await runPieces({
         deps,
         recording: rec,
@@ -205,8 +210,9 @@ export async function runTranscribe(
         call: id,
       });
       if (outcome.kind === 'lost') log.log('Another delivery took the transcript', recordingId);
-      if (outcome.kind !== 'done') return;
-      return await complete(outcome.result, { rawPath: outcome.rawPath });
+      if (outcome.kind === 'done')
+        return await complete(outcome.result, { rawPath: outcome.rawPath });
+      if (outcome.kind !== 'whole') return;
     }
     const submitted = await provider.submit({
       recordingId,

@@ -19,6 +19,7 @@ import { INSTALL, seedRecording, testDb } from './sqlite-db';
 const AUDIO = new Uint8Array(readFileSync(join(__dirname, 'fixtures/audio/chrome.webm')));
 const LIMITS = {
   wholeMaxBytes: 20_000,
+  wholeMaxMs: 60 * 60_000,
   maxBytes: 30_000,
   maxMs: 6_000,
   overlapMs: 500,
@@ -257,6 +258,37 @@ describe('a recording in pieces', () => {
     expect(w.calls).toHaveLength(0);
   });
 
+  it('a long recording under the byte ceiling goes in pieces too', async () => {
+    const h = harness();
+    ctx.raw.exec(`UPDATE recordings SET size_bytes = 10000, duration_s = 14`);
+    const w = whisper();
+    const provider = {
+      ...w.provider,
+      pieces: { ...w.provider.pieces!, limits: { ...LIMITS, wholeMaxMs: 10_000 } },
+    };
+    await runTranscribe(deps(h, provider), 'rec-1', 1);
+    expect(row()).toMatchObject({ status: 'done', chunks_total: 3, chunks_done: 3 });
+  });
+
+  it('a long recording under the byte ceiling that cannot be cut still goes whole', async () => {
+    const flac = new TextEncoder().encode('fLaC'.padEnd(10_000, '\0'));
+    const h = harness(flac);
+    ctx.raw.exec(`UPDATE recordings SET size_bytes = ${flac.byteLength}, duration_s = 3600`);
+    const w = whisper();
+    const submit = vi.fn(async () => ({
+      kind: 'done' as const,
+      result: await w.transcribePiece({
+        audio: AUDIO,
+        contentType: 'audio/webm',
+        language: 'da',
+        keyterms: [],
+      }),
+    }));
+    await runTranscribe(deps(h, { ...w.provider, submit }), 'rec-1', 1);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(row()).toMatchObject({ status: 'done', chunks_total: null });
+  });
+
   it('a recording under the ceiling still goes whole', async () => {
     const h = harness();
     ctx.raw.exec(`UPDATE recordings SET size_bytes = 10000`);
@@ -305,6 +337,7 @@ describe('a recording in pieces', () => {
 
   it('the Workers AI limits leave room in a Worker: pieces under 12 MiB, files up to 25 MiB whole', () => {
     expect(WHISPER_PIECE_LIMITS.wholeMaxBytes).toBe(25 * 1024 * 1024);
+    expect(WHISPER_PIECE_LIMITS.wholeMaxMs).toBe(15 * 60_000);
     expect(WHISPER_PIECE_LIMITS.maxBytes).toBe(12 * 1024 * 1024);
     // A piece, its base64 copy and a request body of the same size stay under 128 MB.
     expect(WHISPER_PIECE_LIMITS.maxBytes * (1 + 4 / 3 + 4 / 3)).toBeLessThan(64 * 1024 * 1024);

@@ -40,6 +40,8 @@ export interface StoredPiece extends StitchPiece {
 
 export type PiecesOutcome =
   | { kind: 'done'; result: SttResult; rawPath: string }
+  /** Under the byte ceiling and one piece after all, or a container the cutter cannot read: send it whole. */
+  | { kind: 'whole' }
   /** Queued again to carry on, or the claim was lost to another delivery. */
   | { kind: 'continued' }
   | { kind: 'lost' };
@@ -93,9 +95,15 @@ export async function runPieces(run: PiecesRun): Promise<PiecesOutcome> {
     const stale = prefix ? recordCleanup(db, installId, cleanupEntries([prefix])) : null;
     if (stale) await stale;
     const began = Date.now();
-    plan = await planCut(open, recording.sizeBytes, run.pieces.limits).catch((error) => {
+    const fits = recording.sizeBytes <= run.pieces.limits.wholeMaxBytes;
+    try {
+      plan = await planCut(open, recording.sizeBytes, run.pieces.limits);
+    } catch (error) {
+      // Long but under the ceiling: what went whole before packet 18 still can.
+      if (fits && error instanceof UnsupportedAudio) return { kind: 'whole' };
       throw unsplittable(error);
-    });
+    }
+    if (fits && plan.pieces.length === 1) return { kind: 'whole' };
     prefix = piecePrefix(installId, recording.id, claim.provider, claim.token);
     await storage.put(planKey(prefix), JSON.stringify(plan), { contentType: 'application/json' });
     const planned = await db

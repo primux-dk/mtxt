@@ -31,6 +31,9 @@ export const WHISPER_MAX_BYTES = 25 * 1024 * 1024;
  */
 export const WHISPER_PIECE_LIMITS: PiecedTranscription['limits'] = {
   wholeMaxBytes: WHISPER_MAX_BYTES,
+  // A long recording under 25 MiB (70 minutes from the desktop recorder is 21 MB) goes in
+  // pieces too, for the progress line and a retry per piece (decided 2026-10-24).
+  wholeMaxMs: 15 * 60_000,
   maxBytes: 12 * 1024 * 1024,
   maxMs: 15 * 60_000,
   overlapMs: 3_000,
