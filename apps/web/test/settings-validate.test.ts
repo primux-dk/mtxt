@@ -249,7 +249,7 @@ describe('validateSettings', () => {
     expect(errorsOf(form({ recordingSources: null })).recordingSources).toEqual({
       code: 'atLeastOneSource',
     });
-    // Teams and Meet pickup are out of the product: a stale form value is dropped like any other.
+    // Teams and Meet are no longer recording sources: a stale form value is dropped like any other.
     expect(errorsOf(form({ recordingSources: ['meet', 'teams'] })).recordingSources).toEqual({
       code: 'atLeastOneSource',
     });

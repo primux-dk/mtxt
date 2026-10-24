@@ -27,8 +27,8 @@ import {
 export const VISIBILITIES = ['private', 'shared', 'company'] as const;
 export const RECORDING_SOURCES = ['desktop', 'browser', 'upload', 'device'] as const;
 /**
- * The values the recordings CHECK still allows. Teams and Meet pickup were
- * taken out of the product (docs/decisions.md, 2026-10-23); dropping them
+ * The values the recordings CHECK still allows. Teams and Meet stopped being
+ * recording sources (docs/decisions.md, 2026-10-23); dropping them
  * from the CHECK would rebuild the table, and a D1 rebuild cascades. No
  * row ever held either, and the app writes only RECORDING_SOURCES.
  */

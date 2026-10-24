@@ -4,7 +4,7 @@ Meeting transcription a company hosts itself. A small recorder on each employee'
 
 Meetings only. No dictation.
 
-**Status: the v0.1 library runs; MCP is not built yet.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search, outbound webhooks and a REST API with personal API tokens. The MCP server comes next and wraps that API. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the recorder builds for macOS and, unsigned and not yet tried on a real machine, for Windows. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
+**Status: the v0.1 library and the MCP server run.** The library works end to end: company login, upload, the browser recorder, transcription with AssemblyAI (EU) or Workers AI Whisper, keyterms, speakers, the recap editor with versions and export, private and shared meetings, retention, the audit log, search, outbound webhooks, a REST API with personal API tokens, and an MCP server over that API with its own OAuth. The deploy tooling creates and updates an install in a company's own Cloudflare account, and the recorder builds for macOS and, unsigned and not yet tried on a real machine, for Windows. The author's own install runs at `app.mtxt.co`. The spec is in [docs/spec.md](docs/spec.md), the decisions behind it in [docs/decisions.md](docs/decisions.md). Every install runs in the owning company's own cloud account; nobody hosts it for anyone else.
 
 ## What it does
 
@@ -17,7 +17,7 @@ Meetings only. No dictation.
 7. **Speakers.** Diarization, renaming, and labels that can link to a colleague in the directory.
 8. **Recap.** The AI drafts it from a template; the owner finishes it in a Notion-style editor inside the platform. Markdown stored, a version per save, AI text and human edits told apart. Decisions are a checklist with an owner and a due date: the draft fills in the date when the meeting said one ("på torsdag", "by Friday"), and the owner sets or clears it on the item. Export markdown and docx.
 9. **Private and shared.** Each meeting is private, shared with named colleagues, or company-wide. Search and MCP respect it.
-10. **Retention, audit, MCP.** Delete after N days per install with a keep flag per meeting. A log of who opened what. An MCP server with the same company login, scoped to what the user may see, with read and write tools.
+10. **Retention, audit, MCP.** Delete after N days per install with a keep flag per meeting. A log of who opened what. An MCP server with the same company login, scoped to what the user may see, with read and write tools (see [MCP](#mcp)).
 
 ## Stack
 
@@ -145,6 +145,31 @@ curl -s -o recap.docx "$MTXT/api/v1/meetings/$ID/recap?format=docx" -H "Authoriz
 | `DELETE /api/v1/meetings/{id}/shares/{userId}` | `read_write` | Remove a reader                                                                                      |
 
 60 requests a minute per token; the 61st is 429 with `Retry-After`. Every GET answers with an `ETag`; send it back as `If-None-Match` for a 304 when nothing changed. Each read of one meeting through the API is in the audit log with the token's name.
+
+## MCP
+
+An employee's AI tool reads, and with permission writes, the meetings that employee may see, through the install's MCP server. It signs in with the company login; there is no service account. An admin turns it on under Settings, Sharing and retention, "MCP server"; it is off on a new install.
+
+The address is the install's hostname with `/mcp`, for example `https://meetings.example.com/mcp`. Add it as a remote MCP server:
+
+- **Claude and Claude Desktop:** Settings, Connectors, Add custom connector, paste the address.
+- **Claude Code:** `claude mcp add --transport http mtxt https://meetings.example.com/mcp`, then `/mcp` to sign in.
+- **ChatGPT:** Settings, Apps and connectors, Create, paste the address and choose OAuth.
+- **Cursor:** Settings, MCP, Add a custom MCP server, with the address as its `url`.
+
+The tool opens the install's own sign-in page in the browser: the company login, then "Connect <tool> to <product>?", where the employee picks **Read only** or **Read and write** and approves. The connection shows under API tokens in the employee's menu, marked MCP, and Revoke there ends it at once.
+
+| Tool             | REST call                                   | What it does                                                                 |
+| ---------------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
+| `list_meetings`  | `GET /api/v1/meetings`                      | Meetings the user may read, newest first; `view`, `q`, `status`, `since`      |
+| `get_transcript` | `GET /api/v1/meetings/{id}/transcript`      | The transcript as text (default) or JSON                                     |
+| `get_minutes`    | `GET /api/v1/meetings/{id}/recap`           | The minutes as JSON (body, version, decisions) or markdown                   |
+| `search`         | `GET /api/v1/search`                        | Titles, transcripts and minutes, best match first                            |
+| `save_minutes`   | `PUT /api/v1/meetings/{id}/recap`           | Save a new version on the version it read; Read and write only               |
+| `set_visibility` | `PATCH /api/v1/meetings/{id}`               | Private, shared or company, on the user's own meeting; Read and write only   |
+| `share`          | `POST` or `DELETE /api/v1/meetings/{id}/shares` | Add or remove a reader of the user's own Shared meeting; Read and write only |
+
+Each tool runs the REST API's own handler, so it sees exactly what the API lets the user see: other people's private meetings never appear. Reads of a transcript or the minutes, and every write, are in the audit log with `via: mcp` and the tool's name. Under the hood it is OAuth 2.1 with PKCE and dynamic client registration (RFC 9728 and RFC 8414 metadata at `/.well-known/`); the details are in [docs/spec.md](docs/spec.md#mcp).
 
 ## Deploy
 

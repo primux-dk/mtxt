@@ -25,7 +25,7 @@ export async function readSettings(db: Db, installId: string): Promise<Settings>
     themeAccent: HEX.test(value.themeAccent) ? value.themeAccent : DEFAULT_SETTINGS.themeAccent,
     themePrimary: HEX.test(value.themePrimary) ? value.themePrimary : DEFAULT_SETTINGS.themePrimary,
     adminEmails: Array.isArray(value.adminEmails) ? value.adminEmails : [],
-    // A row saved before Teams and Meet pickup were removed may still name them.
+    // A row saved while Teams and Meet were sources may still name them.
     recordingSources: Array.isArray(value.recordingSources)
       ? value.recordingSources.filter((s) => (CAPTURE_SOURCES as readonly string[]).includes(s))
       : [],
