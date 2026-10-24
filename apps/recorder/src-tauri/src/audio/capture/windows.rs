@@ -15,13 +15,13 @@
 //! plays, the recorder included; the recorder plays nothing, so unlike the
 //! macOS tap it does not exclude its own process.
 
-use super::loopback::{push_bytes, push_silence, SampleKind, SilenceFill};
+use super::loopback::{push_bytes, push_silence, SampleKind, Timeline, TICKS};
 use super::{Capture, CaptureError, Sink, SourceShared, SourceState, ThreadCapture, WATCH_EVERY};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use windows::Win32::Media::Audio::{
     eConsole, eRender, IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
-    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_E_DEVICE_INVALIDATED, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR, AUDCLNT_E_DEVICE_INVALIDATED, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
     WAVEFORMATEX, WAVEFORMATEXTENSIBLE,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
@@ -29,6 +29,7 @@ use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
 };
+use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 
 /// How often the thread drains the capture buffer.
 const POLL: Duration = Duration::from_millis(10);
@@ -44,7 +45,7 @@ struct Loopback {
     channels: usize,
     kind: SampleKind,
     block_align: usize,
-    fill: SilenceFill,
+    timeline: Timeline,
     scratch: Vec<f32>,
 }
 
@@ -65,6 +66,19 @@ impl Drop for ComThread {
             unsafe { CoUninitialize() };
         }
     }
+}
+
+/// The performance counter now, in the 100 ns units WASAPI stamps packets with.
+fn qpc_now() -> u64 {
+    let (mut count, mut freq) = (0i64, 0i64);
+    unsafe {
+        let _ = QueryPerformanceCounter(&mut count);
+        let _ = QueryPerformanceFrequency(&mut freq);
+    }
+    if freq <= 0 {
+        return 0;
+    }
+    (count as u128 * u128::from(TICKS) / freq as u128) as u64
 }
 
 fn other(what: &str, e: windows::core::Error) -> CaptureError {
@@ -125,7 +139,7 @@ impl Loopback {
                     channels,
                     kind,
                     block_align,
-                    fill: SilenceFill::new(rate, Instant::now()),
+                    timeline: Timeline::new(rate, qpc_now()),
                     scratch: Vec::new(),
                 })
             })();
@@ -134,8 +148,10 @@ impl Loopback {
         }
     }
 
-    /// Everything the device has captured since the last poll, into the ring.
-    /// Err when the device is gone and the stream must be reopened.
+    /// Everything the device has captured since the last poll, into the ring,
+    /// placed on the timeline by each packet's QPC time; zeros for a stretch
+    /// with no packets. Err when the device is gone and the stream must be
+    /// reopened.
     fn drain(&mut self, sink: &mut Sink) -> Result<(), windows::core::Error> {
         let mut got = false;
         unsafe {
@@ -147,25 +163,27 @@ impl Loopback {
                 let mut data: *mut u8 = std::ptr::null_mut();
                 let mut frames = 0u32;
                 let mut flags = 0u32;
-                self.capture.GetBuffer(&mut data, &mut frames, &mut flags, None, None)?;
+                let mut qpc = 0u64;
+                self.capture.GetBuffer(&mut data, &mut frames, &mut flags, None, Some(&mut qpc))?;
                 if frames > 0 {
+                    let stamped = flags & (AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR.0 as u32) == 0 && qpc > 0;
+                    let place = self.timeline.packet(stamped.then_some(qpc), u64::from(frames));
+                    push_silence(sink, place.zeros as usize);
+                    let skip = place.skip as usize;
+                    let keep = frames as usize - skip;
                     if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 || data.is_null() {
-                        push_silence(sink, frames as usize);
-                    } else {
+                        push_silence(sink, keep);
+                    } else if keep > 0 {
                         let bytes = std::slice::from_raw_parts(data, frames as usize * self.block_align);
-                        push_bytes(sink, bytes, self.kind, self.channels, &mut self.scratch);
+                        push_bytes(sink, &bytes[skip * self.block_align..], self.kind, self.channels, &mut self.scratch);
                     }
-                    self.fill.packet(u64::from(frames), Instant::now());
                     got = true;
                 }
                 self.capture.ReleaseBuffer(frames)?;
             }
         }
         if !got {
-            let owed = self.fill.owed(Instant::now());
-            if owed > 0 {
-                push_silence(sink, owed as usize);
-            }
+            push_silence(sink, self.timeline.silence(qpc_now()) as usize);
         }
         Ok(())
     }
@@ -195,16 +213,22 @@ pub fn start(sink: Sink) -> Result<Box<dyn Capture>, CaptureError> {
                     return;
                 }
             };
-            let stream = match Loopback::open(&en) {
-                Ok(l) => l,
+            // No output device yet, or one in a format we cannot read: the
+            // source starts Lost and the watch below keeps trying, so a
+            // headset plugged in later still brings system audio in.
+            let (mut stream, shared) = match Loopback::open(&en) {
+                Ok(l) => {
+                    let shared = SourceShared::new(l.rate);
+                    (Some(l), shared)
+                }
                 Err(e) => {
-                    let _ = ready_tx.send(Err(e));
-                    return;
+                    log::warn!("system audio: no loopback at the start ({e}); trying again every second");
+                    let shared = SourceShared::new(48_000);
+                    shared.set_state(SourceState::Lost);
+                    (None, shared)
                 }
             };
-            let shared = SourceShared::new(stream.rate);
             let _ = ready_tx.send(Ok(shared.clone()));
-            let mut stream = Some(stream);
             let mut last_watch = Instant::now();
             let mut watch_now = false;
             while let Err(mpsc::RecvTimeoutError::Timeout) = stop_rx.recv_timeout(POLL) {

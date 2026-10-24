@@ -465,7 +465,8 @@ mod tests {
     impl FrameSink for FullDisk {
         fn write_frame(&mut self, _: &[f32]) -> std::io::Result<()> {
             if self.written.load(Ordering::SeqCst) as usize >= self.ok_frames {
-                return Err(std::io::Error::from_raw_os_error(28));
+                // Not OS error 28: Windows calls 28 "the printer is out of paper".
+                return Err(std::io::Error::new(std::io::ErrorKind::StorageFull, "No space left on device"));
             }
             self.written.fetch_add(1, Ordering::SeqCst);
             Ok(())
@@ -524,7 +525,7 @@ mod tests {
         // The mixer ends by itself; nobody pressed Stop.
         let err = handle.join().unwrap().unwrap_err();
         assert!(t.elapsed() < Duration::from_secs(3));
-        assert_eq!(err.raw_os_error(), Some(28));
+        assert_eq!(err.kind(), std::io::ErrorKind::StorageFull);
         assert_eq!(written.load(Ordering::SeqCst), 5);
         assert!(shared.failure().unwrap().contains("No space left on device"));
         assert!(!stop.load(Ordering::SeqCst));

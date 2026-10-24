@@ -5,14 +5,15 @@
 //! Loopback delivers no packets while nothing plays. Left alone, the ring
 //! would run dry, the mixer would pad its own silence, and when sound came
 //! back it would be written up to 200 ms early against the microphone (the
-//! mixer's latency, gone from the queue). `SilenceFill` keeps the source on
-//! the wall clock instead: when no packet has come for a while, it owes the
-//! ring the frames that time covered, as zeros.
+//! mixer's latency, gone from the queue). `Timeline` keeps the source on one
+//! clock instead: each packet carries the QPC time of its first frame, so a
+//! gap between packets becomes zeros, an overlap is cut, and a stretch with no
+//! packets is filled up to a little before now. Times are in 100 ns units,
+//! the unit WASAPI gives the QPC position in.
 
 #![cfg_attr(not(target_os = "windows"), allow(dead_code))]
 
 use super::{push_mono, Sink};
-use std::time::{Duration, Instant};
 
 /// How each sample of the mix format is stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,42 +88,70 @@ pub fn push_silence(sink: &mut Sink, frames: usize) {
     }
 }
 
-/// Keeps a loopback source on the wall clock across silence.
-#[derive(Debug, Clone)]
-pub struct SilenceFill {
-    rate: u32,
-    /// When the last packet came, and the frame count right after it.
-    anchor: Instant,
-    anchor_frames: u64,
-    delivered: u64,
+/// 100 ns units per second.
+pub const TICKS: u64 = 10_000_000;
+/// A gap or an overlap smaller than this is rounding, not time.
+pub const SLACK: u64 = TICKS / 500; // 2 ms
+/// Silence is filled up to this far behind now. A packet arrives one device
+/// period (about 10 ms) after its first frame; filling closer to now would
+/// write zeros over sound that is on its way.
+pub const FILL_LAG: u64 = TICKS / 20; // 50 ms
+
+/// What a packet needs before it goes into the ring.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Place {
+    /// Zeros for the gap before it.
+    pub zeros: u64,
+    /// Frames at its start that are already covered.
+    pub skip: u64,
 }
 
-/// Packets come every device period (about 10 ms); longer than this without
-/// one is silence.
-pub const QUIET_AFTER: Duration = Duration::from_millis(30);
+/// The source's position on the QPC clock: the time just after the last
+/// frame that went into the ring.
+#[derive(Debug, Clone)]
+pub struct Timeline {
+    rate: u64,
+    next: u64,
+}
 
-impl SilenceFill {
-    pub fn new(rate: u32, now: Instant) -> SilenceFill {
-        SilenceFill { rate: rate.max(1), anchor: now, anchor_frames: 0, delivered: 0 }
+impl Timeline {
+    /// The stream opened at `now`: the ring is owed sound from then on.
+    pub fn new(rate: u32, now: u64) -> Timeline {
+        Timeline { rate: u64::from(rate.max(1)), next: now }
     }
 
-    /// A packet of `frames` went into the ring at `now`.
-    pub fn packet(&mut self, frames: u64, now: Instant) {
-        self.delivered += frames;
-        self.anchor = now;
-        self.anchor_frames = self.delivered;
+    fn frames(&self, ticks: u64) -> u64 {
+        ticks * self.rate / TICKS
     }
 
-    /// Frames of silence the ring is owed at `now`, counted as delivered.
-    pub fn owed(&mut self, now: Instant) -> u64 {
-        let since = now.saturating_duration_since(self.anchor);
-        if since < QUIET_AFTER {
+    fn ticks(&self, frames: u64) -> u64 {
+        frames * TICKS / self.rate
+    }
+
+    /// A packet of `frames` whose first frame is at `at`. Without a usable
+    /// timestamp (`None`), it follows the last frame.
+    pub fn packet(&mut self, at: Option<u64>, frames: u64) -> Place {
+        let at = at.unwrap_or(self.next);
+        let mut place = Place { zeros: 0, skip: 0 };
+        if at > self.next + SLACK {
+            place.zeros = self.frames(at - self.next);
+        } else if at + SLACK < self.next {
+            place.skip = self.frames(self.next - at).min(frames);
+        }
+        self.next = self.next.max(at + self.ticks(frames));
+        place
+    }
+
+    /// Zeros owed at `now` for a stretch without packets, up to `FILL_LAG`
+    /// behind now.
+    pub fn silence(&mut self, now: u64) -> u64 {
+        let until = now.saturating_sub(FILL_LAG);
+        if until <= self.next + SLACK {
             return 0;
         }
-        let expected = self.anchor_frames + (since.as_secs_f64() * f64::from(self.rate)) as u64;
-        let owed = expected.saturating_sub(self.delivered);
-        self.delivered += owed;
-        owed
+        let zeros = self.frames(until - self.next);
+        self.next += self.ticks(zeros);
+        zeros
     }
 }
 
@@ -167,32 +196,75 @@ mod tests {
         assert_eq!(c.slots(), 1_234);
     }
 
-    #[test]
-    fn silence_is_owed_only_after_a_quiet_stretch() {
-        let t0 = Instant::now();
-        let mut f = SilenceFill::new(48_000, t0);
-        f.packet(480, t0);
-        // Packets every 10 ms: nothing owed.
-        assert_eq!(f.owed(t0 + Duration::from_millis(10)), 0);
-        f.packet(480, t0 + Duration::from_millis(10));
-        // 100 ms of nothing after the last packet: 100 ms of zeros.
-        assert_eq!(f.owed(t0 + Duration::from_millis(110)), 4_800);
-        // Asked again 10 ms later: only the new 10 ms.
-        assert_eq!(f.owed(t0 + Duration::from_millis(120)), 480);
-        // Sound comes back; the count carries on from the zeros.
-        f.packet(480, t0 + Duration::from_millis(125));
-        assert_eq!(f.owed(t0 + Duration::from_millis(130)), 0);
-        assert_eq!(f.delivered, 480 * 3 + 4_800 + 480);
+    const MS: u64 = TICKS / 1000;
+
+    /// Feed packets and quiet polls; count the frames that reach the ring.
+    fn run(t: &mut Timeline, steps: &[(u64, Option<(u64, u64)>)]) -> u64 {
+        let mut total = 0;
+        for &(now, packet) in steps {
+            match packet {
+                Some((at, frames)) => {
+                    let p = t.packet(Some(at), frames);
+                    total += p.zeros + frames - p.skip;
+                }
+                None => total += t.silence(now),
+            }
+        }
+        total
     }
 
     #[test]
-    fn the_count_restarts_at_each_packet() {
-        let t0 = Instant::now();
-        let mut f = SilenceFill::new(48_000, t0);
-        // A packet larger than the time since the start: the count follows the
-        // packet, and silence is owed only for time after it.
-        f.packet(48_000, t0 + Duration::from_millis(500));
-        assert_eq!(f.owed(t0 + Duration::from_millis(520)), 0);
-        assert!(f.owed(t0 + Duration::from_millis(600)) > 0);
+    fn continuous_packets_are_written_once() {
+        // 40 ms packets back to back for a second, arriving 10 ms after their
+        // end, with the 10 ms polls between them finding nothing.
+        let mut t = Timeline::new(48_000, 0);
+        let mut steps = Vec::new();
+        for i in 0..25 {
+            let at = i * 40 * MS;
+            steps.push((at + 50 * MS, Some((at, 1_920))));
+            for q in 1..4 {
+                steps.push((at + 50 * MS + q * 10 * MS, None));
+            }
+        }
+        assert_eq!(run(&mut t, &steps), 48_000);
+    }
+
+    #[test]
+    fn short_packets_with_gaps_between_them_fill_the_gaps() {
+        // 10 ms of sound, 20 ms of nothing, for 300 ms: 300 ms of frames.
+        let mut t = Timeline::new(48_000, 0);
+        let mut steps = Vec::new();
+        for i in 0..10 {
+            let at = i * 30 * MS;
+            steps.push((at + 15 * MS, Some((at, 480))));
+            steps.push((at + 25 * MS, None));
+        }
+        // The last gap, after the last packet, is owed once its time has passed.
+        steps.push((300 * MS + FILL_LAG, None));
+        assert_eq!(run(&mut t, &steps), 14_400);
+    }
+
+    #[test]
+    fn silence_then_sound_lines_up() {
+        let mut t = Timeline::new(48_000, 0);
+        // Nothing for a second, polled every 10 ms: filled up to 50 ms behind now.
+        let quiet: u64 = (1..=100).map(|i| t.silence(i * 10 * MS)).sum();
+        assert_eq!(quiet, 48_000 - 2_400);
+        // Sound starts at 980 ms, inside the 50 ms not filled yet: only the gap
+        // before it is zeros, nothing of the sound is cut.
+        let p = t.packet(Some(980 * MS), 480);
+        assert_eq!(p, Place { zeros: 1_440, skip: 0 });
+        // A packet that starts inside what was filled loses only the overlap.
+        let mut t = Timeline::new(48_000, 0);
+        t.silence(1_000 * MS);
+        assert_eq!(t.packet(Some(940 * MS), 960), Place { zeros: 0, skip: 480 });
+    }
+
+    #[test]
+    fn a_packet_without_a_timestamp_follows_the_last_frame() {
+        let mut t = Timeline::new(48_000, 0);
+        assert_eq!(t.packet(Some(0), 480), Place { zeros: 0, skip: 0 });
+        assert_eq!(t.packet(None, 480), Place { zeros: 0, skip: 0 });
+        assert_eq!(t.packet(Some(20 * MS), 480), Place { zeros: 0, skip: 0 });
     }
 }
