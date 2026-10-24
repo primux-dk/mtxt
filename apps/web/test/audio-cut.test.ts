@@ -256,6 +256,13 @@ describe('cutting each container', () => {
     );
   });
 
+  it('refuses an M4A whose audio track has no mdhd box', async () => {
+    const m4a = fixture('tone.m4a').slice();
+    const at = Buffer.from(m4a).indexOf('mdhd');
+    m4a.set(new TextEncoder().encode('free'), at);
+    await expect(planCut(opener(m4a), m4a.length, LIMITS)).rejects.toThrow(UnsupportedAudio);
+  });
+
   it('refuses an MP3 that loses its frame sync in the middle', async () => {
     const mp3 = fixture('tone.mp3');
     const broken = new Uint8Array(mp3.length + 70_000);

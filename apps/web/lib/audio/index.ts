@@ -154,11 +154,14 @@ async function buildPieceUnchecked(
 
 /**
  * A damaged container can send a parser past the end of its bytes (a box
- * size that points outside the file): that is a file the cutter cannot cut,
- * not an error worth a retry.
+ * size that points outside the file) or to a box it lacks: that is a file
+ * the cutter cannot cut, not an error worth a retry. Storage errors are
+ * neither, and stay retryable.
  */
 function damaged(error: unknown): never {
-  if (error instanceof RangeError) throw new UnsupportedAudio('damaged container');
+  if (error instanceof RangeError || error instanceof TypeError) {
+    throw new UnsupportedAudio('damaged container');
+  }
   throw error;
 }
 

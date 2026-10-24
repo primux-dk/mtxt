@@ -156,7 +156,8 @@ function sampleTable(moov: Uint8Array, trakIndex?: number) {
     const mdia = child(moov, trak.start, trak.end, 'mdia');
     const hdlr = mdia && child(moov, mdia.start, mdia.end, 'hdlr');
     if (!mdia || !hdlr || ascii(moov, hdlr.start + 8) !== 'soun') continue;
-    const mdhd = child(moov, mdia.start, mdia.end, 'mdhd')!;
+    const mdhd = child(moov, mdia.start, mdia.end, 'mdhd');
+    if (!mdhd) throw new UnsupportedAudio('MP4 audio without mdhd');
     const mv = view(moov);
     const timescale = mv.getUint32(mdhd.start + (moov[mdhd.start] === 1 ? 20 : 12));
     const minf = child(moov, mdia.start, mdia.end, 'minf');
