@@ -181,7 +181,8 @@ impl Store {
         let tmp = parent.join(format!(".{name}.{}.part", uuid::Uuid::new_v4()));
         let result = (|| {
             fs::copy(&src, &tmp).map_err(io)?;
-            fs::File::open(&tmp).and_then(|f| f.sync_all()).map_err(io)?;
+            // Opened for writing: Windows flushes only a handle with write access.
+            fs::OpenOptions::new().write(true).open(&tmp).and_then(|f| f.sync_all()).map_err(io)?;
             let (copy_hash, _) = hash_file(&tmp).map_err(io)?;
             if copy_hash != source_hash {
                 return Err(ExportError::Mismatch);
