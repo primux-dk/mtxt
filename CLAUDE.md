@@ -39,6 +39,6 @@ Kristian's setup for this project, 2026-10-22: a **Fable 5.1 (1M, high)** thread
 ## Working
 
 - Node 22 and pnpm are on agent-server; wrangler runs locally with `wrangler dev`. Deploys to any Cloudflare account wait for Kristian's go.
-- Branch work on agent-server goes in a worktree under `/srv/work/mtxt-<name>`, never in `/srv/work/primux/mtxt` itself.
+- Branch work on agent-server goes in a worktree under `/srv/work/primux/mtxt-worktrees/<name>`, never in `/srv/work/primux/mtxt` itself.
 - Deploys to any Cloudflare account and anything a client sees wait for Kristian's explicit go, per action.
 - **Standing go, given 2026-10-22, extended the same day.** The lead runs the packets end to end: a draft PR with its artifact per packet, a Codex review, the fixes, then the lead merges and starts the next packet without asking. It covers deploys of the author's own install to the Primux Cloudflare account (`app.mtxt.co`) as well, and it covers the recorder: `apps/recorder` is built in the same run, as a bb thread on Kristian's Mac because macOS capture and signing need a Mac. Kristian reviews the whole platform once library and recorder work end to end. Customer accounts and anything a customer sees still wait for his go.
